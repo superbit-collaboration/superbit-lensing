@@ -35,18 +35,18 @@ run_name:         'nfw_only'   # Root for exposure name creation           []
 # Simulated cluster parameters
 # ----------------------------
 lam:                475         # Fiducial wavelength for abberations       [nm]
-mass:               7.8e14      # Cluster mass                              [Msol / h]
-nfw_z_halo:         0.3         # redshift of the halo                      []
-nfw_conc:           4           # Concentration parameter = virial radius / NFW scale radius
+mass:               9.44e14        # Cluster mass                              [Msol / h]
+nfw_z_halo:         0.039         # redshift of the halo                      []
+nfw_conc:           3.4           # Concentration parameter = virial radius / NFW scale radius
 omega_m:            0.3         # Omega matter for the background cosmology []
 omega_lam:          0.7         # Omega lambda for the background cosmology []
 
 # Run parameters
 # --------------
 # Define some paths and filenames
-cosmosdir:         '/path/to/superbit-mock-catalogs/galsim-cosmos' # Path to COSMOS data directory
-datadir:	   '/path/to/superbit-mock-catalogs' # Path to repo/galsim data directory
+cosmosdir:         '/Users/j.mccleary/Research/SuperBIT/mock-data-forecasting/mock-catalogs/galsim-cosmos' # Path to COSMOS data directory
+datadir:           '/Users/j.mccleary/Research/SuperBIT/mock-data-forecasting/mock-catalogs' # Path to repo/galsim data directory
 cat_file_name:     'cosmos15_superbit2023_phot_shapes.csv' # catalog file name for COSMOS (in cosmosdir)
 cluster_cat_name:  'real_galaxy_catalog_23.5_example.fits' # path to cluster catalog
-gaia_dir:          '/path/to/superbit/superbit-metacal/superbit-lensing/galsim/data/GAIA' # Path to GAIA
+gaia_dir:          '/Users/j.mccleary/Research/SuperBIT/superbit-metacal/superbit-lensing/galsim/data/GAIA' # Path to GAIA
 outdir:  './nfw_only'

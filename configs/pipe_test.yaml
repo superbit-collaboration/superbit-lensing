@@ -1,6 +1,6 @@
 galsim:
   clobber: true
-  config_dir: /gpfs/data/idellant/jmcclear/superbit/superbit-metacal/superbit_lensing/galsim/config_files
+  config_dir: /gpfs/data/idellant/jmcclear/superbit/superbit-metacal/superbit-lensing/galsim/config_files
   config_file: pipe_test.yaml
   outdir: /gpfs/data/idellant/jmcclear/superbit/superbit-metacal/tests/pipe_test
 medsmaker:
