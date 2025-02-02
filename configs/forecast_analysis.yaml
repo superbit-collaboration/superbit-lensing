@@ -1,0 +1,37 @@
+galsim:
+  clobber: true
+  config_dir: /Users/jemcclea/Research/SuperBIT/superbit-metacal/superbit_lensing/galsim/config_files
+  config_file: superbit_forecast_test.yaml
+  outdir: /users/jmcclear/data/superbit/forecasting-analysis/cluster5/
+  
+medsmaker:
+  # These are config parameters for: superbit-metacal/superbit_lensing/scripts/process_mocks.py
+  # :mock_dir: Directory from which to access mock images
+  # :fname_base: Base filename for mock images;
+  #      --> do NOT append "fits", wildcards, etc. to end. Code does that for you.
+  # :outdir: Directory for all output files (MEDS, catalogs, images, etc.)
+  # :outfile: Name of output MEDS file
+  # :clobber: Set to overwrite files
+  mock_dir: /users/jmcclear/data/superbit/mock-data-forecasting/cluster5/v6/round?
+  fname_base: superbit_gaussJitter
+  outdir: /users/jmcclear/data/superbit/forecasting-analysis/cluster5/v6
+  outfile: cluster5_v6.meds
+
+metacal:
+  # :plot: Boolean condition to create diagnostics plots, saved in '{outdir}/plots/metacalibration/'
+  #        ["True"/"False", default="True"]
+  medsfile: /users/jmcclear/data/superbit/forecasting-analysis/cluster5/v6/cluster5_v6.meds
+  outdir: /users/jmcclear/data/superbit/forecasting-analysis/cluster5/v6
+  outfile: cl5_v6_mcalfit.fits
+  plot: False 
+
+  
+run_options:
+  ncores: 36
+  order:
+  #- galsim
+  #- medsmaker
+  - metacal
+  run_diagnostics: false
+  run_name: cl5_v6
+  vb: false

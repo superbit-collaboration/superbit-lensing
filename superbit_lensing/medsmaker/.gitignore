@@ -1,0 +1,6 @@
+*.fits
+psfex.xml
+swarp.xml
+data/
+output_debug/
+output/

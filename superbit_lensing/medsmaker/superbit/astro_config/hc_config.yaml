@@ -1,0 +1,9 @@
+# Script Parameters
+buffer_radius: 0.01 # Radius in which nearest neighbors are queried (degrees)
+n_neighbors: 5 # Number of nearest neighbors to query
+
+# Modes of SExtractor to run (hot, cold, and/or default)
+modes: 
+#  - hot
+#  - cold
+  - default
