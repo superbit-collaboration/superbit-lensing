@@ -1,4 +1,4 @@
-# superbit-metacal
+# superbit-lensing
 Contains a collection of routines used to perform ngmix fits, including metacalibration, on simulated SuperBIT images.
 
 This repo has recently been significantly refactored into the new `superbit-lensing` module, which you can include in your desired environment by running `python setup.py install` without the need to add the various submodules to your `PYTHONPATH`. The module includes the following four submodules which can be used independently if desired:
@@ -57,11 +57,11 @@ Build it:
 
 cd to this repo:
 
-`cd /path/to/repos/superbit-metacal`
+`cd /path/to/repos/superbit-lensing`
 
 pip install repo:
 
-`pip install -e /path/to/repos/superbit-metacal`
+`pip install -e /path/to/repos/superbit-lensing`
 
 ## For the experts
 

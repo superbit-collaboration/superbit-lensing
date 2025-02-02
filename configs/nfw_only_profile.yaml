@@ -48,5 +48,5 @@ cosmosdir:         '/path/to/superbit-mock-catalogs/galsim-cosmos' # Path to COS
 datadir:	   '/path/to/superbit-mock-catalogs' # Path to repo/galsim data directory
 cat_file_name:     'cosmos15_superbit2023_phot_shapes.csv' # catalog file name for COSMOS (in cosmosdir)
 cluster_cat_name:  'real_galaxy_catalog_23.5_example.fits' # path to cluster catalog
-gaia_dir:          '/path/to/superbit/superbit-metacal/superbit-lensing/galsim/data/GAIA' # Path to GAIA
+gaia_dir:          '/path/to/superbit/superbit-lensing/superbit-lensing/galsim/data/GAIA' # Path to GAIA
 outdir:  './nfw_only'

@@ -189,7 +189,7 @@ class SuperBITNgmixFitter():
             im_name = image_info[file_id[i]][0]
 
             """
-            im_name = im_name.replace('/users/jmcclear/data/superbit/superbit-metacal/GalSim/forecasting/',\
+            im_name = im_name.replace('/users/jmcclear/data/superbit/superbit-lensing/GalSim/forecasting/',\
             '/Volumes/PassportWD/SuperBIT/mock-data-forecasting/')
             """
             psfex_des = galsim.des.DES_PSFEx(psf_name, im_name)

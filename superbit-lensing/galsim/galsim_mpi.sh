@@ -16,7 +16,7 @@
 #SBATCH -e mpi-output/galsimMPI-%j.out
 
 # Run a command
-GALSIM_DIR=/users/jmcclear/data/superbit/superbit-metacal/GalSim
+GALSIM_DIR=/users/jmcclear/data/superbit/superbit-lensing/GalSim
 CONFIG_FILE=$GALSIM_DIR/superbit_parameters_debugforecast.yaml
 
 srun --mpi=pmix python $GALSIM_DIR/mock_superBIT_data.py config_file=$CONFIG_FILE

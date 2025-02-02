@@ -14,7 +14,7 @@
 #SBATCH --partition=physics
 
 # change this to point to your copy, unless you want to risk it with mine
-GALSIM_DIR=/home/sbenton/bit/superbit-metacal/GalSim
+GALSIM_DIR=/home/sbenton/bit/superbit-lensing/GalSim
 CONFIG_FILE=$GALSIM_DIR/superbit_parameters.yaml
 
 set -x

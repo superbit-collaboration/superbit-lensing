@@ -936,7 +936,7 @@ def main(args):
     ncores = args.ncores
     vb = args.vb
 
-    test_dir = '/Users/sweveret/repos/superbit-metacal/runs/real-test/'
+    test_dir = '/Users/sweveret/repos/superbit-lensing/runs/real-test/'
     meds_dir = 'redo/real-base/r0/'
     meds_file = 'real-base_meds.fits'
     shear = 0.01

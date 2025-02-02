@@ -45,8 +45,8 @@ omega_lam:          0.7         # Omega lambda for the background cosmology []
 # Run parameters
 # --------------
 # Define some paths and filenames
-cosmosdir:        '/users/jmcclear/data/superbit/superbit-metacal/GalSim/data/galsim_cosmos_catalogs' # Path to COSMOS data directory
-datadir:          '/users/jmcclear/data/superbit/superbit-metacal/GalSim/data' # Path to repo/GalSim data directory
+cosmosdir:        '/users/jmcclear/data/superbit/superbit-lensing/GalSim/data/galsim_cosmos_catalogs' # Path to COSMOS data directory
+datadir:          '/users/jmcclear/data/superbit/superbit-lensing/GalSim/data' # Path to repo/GalSim data directory
 cat_file_name:    'cosmos2015_cam2021_filt2021.csv' # catalog file name for COSMOS (in cosmosdir)
 cluster_cat_name: 'real_galaxy_catalog_23.5_example.fits' # path to cluster catalog
 star_cat_name:    'master_gaiastar_cat.fits' # File containing GAIA stars

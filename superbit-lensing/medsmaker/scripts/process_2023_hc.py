@@ -124,7 +124,7 @@ def main(args):
         # Create an instance of HotColdSExtractor
         logprint('Setting up HotColdSExtractor configuration...')
 
-        hc_config = '/work/mccleary_group/vassilakis.g/superbit-metacal/superbit-lensing/medsmaker/superbit/astro_config/hc_config.yaml'
+        hc_config = '/work/mccleary_group/vassilakis.g/superbit-lensing/superbit-lensing/medsmaker/superbit/astro_config/hc_config.yaml'
 
         hcs = HotColdSExtractor(
             science,
