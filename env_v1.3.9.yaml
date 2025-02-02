@@ -1,4 +1,4 @@
-name: sbmcal_139
+name: sblens_139
 channels:
   - defaults
   - conda-forge
