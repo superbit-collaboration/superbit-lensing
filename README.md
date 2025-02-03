@@ -10,7 +10,7 @@ This repo has recently been significantly refactored into the new `superbit-lens
 
 More detailed descriptions for each stage are contained in their respective directories.
 
-To run the full pipeine in sequence (or a particular subset), we have created the `SuperBITPipeline` class in `superbit-lensing/pipe.py` along with a subclass for each of the submodules. This is run by passing a single yaml configuration file that defines the run options for the pipeline run. The most important arguments are as follows:
+To run the full pipeine in sequence (or a particular subset), we have created the `SuperBITPipeline` class in `superbit_lensing/pipe.py` along with a subclass for each of the submodules. This is run by passing a single yaml configuration file that defines the run options for the pipeline run. The most important arguments are as follows:
 
 - `run_name`: The name of the run, which is also used to specify the `outdir` if you do not provide one; **Required**
 - `order`: A list of submodule names that you want the pipeline to run in the given order; **Required**
@@ -20,8 +20,8 @@ To run the full pipeine in sequence (or a particular subset), we have created th
 
 These should be set in the `run_options` field of the config file, while options for each submodule should be set in a field with the same name (e.g. `medsmaker: {...}`). Once the configuration is set, run the pipeline by doing the following:
 ```
-import superbit-lensing.utils as utils
-from superbit-lensing.pipe import SuperBITPipeline
+import superbit_lensing.utils as utils
+from superbit_lensing.pipe import SuperBITPipeline
 
 log = utils.setup_logger({logfile}, logdir={logdir})
 pipe = SuperBITPipeline(config_file, log)
@@ -34,9 +34,9 @@ An example of a pipeline run along with a test configuration is given in `pipe.m
 
 `python pipe_test.py`.
 
-The example configuration file is shown in `configs/pipe_test.yaml`. An example wrapper script you can use to run the `SuperBITPipeline` is shown in `superbit-lensing/process_all.py`.
+The example configuration file is shown in `configs/pipe_test.yaml`. An example wrapper script you can use to run the `SuperBITPipeline` is shown in `superbit_lensing/process_all.py`.
 
-The available config options for each submodule are defined in the various module classes in `superbit-lensing.pipe.py`, such as `GalSimModule`. The required & optional fields are given in `_req_fields` and `_opt_fields` respectively. The pipeline runner tells you if you fail to pass a required field or if you pass something that it doesn't understand.
+The available config options for each submodule are defined in the various module classes in `superbit_lensing.pipe.py`, such as `GalSimModule`. The required & optional fields are given in `_req_fields` and `_opt_fields` respectively. The pipeline runner tells you if you fail to pass a required field or if you pass something that it doesn't understand.
 
 ## To build a specific run environment
 Create env from yaml (e.g. `env_v1.3.9.yaml`):

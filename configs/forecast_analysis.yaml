@@ -1,11 +1,11 @@
 galsim:
   clobber: true
-  config_dir: /Users/jemcclea/Research/SuperBIT/superbit-lensing/superbit-lensing/galsim/config_files
+  config_dir: /Users/jemcclea/Research/SuperBIT/superbit-lensing/superbit_lensing/galsim/config_files
   config_file: superbit_forecast_test.yaml
   outdir: /users/jmcclear/data/superbit/forecasting-analysis/cluster5/
   
 medsmaker:
-  # These are config parameters for: superbit-lensing/superbit-lensing/scripts/process_mocks.py
+  # These are config parameters for: superbit-lensing/superbit_lensing/scripts/process_mocks.py
   # :mock_dir: Directory from which to access mock images
   # :fname_base: Base filename for mock images;
   #      --> do NOT append "fits", wildcards, etc. to end. Code does that for you.

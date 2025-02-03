@@ -31,7 +31,7 @@ export TARGET="Cluster Name" #ex. Abell3411
 export BAND="Band" #(b, g, u)
 export DATADIR="/path/to/union"
 export OUTDIR="/path/to/union/TARGET/BAND/out"
-export CODEDIR="/path/to/your/superbit-lensing/superbit-lensing"
+export CODEDIR="/path/to/your/superbit-lensing/superbit_lensing"
 export REDSHIFT="See superBIT_target_list" #message amit.m@northeastern.edu for list 
 export DETECTION_BAND="Band" #usually b band
 
