@@ -34,6 +34,8 @@ parser.add_argument('-gal_model', type=str, default='gauss',
                     help='Galaxy model to use')
 parser.add_argument('--plot', action='store_true', default=False,
                     help='Set to make diagnstic plots')
+parser.add_argument('--use_coadd', action='store_true', default=False,
+                    help='Will use the coadd, if present')                    
 parser.add_argument('--overwrite', action='store_true', default=False,
                     help='Overwrite output mcal file')
 parser.add_argument('--vb', action='store_true', default=False,
@@ -78,6 +80,7 @@ class SuperBITNgmixFitter():
         self.catalog = self.medsObj.get_cat()
 
         self.has_coadd = bool(self.medsObj._meta['has_coadd'])
+        self.use_coadd = config['use_coadd']
 
         try:
             self.verbose = config['verbose']
@@ -135,15 +138,21 @@ class SuperBITNgmixFitter():
 
         obslist = self.medsObj.get_obslist(iobj, weight_type)
 
-        # We don't want to fit to the coadd, as its PSF is not
-        # well defined
-        if self.has_coadd is True:
-            # NOTE: doesn't produce the right type...
-            # obslist = obslist[1:]
+        if self.use_coadd:
+            print('Using coadd along with multi-epoch obs to do ngmix fitting')
+            if not self.has_coadd:
+                print('No coadd found, skipping...')
             se_obslist = ngmix.ObsList(meta=deepcopy(obslist._meta))
-            for obs in obslist[1:]:
+            for obs in obslist[:]:
                 se_obslist.append(obs)
             obslist = se_obslist
+        else:
+            print('Using only multi-epoch obs to do ngmix fitting')
+            if self.has_coadd:
+                se_obslist = ngmix.ObsList(meta=deepcopy(obslist._meta))
+                for obs in obslist[1:]:
+                    se_obslist.append(obs)
+                obslist = se_obslist
 
         return obslist
 
@@ -178,18 +187,22 @@ def mcal_dict2tab(mcal, obsdict, ident):
     for key, val in ident.items():
         ident[key] = np.array([val])
 
-    tab_names = ['noshear', '1p', '1m', '2p', '2m','1p_psf', '1m_psf', '2p_psf', '2m_psf']
+    tab_names = ['noshear', '1p', '1m', '2p', '2m', '1p_psf', '1m_psf', '2p_psf', '2m_psf']
     for name in tab_names:
         tab = mcal[name]
+
+        # Remove "pars_cov0" key if it exists
+        if "pars_cov0" in tab:
+            del tab["pars_cov0"]
 
         for key, val in tab.items():
             tab[key] = np.array([val])
 
-            # Get the psf T by averaging over epochs (and eventually bands)
+        # Get the psf T by averaging over epochs (and eventually bands)
         tpsf_list = []
         gpsf_list = []
         obs = obsdict[name]
-        
+
         for i in range(len(obs)):
             try:
                 tpsf_list.append(obs[i].psf.meta['result']['T'])
@@ -199,10 +212,10 @@ def mcal_dict2tab(mcal, obsdict, ident):
                 gpsf_list.append(obs[i].psf.meta['result']['g'])
             except:
                 pass
-        
+
         tab['Tpsf'] = np.array([np.mean(tpsf_list)]) if tpsf_list else np.array([np.nan])
         tab['gpsf'] = np.array([np.mean(gpsf_list, axis=0)]) if gpsf_list else np.array([np.nan, np.nan])
-        #print(tab)
+
         mcal[name] = tab
 
     id_tab = Table(data=ident)
@@ -217,7 +230,8 @@ def mcal_dict2tab(mcal, obsdict, ident):
     tab_2p_psf = Table(mcal['2p_psf'])
     tab_2m_psf = Table(mcal['2m_psf'])
 
-    join_tab = hstack([id_tab, hstack([tab_noshear, tab_1p,  tab_1m, tab_2p, tab_2m, tab_1p_psf, tab_1m_psf, tab_2p_psf, tab_2m_psf], \
+    join_tab = hstack([id_tab, hstack([tab_noshear, tab_1p, tab_1m, tab_2p, tab_2m,
+                                       tab_1p_psf, tab_1m_psf, tab_2p_psf, tab_2m_psf],
                                       table_names=tab_names)])
 
     return join_tab
@@ -240,7 +254,7 @@ def mp_fit_one(obslist, prior, rng, psf_model='gauss', gal_model='gauss', mcal_p
     # get image pixel scale (assumes constant across list)
     jacobian = obslist[0]._jacobian
     Tguess = 4*jacobian.get_scale()**2
-    ntry = 4
+    ntry = 20
     lm_pars = {'maxfev':2000, 'xtol':5.0e-5, 'ftol':5.0e-5}
     psf_lm_pars={'maxfev': 4000, 'xtol':5.0e-5,'ftol':5.0e-5}
 
@@ -388,6 +402,7 @@ def main():
     psf_model = args.psf_model
     gal_model = args.gal_model
     overwrite = args.overwrite
+    use_coadd = args.use_coadd
     rng  = np.random.RandomState(seed)
     mcal_pars= {'psf': 'dilate', 'mcal_shear': 0.01}
 
@@ -407,6 +422,7 @@ def main():
     config['verbose'] = vb
     config['make_plots'] = make_plots
     config['nproc'] = nproc
+    config['use_coadd'] = use_coadd
 
     if seed is not None:
         config['seed'] = seed
@@ -423,6 +439,9 @@ def main():
     logprint(f'outfile: {os.path.join(outdir, outfilename)}')
     logprint(f'make_plots: {make_plots}')
     logprint(f'nproc: {nproc}')
+    logprint(f'psf_model: {psf_model}')
+    logprint(f'gal_model: {gal_model}')
+    logprint(f'Use coadd: {use_coadd}')
     logprint(f'vb: {vb}')
     logprint(f'seed: {config["seed"]}')
 
