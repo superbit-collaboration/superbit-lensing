@@ -137,15 +137,25 @@ class SuperBITNgmixFitter():
     def _get_source_observations(self, iobj, weight_type='uberseg'):
 
         obslist = self.medsObj.get_obslist(iobj, weight_type)
+        se_obslist = ngmix.ObsList(meta=deepcopy(obslist._meta))
 
         if self.use_coadd:
             print('Using coadd along with multi-epoch obs to do ngmix fitting')
             if not self.has_coadd:
                 print('No coadd found, skipping...')
-            se_obslist = ngmix.ObsList(meta=deepcopy(obslist._meta))
-            for obs in obslist[:]:
-                se_obslist.append(obs)
-            obslist = se_obslist
+                for obs in obslist[:]:
+                    se_obslist.append(obs)
+                obslist = se_obslist
+            elif self.has_coadd & (obslist[0].psf._pixels['ierr'] == np.inf)[0]:
+                print('Coadd is present, however Coadd psf is missing (Comment out the make_external_header command in medsmaker_real.py), So skipping the coadd....')
+                for obs in obslist[1:]:
+                    se_obslist.append(obs)
+                obslist = se_obslist
+            else:
+                for obs in obslist[:]:
+                    se_obslist.append(obs)
+                obslist = se_obslist
+            
         else:
             print('Using only multi-epoch obs to do ngmix fitting')
             if self.has_coadd:

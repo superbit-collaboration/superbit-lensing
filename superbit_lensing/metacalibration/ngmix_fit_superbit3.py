@@ -41,6 +41,8 @@ parser.add_argument('-seed', type=int, default=None,
                     help='Metacalibration seed')
 parser.add_argument('--plot', action='store_true', default=False,
                     help='Set to make diagnstic plots')
+parser.add_argument('--use_coadd', action='store_true', default=False,
+                    help='Will use the coadd, if present')                      
 parser.add_argument('--overwrite', action='store_true', default=False,
                     help='Overwrite output mcal file')
 parser.add_argument('--vb', action='store_true', default=False,
@@ -83,6 +85,7 @@ class SuperBITNgmixFitter():
         self.catalog = self.medsObj.get_cat()
 
         self.has_coadd = bool(self.medsObj._meta['has_coadd'])
+        self.use_coadd = config['use_coadd']
 
         try:
             self.verbose = config['verbose']
@@ -202,19 +205,35 @@ class SuperBITNgmixFitter():
 
         return psfex_cutouts
 
-    def _get_source_observations(self, iobj, weight_type='uberseg', logprint=None):
+    def _get_source_observations(self, iobj, weight_type='uberseg'):
 
         obslist = self.medsObj.get_obslist(iobj, weight_type)
+        se_obslist = ngmix.ObsList(meta=deepcopy(obslist._meta))
 
-        # We don't want to fit to the coadd, as its PSF is not
-        # well defined
-        if self.has_coadd is True:
-            # NOTE: doesn't produce the right type...
-            # obslist = obslist[1:]
-            se_obslist = ngmix.ObsList(meta=deepcopy(obslist._meta))
-            for obs in obslist[1:]:
-                se_obslist.append(obs)
-            obslist = se_obslist
+        if self.use_coadd:
+            print('Using coadd along with multi-epoch obs to do ngmix fitting')
+            if not self.has_coadd:
+                print('No coadd found, skipping...')
+                for obs in obslist[:]:
+                    se_obslist.append(obs)
+                obslist = se_obslist
+            elif self.has_coadd & (obslist[0].psf._pixels['ierr'] == np.inf)[0]:
+                print('Coadd is present, however Coadd psf is missing (Comment out the make_external_header command in medsmaker_real.py), So skipping the coadd....')
+                for obs in obslist[1:]:
+                    se_obslist.append(obs)
+                obslist = se_obslist
+            else:
+                for obs in obslist[:]:
+                    se_obslist.append(obs)
+                obslist = se_obslist
+            
+        else:
+            print('Using only multi-epoch obs to do ngmix fitting')
+            if self.has_coadd:
+                se_obslist = ngmix.ObsList(meta=deepcopy(obslist._meta))
+                for obs in obslist[1:]:
+                    se_obslist.append(obs)
+                obslist = se_obslist
 
         return obslist
 
@@ -649,6 +668,7 @@ def main():
     make_plots = args.plot
     nproc = args.n
     seed = args.seed
+    use_coadd = args.use_coadd
     overwrite = args.overwrite
     identifying = {'meds_index':[], 'id':[], 'ra':[], 'dec':[]}
     mcal = {'noshear':[], '1p':[], '1m':[], '2p':[], '2m':[]}
@@ -688,6 +708,8 @@ def main():
     config['make_plots'] = make_plots
     config['im_savedir'] = im_savedir
     config['nproc'] = nproc
+    config['use_coadd'] = use_coadd
+    
 
     if seed is not None:
         config['seed'] = seed
@@ -705,6 +727,7 @@ def main():
     logprint(f'make_plots: {make_plots}')
     logprint(f'im_savedir: {im_savedir}')
     logprint(f'nproc: {nproc}')
+    logprint(f'Use coadd: {use_coadd}')
     logprint(f'vb: {vb}')
     logprint(f'seed: {config["seed"]}')
 

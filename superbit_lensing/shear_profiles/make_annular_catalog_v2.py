@@ -281,10 +281,10 @@ class AnnularCatalog():
 
         # TODO: It would be nice to move selection cuts
         # to a different file
-        min_Tpsf = 1.5
+        min_Tpsf = 20
         max_sn = 1000
         min_sn = 20
-        min_T = 10.0
+        min_T = 2.0
         max_T = 100
 
         if self.cluster_redshift != None:
