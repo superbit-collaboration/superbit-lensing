@@ -146,7 +146,7 @@ class SuperBITNgmixFitter():
                 for obs in obslist[:]:
                     se_obslist.append(obs)
                 obslist = se_obslist
-            elif self.has_coadd & (obslist[0].psf._pixels['ierr'] == np.inf)[0]:
+            elif self.has_coadd and obslist and (obslist[0].psf._pixels['ierr'] == np.inf)[0]:
                 print('Coadd is present, however Coadd psf is missing (Comment out the make_external_header command in medsmaker_real.py), So skipping the coadd....')
                 for obs in obslist[1:]:
                     se_obslist.append(obs)
