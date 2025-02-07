@@ -26,9 +26,9 @@ cd to this repo:
 cd /path/to/repos/superbit-lensing
 ```
 
-Create env from yaml (e.g. `sblens.yml`):
+Create env from yml (e.g. `sblens.yml`):
 ```bash
-conda env create --name sblens --file sblens.yaml
+conda env create --name sblens --file sblens.yml
 ```
 
 Activate new env:
