@@ -177,7 +177,7 @@ class AnnularCatalog():
             # is actually a truth catalog
             truth = redshifts
             zcat_gals = truth[truth['obj_class'] == 'gal']
-            self.n_truth_gals = len(truth_gals)
+            self.n_truth_gals = len(truth_gals) # type: ignore
             cluster_gals = truth[truth['obj_class']=='cluster_gal']
             cluster_redshift = np.mean(cluster_gals['redshift'])
             self.cluster_redshift = cluster_redshift
