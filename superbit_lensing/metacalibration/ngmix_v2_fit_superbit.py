@@ -201,9 +201,10 @@ def mcal_dict2tab(mcal, obsdict, ident):
     for name in tab_names:
         tab = mcal[name]
 
-        # Remove "pars_cov0" key if it exists
-        if "pars_cov0" in tab:
-            del tab["pars_cov0"]
+        # Remove "pars_cov0" and "pars_cov" keys if they exist
+        for key_to_remove in ["pars_cov0", "pars_cov"]:
+            if key_to_remove in tab:
+                del tab[key_to_remove]
 
         for key, val in tab.items():
             tab[key] = np.array([val])
