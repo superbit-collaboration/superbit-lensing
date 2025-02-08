@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Source the configuration file
-source config.sh
+bash "./config.sh"
 
 # Define variables
 base_arraroutdir="${DATADIR}/${cluster_name}/${band_name}/arr/run"
 base_seed=$base_ngmix_seed  # Starting seed value, can be modified as needed
-job_script_template="ngmix_array_runs/job1.sh"  # Path to the job script template
+job_script_template="./ngmix_array_runs/ngmix_job_template.sh"  # Path to the job script template
 
 # Loop to create and submit jobs based on the ngmix_nruns variable
 for i in $(seq 1 $ngmix_nruns)
