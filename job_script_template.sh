@@ -13,7 +13,7 @@
 
 # Load conda environment
 source /path/to/your/miniconda3/etc/profile.d/conda.sh 
-conda activate sbmcal_py11
+conda activate sblens
 echo "Using Python from: $(which python)"
 echo "PATH: $PATH"
 echo "PYTHONPATH: $PYTHONPATH"
