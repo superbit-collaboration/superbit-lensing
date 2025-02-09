@@ -63,7 +63,7 @@ cd /path/to/repos/superbit-lensing
 
 pip install repo:
 ```bash
-pip install -e /path/to/repos/superbit-lensing
+pip install -e . 
 ```
 
 ## For the experts
