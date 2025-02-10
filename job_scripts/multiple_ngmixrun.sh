@@ -1,12 +1,14 @@
 #!/bin/bash
 
 # Source the configuration file
-bash "./config.sh"
+#echo $SLURM_SUBMIT_DIR
+#source "$SLURM_SUBMIT_DIR/config.sh"
+source "./config.sh"
 
 # Define variables
 base_arraroutdir="${DATADIR}/${cluster_name}/${band_name}/arr/run"
 base_seed=$base_ngmix_seed  # Starting seed value, can be modified as needed
-job_script_template="./ngmix_array_runs/ngmix_job_template.sh"  # Path to the job script template
+job_script_template="./ngmix_array_runs/ngmix_job_template.sh"
 
 # Loop to create and submit jobs based on the ngmix_nruns variable
 for i in $(seq 1 $ngmix_nruns)
@@ -17,7 +19,7 @@ do
   job_name="ngmix${i}"  # Job name format ngmix1, ngmix2, ...
 
   # Define the job script name
-  job_script_name="ngmix_array_runs/job${i}.sh"  # Adjusted path
+  job_script_name="./ngmix_array_runs/job${i}.sh" 
 
   # Copy the job template to the new job script
   cp $job_script_template $job_script_name

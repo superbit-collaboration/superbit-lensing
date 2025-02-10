@@ -142,7 +142,7 @@ class AnnularCatalog():
                 p = f'{self.run_name}_'
 
             outfile = os.path.join(self.outdir, f'{p}full_joined_catalog.fits')
-            self.joined.write(outfile, overwrite=overwrite)
+            #self.joined.write(outfile, overwrite=overwrite)
 
         # we *want* it to fail loudly!
         except OSError as err:
@@ -226,7 +226,7 @@ class AnnularCatalog():
                 outfile = os.path.join(self.outdir,
                                     f'{p}gals_joined_catalog.fits'
                                     )
-                gals_joined_cat.write(outfile, overwrite=overwrite)
+                #gals_joined_cat.write(outfile, overwrite=overwrite)
 
         except OSError as err:
             print('Cannot overwrite {outfile} unless `overwrite` is set to True!')
@@ -301,7 +301,7 @@ class AnnularCatalog():
                     'min_sn' : min_sn,
                     'min_T' : min_T,
                     'max_T' : max_T,
-                    'min_redshift' : min_redshift,
+                    'min_z' : min_redshift,
                     }
 
         mcal = self.joined_gals

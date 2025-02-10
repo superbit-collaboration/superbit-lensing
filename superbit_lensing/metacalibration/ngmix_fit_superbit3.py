@@ -43,6 +43,8 @@ parser.add_argument('--plot', action='store_true', default=False,
                     help='Set to make diagnstic plots')
 parser.add_argument('--use_coadd', action='store_true', default=False,
                     help='Will use the coadd, if present')                      
+parser.add_argument('--use_coadd_only', action='store_true', default=False,
+                    help='Will use the coadd, if present')  
 parser.add_argument('--overwrite', action='store_true', default=False,
                     help='Overwrite output mcal file')
 parser.add_argument('--vb', action='store_true', default=False,
@@ -86,6 +88,7 @@ class SuperBITNgmixFitter():
 
         self.has_coadd = bool(self.medsObj._meta['has_coadd'])
         self.use_coadd = config['use_coadd']
+        self.use_coadd_only = config['use_coadd_only']
 
         try:
             self.verbose = config['verbose']
@@ -210,7 +213,25 @@ class SuperBITNgmixFitter():
         obslist = self.medsObj.get_obslist(iobj, weight_type)
         se_obslist = ngmix.ObsList(meta=deepcopy(obslist._meta))
 
-        if self.use_coadd:
+        if self.use_coadd_only:
+            print('Using only coadd to do ngmix fitting')
+            if not self.has_coadd:
+                print('No coadd found, skipping...')
+                for obs in obslist[:]:
+                    se_obslist.append(obs)
+                obslist = se_obslist            
+            elif self.has_coadd and obslist and (obslist[0].psf._pixels['ierr'] == np.inf)[0]:
+                print('Coadd is present, however Coadd psf is missing (Comment out the make_external_header command in medsmaker_real.py), So skipping the coadd....')
+                for obs in obslist[1:]:
+                    se_obslist.append(obs)
+                obslist = se_obslist
+            else:
+                for obs in obslist[:1]:
+                    se_obslist.append(obs)
+                obslist = se_obslist
+            return obslist
+
+        elif self.use_coadd:
             print('Using coadd along with multi-epoch obs to do ngmix fitting')
             if not self.has_coadd:
                 print('No coadd found, skipping...')
@@ -226,6 +247,7 @@ class SuperBITNgmixFitter():
                 for obs in obslist[:]:
                     se_obslist.append(obs)
                 obslist = se_obslist
+            return obslist
             
         else:
             print('Using only multi-epoch obs to do ngmix fitting')
@@ -234,8 +256,7 @@ class SuperBITNgmixFitter():
                 for obs in obslist[1:]:
                     se_obslist.append(obs)
                 obslist = se_obslist
-
-        return obslist
+            return obslist
 
 class SuperBITPlotter(object):
 
@@ -669,6 +690,7 @@ def main():
     nproc = args.n
     seed = args.seed
     use_coadd = args.use_coadd
+    use_coadd_only = args.use_coadd_only
     overwrite = args.overwrite
     identifying = {'meds_index':[], 'id':[], 'ra':[], 'dec':[]}
     mcal = {'noshear':[], '1p':[], '1m':[], '2p':[], '2m':[]}
@@ -709,6 +731,7 @@ def main():
     config['im_savedir'] = im_savedir
     config['nproc'] = nproc
     config['use_coadd'] = use_coadd
+    config['use_coadd_only'] = use_coadd_only
     
 
     if seed is not None:

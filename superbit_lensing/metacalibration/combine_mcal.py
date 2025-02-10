@@ -1,6 +1,7 @@
 import numpy as np
 from astropy.table import Table
 from argparse import ArgumentParser
+import os
 
 def parse_args():
     parser = ArgumentParser()
@@ -27,7 +28,7 @@ def main(args):
     os.makedirs(outdir, exist_ok=True)
 
     # Generate file paths for 50 runs
-    mcal_files = [f"{data_dir}{run_name}/{band}/arr/run{i}/{run_name}_{band}_mcal.fits" for i in range(1, nrun+1)]
+    mcal_files = [f"{data_dir}/{run_name}/{band}/arr/run{i}/{run_name}_{band}_mcal.fits" for i in range(1, nrun+1)]
 
     # Load the mcal tables
     mcal_tables = [Table.read(f, format="fits") for f in mcal_files]

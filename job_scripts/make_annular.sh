@@ -1,13 +1,13 @@
 #!/bin/bash
 
-source config.sh
+source "./config.sh"
 
 # First combine mcal files
 python $CODEDIR/superbit_lensing/metacalibration/combine_mcal.py \
 -nrun=$ngmix_nruns \
 -data_dir=$DATADIR \
--run_name=$cluster_name
--band=$band_name
+-run_name=$cluster_name \
+-band=$band_name \
 -outdir=$OUTDIR
 
 # Then run annular.py code
