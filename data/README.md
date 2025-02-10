@@ -1,0 +1,3 @@
+- The template folder is how the code expects the arcitechture should be for any cluster data. So let's say you are running it on `Abell3411`, you should rename it as `Abell3411`. And you should have your clean exposure images, i.e. `*clean.fits` inside the`Abell3411/cal` directory.
+
+- To run the code, you should also have the `catalogs` folder as it is inside your `data` directory. For now it only have teh NED redshifts for 7 clusters. But feel free to add more for running it for other clusters.  

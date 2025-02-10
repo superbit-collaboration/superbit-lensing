@@ -1,0 +1,166 @@
+No.,Object Name,RA,DEC,Type,Velocity,Redshift,Redshift Flag,Magnitude and Filter,Separation,References,Notes,Photometry Points,Positions,Redshift Points,Diameter Points,Associations
+1,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-082</a>",110.84479,-73.44044,G,914367.00,3.05,PSE,,0.11,1,0,0,1,1,0,0
+2,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723:[CAR2023] I03</a>",110.84562,-73.43715,G_Lens,1113729.00,3.715,SUN,,0.16,1,0,0,1,1,0,0
+3,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">PSZ1 G284.97-23.69</a>",110.83950,-73.43930,GClstr,116919.00,0.39,SUN,,0.184,6,0,1,3,3,0,0
+4,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-090</a>",110.85929,-73.43717,G,956338.00,3.19,PSE,,0.208,1,0,0,1,1,0,0
+5,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723:[CAR2023] I04</a>",110.84458,-73.43506,G_Lens,2298209.00,7.666,SLS,,0.281,3,0,0,3,3,0,0
+6,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-C_4</a>",110.85975,-73.44421,G_Lens,1582904.00,5.28,PSE,,0.328,3,0,0,3,3,0,0
+7,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-095</a>",110.85317,-73.43367,G,854409.00,2.85,PSE,,0.352,1,0,0,1,1,0,0
+8,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723:[CAR2023] I02</a>",110.83967,-73.44536,G_Lens,1913576.00,6.383,SLS,,0.397,2,0,0,2,2,0,0
+9,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723:[CAR2023] I10</a>",110.83396,-73.43452,G_Lens,2297310.00,7.663,SLS,,0.407,2,0,0,2,2,0,0
+10,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F200DB-159</a>",110.85563,-73.44611,G,1025290.00,3.42,PSE,,0.409,1,0,0,1,1,0,0
+11,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[NSB2022]0286</a>",110.82819,-73.44226,G,1819740.00,6.07,PUN,,0.412,1,0,0,1,1,0,0
+12,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-076</a>",110.87254,-73.44436,G,1133216.00,3.78,PSE,,0.482,1,0,0,1,1,0,0
+13,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[NSB2022]0519</a>",110.84207,-73.44800,G,1717811.00,5.73,PUN,,0.53,1,0,0,1,1,0,0
+14,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 17.3</a>",110.82979,-73.44746,G_Lens,629564.00,2.1,MUN,,0.593,2,0,0,2,1,0,0
+15,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723:[CAR2023] I01</a>",110.85933,-73.44916,G_Lens,2547637.00,8.498,SLS,,0.602,2,0,0,2,2,0,0
+16,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 03.1</a>",110.83059,-73.44849,G_Lens,542624.00,1.81,MLE,,0.637,1,0,0,1,1,0,0
+17,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[SCM2023] 3.3</a>",110.83019,-73.44845,G_Lens,602583.00,2.01,PML,,0.639,1,0,0,1,1,0,0
+18,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[SCM2023] 5.3</a>",110.83027,-73.44854,G_Lens,596587.00,1.99,PML,,0.642,1,0,0,1,1,0,0
+19,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[GFM2022] 3.1</a>",110.83031,-73.44856,G_Lens,380736.00,1.27,MUN,,0.643,1,0,0,1,1,0,0
+20,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[NSB2022]0599</a>",110.84029,-73.44999,G,1981628.00,6.61,PUN,,0.654,1,0,0,1,1,0,0
+21,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 13.1</a>",110.82982,-73.44890,G_Lens,701514.00,2.34,MLE,,0.665,2,0,0,2,3,0,0
+22,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[GFM2022] 1.1</a>",110.84071,-73.45108,G_Lens,434699.00,1.45,SUN,,0.715,4,0,0,4,4,0,0
+23,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-088</a>",110.80850,-73.43814,G,917365.00,3.06,PSE,,0.718,1,0,0,1,1,0,0
+24,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[GFM2022] 2.1</a>",110.83875,-73.45105,G_Lens,413114.00,1.378,SUN,,0.722,4,0,0,4,4,0,0
+25,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 12.1</a>",110.82220,-73.44909,G_Lens,467676.00,1.56,MLE,,0.75,1,0,0,1,1,0,0
+26,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 15.1</a>",110.81963,-73.44865,G_Lens,662541.00,2.21,MLE,,0.76,1,0,0,1,1,0,0
+27,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 08.3</a>",110.81322,-73.44673,G_Lens,1876701.00,6.26,PUN,,0.768,1,0,0,1,1,0,0
+28,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 06.1</a>",110.83583,-73.45182,G_Lens,500653.00,1.67,MUN,,0.781,3,0,0,3,4,0,0
+29,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-079</a>",110.80479,-73.44156,G,824429.00,2.75,PSE,,0.787,1,0,0,1,1,0,0
+30,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 18.1</a>",110.82180,-73.45057,G_Lens,398724.00,1.33,MLE,,0.825,1,0,0,1,1,0,0
+31,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 09.3</a>",110.81261,-73.44811,G_Lens,515643.00,1.72,PUN,,0.826,1,0,0,1,1,0,0
+32,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723:[CAR2023] S19.1</a>",110.82088,-73.45074,G_Lens,404720.00,1.35,MUN,,0.842,1,0,0,1,1,0,0
+33,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[GFM2022] 4.3</a>",110.81329,-73.44878,G_Lens,656546.00,2.19,MUN,,0.843,4,0,0,4,4,0,0
+34,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 06.2</a>",110.83675,-73.45309,G_Lens,500653.00,1.67,MUN,,0.849,3,0,0,3,3,0,0
+35,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 10.1</a>",110.82364,-73.45169,G_Lens,365747.00,1.22,PUN,,0.863,1,0,0,1,1,0,0
+36,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[GFM2022] 5.1</a>",110.82388,-73.45188,G_Lens,427204.00,1.425,SUN,,0.87,4,0,0,4,4,0,0
+37,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-050</a>",110.85242,-73.45417,G,899378.00,3.0,PSE,,0.883,1,0,0,1,1,0,0
+38,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 05.B</a>",110.82336,-73.45224,G_Lens,428703.00,1.43,SUN,,0.893,1,0,0,1,1,0,0
+39,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 05.A</a>",110.82331,-73.45228,G_Lens,428703.00,1.43,SUN,,0.896,1,0,0,1,1,0,0
+40,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-052</a>",110.86725,-73.45383,G,1124222.00,3.75,PSE,,0.91,1,0,0,1,1,0,0
+41,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[GFM2022] 5.2</a>",110.82233,-73.45278,G_Lens,427204.00,1.425,SUN,,0.93,4,0,0,4,4,0,0
+42,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[GFM2022] 1.2</a>",110.84296,-73.45484,G_Lens,434699.00,1.45,SUN,,0.931,4,0,0,4,4,0,0
+43,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 16.1</a>",110.82082,-73.45259,G_Lens,86940.00,0.29,PUN,,0.934,1,0,0,1,2,0,0
+44,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 10.2</a>",110.82174,-73.45277,G_Lens,377739.00,1.26,PUN,,0.935,1,0,0,1,1,0,0
+45,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 13.4</a>",110.83265,-73.45436,G_Lens,968330.00,3.23,PML,,0.943,2,0,0,2,1,0,0
+46,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[NSB2022]0570</a>",110.89438,-73.44925,G,1747790.00,5.83,PUN,,0.956,1,0,0,1,1,0,0
+47,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">The Sparkler Galaxy</a>",110.84079,-73.45521,G,413114.00,1.378,SUN,,0.958,3,0,0,3,3,0,0
+48,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 07.3</a>",110.79963,-73.44709,G_Lens,1097241.00,3.66,PUN,,0.978,2,0,0,2,2,0,0
+49,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[SCM2023] 5.2</a>",110.83176,-73.45511,G_Lens,596587.00,1.99,PML,,0.99,1,0,0,1,1,0,0
+50,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[GFM2022] 3.2</a>",110.83200,-73.45520,G_Lens,343862.00,1.147,PUN,,0.994,3,0,0,3,2,0,0
+51,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[SCM2023] 3.2</a>",110.83152,-73.45515,G_Lens,602583.00,2.01,PML,,0.994,1,0,0,1,1,0,0
+52,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J072318.38-732717.0</a>",110.82660,-73.45473,IrS,116919.00,0.39,PUN,,1.001,1,0,13,2,1,0,0
+53,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 13.2</a>",110.82221,-73.45412,G_Lens,968330.00,3.23,PML,,1.001,2,0,0,2,1,0,0
+54,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723:[CAR2023] S19.2</a>",110.81642,-73.45357,G_Lens,404720.00,1.35,MUN,,1.025,1,0,0,1,1,0,0
+55,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[SCM2023] 5.4</a>",110.82316,-73.45474,G_Lens,596587.00,1.99,PML,,1.026,1,0,0,1,1,0,0
+56,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[GFM2022] 3.4</a>",110.82337,-73.45483,G_Lens,380736.00,1.27,MUN,,1.03,3,0,0,3,2,0,0
+57,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[SCM2023] 3.4</a>",110.82297,-73.45479,G_Lens,602583.00,2.01,PML,,1.03,1,0,0,1,1,0,0
+58,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">The Beret Galaxy</a>",110.79758,-73.44907,G,348659.00,1.163,SLS,,1.068,2,0,0,2,2,0,0
+59,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 12.2</a>",110.81478,-73.45432,G_Lens,2023599.00,6.75,PUN,,1.077,1,0,0,1,1,0,0
+60,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 17.1</a>",110.82313,-73.45581,G_Lens,629564.00,2.1,MUN,,1.084,2,0,0,2,3,0,0
+61,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 07.1</a>",110.79546,-73.44872,G_Lens,1879699.00,6.27,MLE,,1.088,2,0,0,2,2,0,0
+62,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 07.2</a>",110.79475,-73.44910,G_Lens,1550827.00,5.173,SUN,,1.111,2,0,0,2,1,0,0
+63,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723:[CAR2023] I08</a>",110.79046,-73.44707,G_Lens,635560.00,2.12,SUN,,1.119,1,0,0,1,1,0,0
+64,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 15.2</a>",110.81156,-73.45454,G_Lens,1975633.00,6.59,PUN,,1.12,1,0,0,1,1,0,0
+65,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-054</a>",110.80213,-73.45297,G,1379046.00,4.6,PSE,,1.154,1,0,0,1,1,0,0
+66,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 17.2</a>",110.82396,-73.45755,G_Lens,629564.00,2.1,MUN,,1.174,2,0,0,2,1,0,0
+67,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[GFM2022] 1.3</a>",110.83900,-73.45879,G_Lens,434699.00,1.45,SUN,,1.175,4,0,0,4,4,0,0
+68,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-084</a>",110.78142,-73.43994,G,899378.00,3.0,PSE,,1.177,1,0,0,1,1,0,0
+69,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[GFM2022] 2.3</a>",110.83650,-73.45882,G_Lens,413114.00,1.378,SUN,,1.184,4,0,0,4,4,0,0
+70,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">The Firework Galaxy</a>",110.80525,-73.45464,G,1990622.00,6.64,PUN,,1.191,4,0,0,4,5,0,0
+71,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 11.1</a>",110.81028,-73.45583,G_Lens,497656.00,1.66,MLE,,1.196,1,0,0,1,1,0,0
+72,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 09.1</a>",110.80308,-73.45490,G_Lens,806442.00,2.69,PUN,,1.227,1,0,0,1,2,0,0
+73,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-031</a>",110.83929,-73.46008,G,3474595.00,11.59,PSE,,1.251,1,0,0,1,1,0,0
+74,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-033</a>",110.87729,-73.45919,G,3411639.00,11.38,PSE,,1.271,1,0,0,1,1,0,0
+75,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[CYH2022] ID3</a>",110.85450,-73.46081,G,314782.00,1.05,UUN,,1.282,2,0,0,2,1,0,0
+76,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[SCM2023] 3.1</a>",110.82491,-73.45958,G_Lens,602583.00,2.01,PML,,1.282,1,0,0,1,1,0,0
+77,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[SCM2023] 5.1</a>",110.82522,-73.45969,G_Lens,596587.00,1.99,PML,,1.286,1,0,0,1,1,0,0
+78,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[GFM2022] 3.3</a>",110.82546,-73.45977,G_Lens,1993620.00,6.65,PUN,,1.289,3,0,0,3,3,0,0
+79,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F200DB-045</a>",110.84488,-73.46103,G,1316089.00,4.39,PSE,,1.297,1,0,0,1,1,0,0
+80,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723:[CAR2023] S19.3</a>",110.81729,-73.45899,G_Lens,404720.00,1.35,MUN,,1.299,1,0,0,1,1,0,0
+81,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723.3-7327</a>",110.80540,-73.45700,GClstr,116919.00,0.39,SUN,,1.301,74,0,0,5,5,0,0
+82,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-026</a>",110.84892,-73.46128,G,3111846.00,10.38,PSE,,1.309,1,0,0,1,1,0,0
+83,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 12.3</a>",110.81752,-73.45923,G_Lens,2035591.00,6.79,PUN,,1.311,1,0,0,1,1,0,0
+84,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] GL.2</a>",110.84352,-73.46138,G_Lens,446691.00,1.49,PUN,,1.32,1,0,0,1,1,0,0
+85,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 15.3</a>",110.81424,-73.45897,G_Lens,689523.00,2.3,PUN,,1.322,1,0,0,1,1,0,0
+86,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723:[CAR2023] S06.3</a>",110.83038,-73.46085,G_Lens,500653.00,1.67,MUN,,1.327,1,0,0,1,1,0,0
+87,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">PSZRX G285.00-23.70</a>",110.82276,-73.46025,XrayS,121116.00,0.404,SST,,1.332,1,0,0,1,1,0,0
+88,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] GL.3</a>",110.84366,-73.46159,G_Lens,446691.00,1.49,PUN,,1.332,1,0,0,1,1,0,0
+89,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 10.3</a>",110.82067,-73.46006,G_Lens,356753.00,1.19,PUN,,1.335,2,0,0,2,2,0,0
+90,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] GL.1</a>",110.84091,-73.46161,G_Lens,392728.00,1.31,MLE,,1.338,1,0,0,1,1,0,0
+91,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[GFM2022]5.3c_b</a>",110.82092,-73.46021,G_Lens,411615.00,1.373,PUN,,1.341,3,0,0,3,3,0,0
+92,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[GFM2022] 4.2</a>",110.80700,-73.45843,G_Lens,656546.00,2.19,MUN,,1.357,4,0,0,5,4,0,0
+93,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-040</a>",110.79975,-73.45692,G,1421016.00,4.74,PSE,,1.357,1,0,0,1,1,0,0
+94,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[GFM2022]5.3c_a</a>",110.81575,-73.46029,G_Lens,372642.00,1.243,PUN,,1.381,1,0,0,1,1,0,0
+95,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 14.1</a>",110.80177,-73.45829,G_Lens,548620.00,1.83,MLE,,1.401,1,0,0,1,1,0,0
+96,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 13.3</a>",110.82340,-73.46162,G_Lens,968330.00,3.23,PML,,1.406,2,0,0,2,2,0,0
+97,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-044</a>",110.91379,-73.45619,G,1034284.00,3.45,PSE,,1.479,1,0,0,1,1,0,0
+98,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-73:[PFD2022a] 08.1</a>",110.80262,-73.46015,G_Lens,1777770.00,5.93,MLE,,1.484,1,0,0,1,1,0,0
+99,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-069</a>",110.76775,-73.44839,G,3594512.00,11.99,PSE,,1.508,1,0,0,1,1,0,0
+100,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[CYH2022] ID1</a>",110.81292,-73.46283,G,266815.00,0.89,UUN,,1.54,1,0,0,1,1,0,0
+101,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F200DB-086</a>",110.77675,-73.45550,G,5135445.00,17.129999,PSE,,1.582,1,0,0,1,1,0,0
+102,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-075</a>",110.75929,-73.44486,G,860404.00,2.87,PSE,,1.588,1,0,0,1,1,0,0
+103,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-021</a>",110.80267,-73.46256,G,728496.00,2.43,PSE,,1.606,1,0,0,1,1,0,0
+104,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723:[CBM2023] 01917</a>",110.87105,-73.46559,G,372942.00,1.244,SLS,,1.607,1,0,0,1,1,0,0
+105,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-007</a>",110.84987,-73.46631,G,1436006.00,4.79,PSE,,1.61,1,0,0,1,1,0,0
+106,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723:[CBM2023] 08506</a>",110.91640,-73.45864,G,663441.00,2.213,SLS,,1.613,1,0,0,1,1,0,0
+107,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[CYH2022] ID2</a>",110.76608,-73.45172,G,738389.00,2.463,SLS,,1.615,3,0,0,3,2,0,0
+108,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-011</a>",110.86413,-73.46611,G,770467.00,2.57,PSE,,1.616,1,0,0,1,1,0,0
+109,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-041</a>",110.77763,-73.45706,G,506649.00,1.69,PSE,,1.629,1,0,0,1,1,0,0
+110,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723:[CAR2023] I05</a>",110.78800,-73.46187,G_Lens,1581405.00,5.275,SLS,,1.714,2,0,0,2,2,0,0
+111,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] SMACS_z16a</a>",110.85996,-73.46792,G,3180798.00,10.61,PSE,,1.715,1,0,0,1,1,0,0
+112,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-048</a>",110.75654,-73.45500,G,3714429.00,12.39,PSE,,1.853,1,0,0,1,1,0,0
+113,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DB-013</a>",110.77304,-73.46406,G,890384.00,2.97,PSE,,1.979,1,0,0,1,1,0,0
+114,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">SMACS J0723-7327:[NSB2022]1317</a>",110.78585,-73.46736,G,2077562.00,6.93,PUN,,2.003,1,0,0,1,1,0,0
+115,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-082</a>",110.71992,-73.46164,G,773465.00,2.58,PSE,,2.594,1,0,0,1,1,0,0
+116,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] SMACS_z12b</a>",110.71775,-73.46539,G,908371.00,3.03,PSE,,2.746,1,0,0,1,1,0,0
+117,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-077</a>",110.71762,-73.46539,G,434699.00,1.45,PSE,,2.748,1,0,0,1,1,0,0
+118,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] 10566</a>",110.76479,-73.47967,G,560612.00,1.87,PSE,,2.819,1,0,0,1,1,0,0
+119,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-038</a>",110.76229,-73.47947,G,821431.00,2.74,PSE,,2.831,1,0,0,1,1,0,0
+120,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-081</a>",110.70517,-73.46236,G,428703.00,1.43,PSE,,2.834,1,0,0,1,1,0,0
+121,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-078</a>",110.70517,-73.46383,G,581597.00,1.94,PSE,,2.878,1,0,0,1,1,0,0
+122,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-062</a>",110.72592,-73.47319,G,539626.00,1.8,PSE,,2.933,1,0,0,1,1,0,0
+123,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-039</a>",110.75242,-73.47972,G,905373.00,3.02,PSE,,2.937,1,0,0,1,1,0,0
+124,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-063</a>",110.72429,-73.47311,G,2095550.00,6.99,PSE,,2.95,1,0,0,1,1,0,0
+125,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F200DA-040</a>",110.76637,-73.48503,G,1181182.00,3.94,PSE,,3.086,1,0,0,1,1,0,0
+126,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F200DA-034</a>",110.77167,-73.48706,G,1621877.00,5.41,PSE,,3.155,1,0,0,1,1,0,0
+127,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-083</a>",110.67800,-73.45897,G,1313091.00,4.38,PSE,,3.168,1,0,0,1,1,0,0
+128,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-027</a>",110.75429,-73.48531,G,1040280.00,3.47,PSE,,3.201,1,0,0,1,1,0,0
+129,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-058</a>",110.70117,-73.47425,G,887386.00,2.96,PSE,,3.292,1,0,0,1,1,0,0
+130,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-020</a>",110.73279,-73.48817,G,1049274.00,3.5,PSE,,3.544,1,0,0,1,1,0,0
+131,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-050</a>",110.68750,-73.47692,G,581597.00,1.94,PSE,,3.574,1,0,0,1,1,0,0
+132,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-018</a>",110.73342,-73.48942,G,3849336.00,12.84,PSE,,3.6,1,0,0,1,1,0,0
+133,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-075</a>",110.65979,-73.46586,G,980321.00,3.27,PSE,,3.619,1,0,0,1,1,0,0
+134,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-066</a>",110.66504,-73.47003,G,896380.00,2.99,PSE,,3.657,1,0,0,1,1,0,0
+135,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-060</a>",110.66979,-73.47325,G,1121224.00,3.74,PSE,,3.689,1,0,0,1,1,0,0
+136,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-054</a>",110.66204,-73.47522,G,911369.00,3.04,PSE,,3.865,1,0,0,1,1,0,0
+137,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F200DA-098</a>",110.64500,-73.46672,G,1672842.00,5.58,PSE,,3.869,1,0,0,1,1,0,0
+138,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-026</a>",110.69175,-73.48558,G,1373050.00,4.58,PSE,,3.87,1,0,0,1,1,0,0
+139,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-031</a>",110.66938,-73.48347,G,3582520.00,11.95,PSE,,4.063,1,0,0,1,1,0,0
+140,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F200DA-033</a>",110.68300,-73.48769,G,1723807.00,5.75,PSE,,4.065,1,0,0,1,1,0,0
+141,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F200DA-089</a>",110.63513,-73.46856,G,4715736.00,15.73,PSE,,4.069,1,0,0,1,1,0,0
+142,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F200DA-056</a>",110.65429,-73.47819,G,1555923.00,5.19,PSE,,4.074,1,0,0,1,1,0,0
+143,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-008</a>",110.71979,-73.49767,G,896380.00,2.99,PSE,,4.141,1,0,0,1,1,0,0
+144,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-015</a>",110.68642,-73.49078,G,902375.00,3.01,PSE,,4.159,1,0,0,1,1,0,0
+145,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] SM-z12-1</a>",110.63579,-73.47592,G,3738412.00,12.47,PSE,,4.266,1,0,0,1,1,0,0
+146,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-019</a>",110.66417,-73.48903,G,668537.00,2.23,PSE,,4.352,1,0,0,1,1,0,0
+147,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F200DA-061</a>",110.63204,-73.47739,G,1471981.00,4.91,PSE,,4.367,1,0,0,1,1,0,0
+148,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-007</a>",110.68700,-73.49822,G,3294720.00,10.99,PSE,,4.494,1,0,0,1,1,0,0
+149,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] SMACS_z12a</a>",110.69742,-73.50047,G,944346.00,3.15,PSE,,4.495,1,0,0,1,1,0,0
+150,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-024</a>",110.63942,-73.48597,G,785456.00,2.62,PSE,,4.555,1,0,0,1,1,0,0
+151,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-052</a>",110.61225,-73.47606,G,473672.00,1.58,PSE,,4.62,1,0,0,1,1,0,0
+152,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-010</a>",110.66704,-73.49614,G,1061265.00,3.54,PSE,,4.62,1,0,0,1,1,0,0
+153,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F150DA-005</a>",110.67087,-73.49858,G,902375.00,3.01,PSE,,4.686,1,0,0,1,1,0,0
+154,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] 01566</a>",110.66379,-73.50017,G,3642479.00,12.15,PSE,,4.837,1,0,0,1,1,0,0
+155,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] 10234</a>",110.66500,-73.50172,G,1600892.00,5.34,PSE,,4.894,1,0,0,1,1,0,0
+156,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] F200DA-006</a>",110.66813,-73.50286,G,3147821.00,10.5,PSE,,4.912,1,0,0,1,1,0,0
+157,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[HOO2023] SMACS_z16b</a>",110.66487,-73.50228,G,4541856.00,15.15,PSE,,4.921,1,0,0,1,1,0,0
+158,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J072516.93-732354.3</a>",111.32079,-73.39842,G,10389.00,0.034653,PUN,,8.425,1,0,27,4,1,2,0
+159,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J072054.14-733000.5</a>",110.22542,-73.50003,G,33481.00,0.111682,PUN,,11.268,1,0,27,4,1,2,0
+160,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J072608.40-732752.4</a>",111.53508,-73.46461,G,25143.00,0.083868,PUN,,11.8,1,0,27,4,1,2,0
+161,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J072252.67-733847.6</a>",110.71958,-73.64636,G,17635.00,0.058824,PUN,,12.611,2,0,27,4,1,2,0
+162,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J072603.10-732048.4</a>",111.51304,-73.34681,G,7068.00,0.023576,SLS,16.0b,12.653,3,0,31,5,3,2,0
+163,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J072048.51-732017.4</a>",110.20292,-73.33778,G,19350.00,0.064545,SLS,18.8b,12.669,2,0,27,4,3,2,0
+164,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J072218.36-734001.4</a>",110.57658,-73.66706,G,24957.00,0.083246,PUN,,14.425,1,0,27,4,1,2,0
+165,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">2MASX J07212356-7314160</a>",110.34788,-73.23772,G,59231.00,0.197572,PUN,,14.873,1,0,15,3,1,2,0

@@ -1,0 +1,325 @@
+No.,Object Name,RA,DEC,Type,Velocity,Redshift,Redshift Flag,Magnitude and Filter,Separation,References,Notes,Photometry Points,Positions,Redshift Points,Diameter Points,Associations
+324,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084046.03-172856.0</a>",130.19183,-17.48292,G,18063.00,0.060251,PUN,,14.8,2,0,30,5,1,2,0
+312,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 256</a>",130.54361,-17.64040,G,26654.00,0.088908,SUN,,10.736,1,0,0,1,1,0,0
+323,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084242.43-173554.0</a>",130.67687,-17.59833,G,40651.00,0.135596,PUN,,14.629,1,0,27,4,1,2,0
+76,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084138.50-172809.4</a>",130.41050,-17.46919,G,44680.00,0.149038,PUN,,2.476,1,0,27,4,1,2,0
+174,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084202.40-172454.8</a>",130.51003,-17.41524,IrS,45654.00,0.152284,SUN,,5.403,1,0,12,2,1,0,0
+255,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084206.85-173524.1</a>",130.52857,-17.59003,IrS,45860.00,0.152972,SUN,,7.723,1,0,12,2,1,0,0
+226,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 173</a>",130.50321,-17.58589,G,45904.00,0.15312,SUN,,6.76,1,0,0,1,1,0,0
+170,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084210.29-172924.5</a>",130.54289,-17.49015,IrS,45946.00,0.153258,SUN,,5.3,1,0,12,2,1,0,0
+7,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084146.14-172934.7</a>",130.44219,-17.49311,IrS,46111.00,0.15381,SUN,,0.674,1,0,18,3,1,0,0
+171,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084150.42-173423.4</a>",130.46003,-17.57344,IrS,46150.00,0.153941,SUN,,5.33,1,0,18,3,1,0,0
+238,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084155.12-172210.9</a>",130.47967,-17.36970,IrS,46154.00,0.153952,SUN,,7.122,1,0,12,2,1,0,0
+83,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 147</a>",130.48889,-17.51097,G,46186.00,0.154059,SUN,,2.694,1,0,0,1,1,0,0
+153,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084157.73-173310.5</a>",130.49057,-17.55294,IrS,46253.00,0.154282,SUN,,4.674,1,0,12,2,1,0,0
+36,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084143.10-172803.1</a>",130.42962,-17.46754,IrS,46281.00,0.154377,SUN,,1.59,1,0,12,2,1,0,0
+66,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084138.38-172908.4</a>",130.40994,-17.48568,IrS,46365.00,0.154657,SUN,,2.318,1,0,12,2,1,0,0
+297,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 286</a>",130.56774,-17.60356,G,46382.00,0.154714,SUN,,9.776,1,0,0,1,1,0,0
+253,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 247</a>",130.53691,-17.58334,G,46461.00,0.154976,SUN,,7.696,1,0,0,1,1,0,0
+133,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 061</a>",130.45803,-17.41535,G,46534.00,0.155222,SUN,,4.207,1,0,0,1,1,0,0
+2,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084149.04-172906.5</a>",130.45437,-17.48515,IrS,46572.00,0.155348,SUN,,0.226,1,0,12,2,1,0,0
+180,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084158.60-173404.6</a>",130.49417,-17.56792,G,46584.00,0.155388,SUN,,5.564,2,0,27,5,2,2,0
+156,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 234</a>",130.53007,-17.50614,G,46593.00,0.155417,SUN,,4.729,1,0,0,1,1,0,0
+20,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084144.94-173006.7</a>",130.43739,-17.50187,IrS,46608.00,0.155467,SUN,,1.254,1,0,18,3,1,0,0
+265,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084201.80-173645.0</a>",130.50752,-17.61251,IrS,46709.00,0.155804,SUN,,8.314,1,0,12,2,1,0,0
+154,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 125</a>",130.48015,-17.55793,G,46798.00,0.156102,SUN,,4.69,1,0,0,1,1,0,0
+25,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084153.60-172833.9</a>",130.47335,-17.47610,IrS,46811.00,0.156145,SUN,,1.418,1,0,12,2,1,0,0
+32,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 049</a>",130.44955,-17.51089,G,46823.00,0.156185,SUN,,1.549,1,0,0,1,1,0,0
+218,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084203.29-173433.0</a>",130.51374,-17.57589,IrS,46844.00,0.156255,SUN,,6.543,1,0,18,3,1,0,0
+143,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 225</a>",130.52708,-17.49445,G,46857.00,0.156298,SUN,,4.422,1,0,0,1,1,0,0
+219,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084208.68-173324.2</a>",130.53685,-17.55664,UvS,46909.00,0.156471,SUN,,6.548,1,0,16,3,1,0,0
+268,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 287</a>",130.56832,-17.56787,G,46933.00,0.156553,SUN,,8.376,1,0,0,1,1,0,0
+41,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084150.45-173041.9</a>",130.46021,-17.51165,IrS,46979.00,0.156704,SUN,,1.689,1,0,12,2,1,0,0
+163,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084143.84-172413.1</a>",130.43269,-17.40365,IrS,47047.00,0.156931,SUN,,4.99,1,0,12,2,1,0,0
+271,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084202.96-173657.2</a>",130.51236,-17.61591,IrS,47063.00,0.156984,SUN,,8.612,1,0,12,2,1,0,0
+5,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">2MASS J08414956-1728468</a>",130.45652,-17.47969,IrS,47097.00,0.1571,SUN,,0.475,1,0,6,2,1,0,0
+172,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 118</a>",130.47750,-17.57014,G,47125.00,0.157191,SUN,,5.334,1,0,0,1,1,0,0
+194,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 188</a>",130.50959,-17.56530,G,47132.00,0.157217,SUN,,5.884,1,0,0,1,1,0,0
+202,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 197</a>",130.51254,-17.56578,G,47185.00,0.157393,SUN,,6.006,1,0,0,1,1,0,0
+147,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084153.58-173326.7</a>",130.47325,-17.55744,IrS,47212.00,0.157482,SUN,,4.534,1,0,12,2,1,0,0
+190,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 200</a>",130.51401,-17.56080,G,47244.00,0.157589,SUN,,5.82,1,0,0,1,1,0,0
+22,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084149.52-173021.5</a>",130.45634,-17.50599,IrS,47248.00,0.157603,SUN,,1.299,1,0,12,2,1,0,0
+244,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084158.47-173553.1</a>",130.49366,-17.59810,IrS,47265.00,0.157658,SUN,,7.218,1,0,12,2,1,0,0
+110,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 106</a>",130.47287,-17.43287,G,47268.00,0.157668,SUN,,3.385,1,0,0,1,1,0,0
+123,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 116</a>",130.47709,-17.54316,G,47299.00,0.157771,SUN,,3.804,1,0,0,1,1,0,0
+233,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 207</a>",130.51885,-17.58153,G,47320.00,0.157842,SUN,,6.986,1,0,0,1,1,0,0
+246,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084153.34-173619.2</a>",130.47227,-17.60536,IrS,47360.00,0.157975,SUN,,7.324,1,0,12,2,1,0,0
+129,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 163</a>",130.49995,-17.53294,G,47369.00,0.158007,SUN,,4.034,1,0,0,1,1,0,0
+106,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 164</a>",130.50007,-17.51514,G,47415.00,0.15816,SUN,,3.365,1,0,0,1,1,0,0
+216,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 167</a>",130.50135,-17.38888,G,47423.00,0.158185,SUN,,6.466,1,0,0,1,1,0,0
+168,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 038</a>",130.44156,-17.39972,G,47429.00,0.158207,SUN,,5.147,1,0,0,1,1,0,0
+117,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 082</a>",130.46501,-17.42579,G,47457.00,0.1583,SUN,,3.654,1,0,0,1,1,0,0
+261,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084200.51-173639.4</a>",130.50207,-17.61096,IrS,47468.00,0.158337,SUN,,8.11,1,0,18,3,1,0,0
+92,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084150.60-173200.1</a>",130.46086,-17.53337,IrS,47478.00,0.158371,SUN,,2.958,1,0,12,2,1,0,0
+116,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084155.18-172553.2</a>",130.47991,-17.43143,IrS,47586.00,0.158729,SUN,,3.635,1,0,18,3,1,0,0
+81,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084159.07-172909.5</a>",130.49613,-17.48598,IrS,47602.00,0.158784,SUN,,2.616,1,0,12,2,1,0,0
+247,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084211.25-173359.9</a>",130.54688,-17.56671,IrS,47639.00,0.158906,SUN,,7.378,1,0,18,3,1,0,0
+77,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084156.45-172733.8</a>",130.48520,-17.45954,IrS,47641.00,0.158912,SUN,,2.512,1,0,18,3,1,0,0
+69,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084150.43-172650.2</a>",130.46010,-17.44729,IrS,47681.00,0.159047,SUN,,2.334,1,0,18,3,1,0,0
+105,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084156.14-172622.2</a>",130.48417,-17.43923,IrS,47687.00,0.159068,SUN,,3.361,1,0,18,3,1,0,0
+75,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084141.60-173101.9</a>",130.42336,-17.51722,IrS,47716.00,0.159163,SUN,,2.474,1,0,12,2,1,0,0
+197,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084148.82-172310.2</a>",130.45344,-17.38617,IrS,47737.00,0.159233,SUN,,5.937,1,0,12,2,1,0,0
+228,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 230</a>",130.52933,-17.57038,G,47745.00,0.159261,SUN,,6.824,1,0,0,1,1,0,0
+245,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 280</a>",130.56284,-17.54138,G,47788.00,0.159405,SUN,,7.265,1,0,0,1,1,0,0
+306,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 220</a>",130.52484,-17.63963,G,47797.00,0.159432,SUN,,10.203,1,0,0,1,1,0,0
+39,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084151.97-173028.4</a>",130.46656,-17.50789,IrS,47825.00,0.159526,SUN,,1.651,1,0,12,2,1,0,0
+23,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 069</a>",130.46142,-17.46501,G,47841.00,0.159579,SUN,,1.359,1,0,0,1,1,0,0
+161,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 192</a>",130.51057,-17.54474,G,47844.00,0.159592,SUN,,4.965,1,0,0,1,1,0,0
+192,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 130</a>",130.48108,-17.39248,G,47868.00,0.159672,SUN,,5.827,1,0,0,1,1,0,0
+29,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 072</a>",130.46203,-17.46222,G,47904.00,0.15979,SUN,,1.524,1,0,0,1,1,0,0
+74,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084156.88-173023.7</a>",130.48710,-17.50658,IrS,47904.00,0.159791,SUN,,2.463,1,0,18,3,1,0,0
+307,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084215.07-173704.1</a>",130.56282,-17.61782,IrS,47962.00,0.159984,SUN,,10.236,1,0,12,2,1,0,0
+53,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084142.27-172743.6</a>",130.42613,-17.46213,IrS,47976.00,0.160031,SUN,,1.957,1,0,12,2,1,0,0
+196,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 083</a>",130.46511,-17.38715,G,47989.00,0.160073,SUN,,5.936,1,0,0,1,1,0,0
+236,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084212.48-173311.3</a>",130.55202,-17.55314,IrS,48004.00,0.160123,SUN,,7.104,1,0,12,2,1,0,0
+299,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 300</a>",130.58144,-17.59100,G,48006.00,0.160131,SUN,,9.826,1,0,0,1,1,0,0
+63,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084151.69-172704.2</a>",130.46566,-17.45123,IrS,48012.00,0.16015,SUN,,2.21,1,0,18,3,1,0,0
+120,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084203.54-172945.0</a>",130.51479,-17.49584,IrS,48014.00,0.160158,SUN,,3.739,1,0,12,2,1,0,0
+224,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 243</a>",130.53527,-17.56247,G,48015.00,0.16016,SUN,,6.718,1,0,0,1,1,0,0
+296,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084220.05-173512.2</a>",130.58358,-17.58673,IrS,48054.00,0.160292,SUN,,9.758,1,0,12,2,1,0,0
+229,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 246</a>",130.53662,-17.56429,G,48074.00,0.160359,SUN,,6.849,1,0,0,1,1,0,0
+43,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084144.93-172733.0</a>",130.43723,-17.45919,IrS,48089.00,0.160407,SUN,,1.728,1,0,12,2,1,0,0
+242,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084217.34-173051.0</a>",130.57229,-17.51417,IrS,48098.00,0.160436,SUN,,7.188,1,0,12,2,1,0,0
+222,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084200.85-173500.8</a>",130.50359,-17.58360,IrS,48138.00,0.160572,SUN,,6.648,1,0,18,3,1,0,0
+254,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 296</a>",130.57627,-17.53091,G,48142.00,0.160585,SUN,,7.708,1,0,0,1,1,0,0
+89,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084156.45-172709.7</a>",130.48514,-17.45267,IrS,48166.00,0.160665,SUN,,2.78,1,0,18,3,1,0,0
+293,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084223.37-173349.2</a>",130.59739,-17.56368,IrS,48168.00,0.160671,SUN,,9.641,1,0,12,2,1,0,0
+124,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084151.87-172522.3</a>",130.46616,-17.42286,IrS,48178.00,0.160703,SUN,,3.84,1,0,12,2,1,0,0
+189,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 263</a>",130.54764,-17.51081,G,48181.00,0.160713,SUN,,5.773,1,0,0,1,1,0,0
+257,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 221</a>",130.52498,-17.59399,G,48183.00,0.160722,SUN,,7.803,1,0,0,1,1,0,0
+282,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084200.96-173730.2</a>",130.50404,-17.62508,IrS,48207.00,0.160801,SUN,,8.942,1,0,12,2,1,0,0
+60,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084152.12-173102.2</a>",130.46721,-17.51726,IrS,48211.00,0.160813,SUN,,2.156,1,0,18,3,1,0,0
+72,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 045</a>",130.44632,-17.44594,G,48221.00,0.160848,SUN,,2.36,1,0,0,1,1,0,0
+258,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 301</a>",130.58202,-17.52967,G,48227.00,0.160868,SUN,,7.991,1,0,0,1,1,0,0
+317,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 303</a>",130.58324,-17.61844,G,48257.00,0.160967,SUN,,11.034,1,0,0,1,1,0,0
+256,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">2MASS J08420948-1734568</a>",130.53954,-17.58245,IrS,48263.00,0.160989,SUN,,7.754,1,0,5,2,1,0,0
+295,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 283</a>",130.56559,-17.60501,G,48300.00,0.161113,SUN,,9.756,1,0,0,1,1,0,0
+131,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 161</a>",130.49852,-17.53528,G,48310.00,0.161145,SUN,,4.079,1,0,0,1,1,0,0
+45,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084154.85-172820.6</a>",130.47866,-17.47254,IrS,48346.00,0.161266,SUN,,1.782,1,0,18,3,1,0,0
+112,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084146.08-172544.5</a>",130.44202,-17.42903,IrS,48373.00,0.161356,SUN,,3.397,1,0,12,2,1,0,0
+234,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084207.79-173417.5</a>",130.53246,-17.57155,IrS,48388.00,0.161404,SUN,,6.996,1,0,12,2,1,0,0
+302,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 288</a>",130.56836,-17.60615,G,48418.00,0.161505,SUN,,9.913,1,0,0,1,1,0,0
+47,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 112</a>",130.47448,-17.46593,G,48418.00,0.161505,SUN,,1.793,1,0,0,1,1,0,0
+42,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 009</a>",130.42192,-17.47723,G,48450.00,0.161612,SUN,,1.698,1,0,0,1,1,0,0
+273,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084219.38-173327.2</a>",130.58078,-17.55756,IrS,48482.00,0.161717,SUN,,8.633,1,0,12,2,1,0,0
+93,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 129</a>",130.48106,-17.52534,G,48501.00,0.161783,SUN,,2.984,1,0,0,1,1,0,0
+136,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084206.07-172856.5</a>",130.52533,-17.48237,IrS,48547.00,0.161937,SUN,,4.289,1,0,12,2,1,0,0
+209,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 115</a>",130.47698,-17.38380,G,48565.00,0.161997,SUN,,6.264,1,0,0,1,1,0,0
+250,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 274</a>",130.55309,-17.56285,G,48571.00,0.162017,SUN,,7.501,1,0,0,1,1,0,0
+88,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084153.10-172636.4</a>",130.47127,-17.44347,IrS,48591.00,0.162082,SUN,,2.767,1,0,12,2,1,0,0
+241,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084207.13-173440.6</a>",130.52967,-17.57793,IrS,48595.00,0.162094,SUN,,7.183,1,0,18,3,1,0,0
+142,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 171</a>",130.50251,-17.53923,G,48603.00,0.162121,SUN,,4.409,1,0,0,1,1,0,0
+90,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084145.48-173149.6</a>",130.43954,-17.53046,IrS,48614.00,0.16216,SUN,,2.793,1,0,12,2,1,0,0
+320,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084218.84-173745.5</a>",130.57851,-17.62932,IrS,48631.00,0.162216,SUN,,11.339,1,0,12,2,1,0,0
+12,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084151.97-172838.0</a>",130.46654,-17.47723,IrS,48632.00,0.162219,SUN,,1.035,1,0,12,2,1,0,0
+298,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 308</a>",130.58669,-17.58355,G,48633.00,0.162221,SUN,,9.781,1,0,0,1,1,0,0
+98,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 017</a>",130.42835,-17.43847,G,48665.00,0.162329,SUN,,3.069,1,0,0,1,1,0,0
+305,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084220.79-173539.4</a>",130.58666,-17.59428,IrS,48670.00,0.162345,SUN,,10.182,1,0,12,2,1,0,0
+208,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084154.90-173509.0</a>",130.47876,-17.58584,IrS,48671.00,0.16235,SUN,,6.259,1,0,12,2,1,0,0
+139,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 102</a>",130.47167,-17.41529,G,48674.00,0.16236,SUN,,4.361,1,0,0,1,1,0,0
+259,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084206.52-173553.6</a>",130.52721,-17.59823,IrS,48696.00,0.162431,SUN,,8.086,1,0,12,2,1,0,0
+151,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084144.46-172432.7</a>",130.43526,-17.40911,IrS,48702.00,0.162454,SUN,,4.64,1,0,12,2,1,0,0
+134,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 070</a>",130.46150,-17.41566,G,48709.00,0.162477,SUN,,4.213,1,0,0,1,1,0,0
+269,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084210.17-173542.9</a>",130.54248,-17.59529,IrS,48719.00,0.16251,SUN,,8.453,1,0,18,3,1,0,0
+87,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 054</a>",130.45137,-17.53046,G,48736.00,0.162567,SUN,,2.723,1,0,0,1,1,0,0
+230,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084153.98-172220.9</a>",130.47479,-17.37250,G,48737.00,0.162569,SLS,16.0R,6.897,3,0,28,4,3,2,0
+275,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084208.63-173618.0</a>",130.53596,-17.60502,IrS,48737.00,0.16257,SUN,,8.702,1,0,12,2,1,0,0
+113,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084152.83-172550.9</a>",130.47010,-17.43084,IrS,48763.00,0.162655,SUN,,3.444,1,0,18,3,1,0,0
+155,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084146.15-173347.1</a>",130.44231,-17.56311,IrS,48774.00,0.162691,SUN,,4.705,1,0,12,2,1,0,0
+281,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084210.72-173611.9</a>",130.54463,-17.60338,IrS,48778.00,0.162706,SUN,,8.912,1,0,18,3,1,0,0
+287,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084213.79-173608.0</a>",130.55747,-17.60223,IrS,48780.00,0.162711,SUN,,9.322,1,0,12,2,1,0,0
+100,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084200.40-173008.8</a>",130.50169,-17.50227,IrS,48786.00,0.162733,SUN,,3.109,1,0,18,3,1,0,0
+65,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 073</a>",130.46233,-17.44833,G,48798.00,0.162773,SUN,,2.308,1,0,0,1,1,0,0
+187,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 239</a>",130.53302,-17.53910,G,48810.00,0.162811,SUN,,5.731,1,0,0,1,1,0,0
+149,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 182</a>",130.50659,-17.54026,G,48810.00,0.162811,SUN,,4.614,1,0,0,1,1,0,0
+267,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084215.54-173420.6</a>",130.56451,-17.57241,IrS,48813.00,0.162823,SUN,,8.37,1,0,18,3,1,0,0
+181,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084157.86-173410.3</a>",130.49112,-17.56954,IrS,48838.00,0.162905,SUN,,5.576,1,0,12,2,1,0,0
+239,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084153.16-172204.9</a>",130.47151,-17.36803,IrS,48844.00,0.162926,SUN,,7.126,1,0,12,2,1,0,0
+288,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 146</a>",130.48817,-17.63769,G,48845.00,0.162928,SUN,,9.408,1,0,0,1,1,0,0
+30,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">2MASX J08415287-1728046</a>",130.47025,-17.46797,G,48867.00,0.163003,SUN,16.8R,1.53,5,0,15,5,2,2,0
+101,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084200.90-172912.5</a>",130.50508,-17.48724,UvS,48876.00,0.163033,SUN,,3.13,1,0,16,3,1,0,0
+85,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084154.35-172650.4</a>",130.47650,-17.44735,IrS,48881.00,0.163049,SUN,,2.711,1,0,12,2,1,0,0
+40,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084150.69-172733.7</a>",130.46125,-17.45937,IrS,48885.00,0.163062,SUN,,1.663,1,0,12,2,1,0,0
+79,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 122</a>",130.47885,-17.45156,G,48893.00,0.163088,SUN,,2.587,1,0,0,1,1,0,0
+127,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084204.02-172755.7</a>",130.51677,-17.46550,IrS,48897.00,0.163102,SUN,,3.974,1,0,12,2,1,0,0
+321,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084224.07-173639.0</a>",130.60033,-17.61085,IrS,48898.00,0.163107,SUN,,11.423,1,0,12,2,1,0,0
+252,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 141</a>",130.48563,-17.60588,G,48900.00,0.163114,SUN,,7.522,1,0,0,1,1,0,0
+200,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084208.44-173237.4</a>",130.53519,-17.54374,IrS,48947.00,0.163268,SUN,,5.992,1,0,12,2,1,0,0
+199,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 236</a>",130.53279,-17.54630,G,48978.00,0.163374,SUN,,5.975,1,0,0,1,1,0,0
+10,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084151.76-172907.0</a>",130.46569,-17.48530,IrS,49000.00,0.163446,SUN,,0.873,1,0,12,2,1,0,0
+286,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084204.70-173733.4</a>",130.51940,-17.62583,IrS,49008.00,0.163473,SUN,,9.321,1,0,18,3,1,0,0
+18,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 090</a>",130.46636,-17.47088,G,49014.00,0.163492,SUN,,1.248,1,0,0,1,1,0,0
+165,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084201.02-173304.1</a>",130.50428,-17.55116,IrS,49058.00,0.163641,SUN,,5.021,1,0,12,2,1,0,0
+183,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 262</a>",130.54747,-17.49898,G,49059.00,0.163644,SUN,,5.615,1,0,0,1,1,0,0
+57,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084156.28-172954.4</a>",130.48452,-17.49846,IrS,49083.00,0.163723,SUN,,2.109,1,0,12,2,1,0,0
+107,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084148.12-172544.1</a>",130.45054,-17.42893,IrS,49099.00,0.163775,SUN,,3.369,1,0,12,2,1,0,0
+179,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084211.03-173005.7</a>",130.54591,-17.50156,IrS,49101.00,0.163782,SUN,,5.553,1,0,18,3,1,0,0
+235,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084207.14-173433.8</a>",130.52981,-17.57605,IrS,49108.00,0.163806,SUN,,7.101,1,0,18,3,1,0,0
+195,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084155.41-172328.9</a>",130.48090,-17.39126,IrS,49129.00,0.163878,SUN,,5.893,1,0,18,3,1,0,0
+310,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">2MASS J08421442-1737311</a>",130.56012,-17.62531,IrS,49131.00,0.163883,SUN,,10.496,1,0,6,2,1,0,0
+319,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084209.23-173909.9</a>",130.53856,-17.65280,IrS,49138.00,0.163906,SUN,,11.255,1,0,18,3,1,0,0
+95,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 152</a>",130.49122,-17.51783,G,49143.00,0.163923,SUN,,3.051,1,0,0,1,1,0,0
+322,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 251</a>",130.54006,-17.65549,G,49143.00,0.163925,SUN,,11.438,1,0,0,1,1,0,0
+210,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084156.39-172305.9</a>",130.48498,-17.38499,IrS,49161.00,0.163985,SUN,,6.323,1,0,12,2,1,0,0
+178,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084205.72-173244.1</a>",130.52382,-17.54558,IrS,49168.00,0.164006,SUN,,5.551,1,0,18,3,1,0,0
+86,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 010</a>",130.42197,-17.44873,G,49171.00,0.164016,SUN,,2.722,1,0,0,1,1,0,0
+3,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 044</a>",130.44553,-17.48782,G,49193.00,0.16409,SUN,,0.325,1,0,0,1,1,0,0
+38,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">2MASS J08415361-1728071</a>",130.47338,-17.46864,IrS,49215.00,0.164165,SUN,,1.643,1,0,6,2,1,0,0
+138,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084145.44-172447.5</a>",130.43937,-17.41320,IrS,49236.00,0.164232,SUN,,4.359,1,0,12,2,1,0,0
+278,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084211.99-173548.3</a>",130.54997,-17.59676,IrS,49272.00,0.164355,SUN,,8.794,1,0,12,2,1,0,0
+51,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084151.53-172723.7</a>",130.46473,-17.45659,IrS,49283.00,0.16439,SUN,,1.895,1,0,12,2,1,0,0
+27,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 022</a>",130.43373,-17.50386,G,49294.00,0.164427,SUN,,1.477,1,0,0,1,1,0,0
+54,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084145.87-172712.4</a>",130.44114,-17.45345,IrS,49313.00,0.164489,SUN,,1.971,1,0,12,2,1,0,0
+186,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 156</a>",130.49329,-17.57064,G,49336.00,0.164566,SUN,,5.689,1,0,0,1,1,0,0
+309,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084216.42-173707.9</a>",130.56844,-17.61887,IrS,49344.00,0.164595,SUN,,10.489,1,0,12,2,1,0,0
+61,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084145.04-172703.2</a>",130.43766,-17.45080,IrS,49405.00,0.164798,SUN,,2.183,1,0,18,3,1,0,0
+308,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 313</a>",130.59413,-17.59111,G,49418.00,0.164841,SUN,,10.395,1,0,0,1,1,0,0
+276,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 241</a>",130.53514,-17.60563,G,49430.00,0.164882,SUN,,8.706,1,0,0,1,1,0,0
+1,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 051</a>",130.44964,-17.48551,G,49440.00,0.164915,SUN,,0.052,1,0,0,1,1,0,0
+8,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 079</a>",130.46395,-17.48498,G,49467.00,0.165003,SUN,,0.774,1,0,0,1,1,0,0
+177,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084146.07-172338.2</a>",130.44198,-17.39399,IrS,49474.00,0.165026,SUN,,5.487,1,0,18,3,1,0,0
+62,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084143.12-173056.9</a>",130.42969,-17.51582,IrS,49485.00,0.165063,SUN,,2.193,1,0,12,2,1,0,0
+17,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084153.21-172921.0</a>",130.47173,-17.48918,IrS,49558.00,0.165308,SUN,,1.244,1,0,12,2,1,0,0
+146,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 224</a>",130.52655,-17.50497,G,49565.00,0.16533,SUN,,4.516,1,0,0,1,1,0,0
+19,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084153.11-172928.5</a>",130.47129,-17.49125,IrS,49585.00,0.165398,SUN,,1.25,1,0,12,2,1,0,0
+21,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084148.72-172752.2</a>",130.45310,-17.46430,IrS,49684.00,0.165727,SUN,,1.256,1,0,18,3,1,0,0
+130,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 133</a>",130.48220,-17.42503,G,49711.00,0.165819,SUN,,4.036,1,0,0,1,1,0,0
+158,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 154</a>",130.49268,-17.41539,G,49797.00,0.166106,SUN,,4.83,1,0,0,1,1,0,0
+264,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084202.95-173629.6</a>",130.51230,-17.60823,IrS,49846.00,0.166269,SUN,,8.193,1,0,12,2,1,0,0
+114,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 180</a>",130.50471,-17.45991,G,49866.00,0.166336,SUN,,3.454,1,0,0,1,1,0,0
+207,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 249</a>",130.53922,-17.54473,G,49892.00,0.166423,SUN,,6.214,1,0,0,1,1,0,0
+213,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 273</a>",130.55269,-17.52671,G,49910.00,0.166482,SUN,,6.362,1,0,0,1,1,0,0
+78,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084141.85-172703.9</a>",130.42438,-17.45109,IrS,49941.00,0.166585,SUN,,2.526,1,0,12,2,1,0,0
+6,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084150.12-172840.7</a>",130.45886,-17.47774,IrS,50004.00,0.166796,SUN,,0.653,1,0,18,3,1,0,0
+52,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084144.75-172722.5</a>",130.43649,-17.45627,IrS,50007.00,0.166804,SUN,,1.904,1,0,12,2,1,0,0
+249,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 202</a>",130.51533,-17.59340,G,50012.00,0.166823,SUN,,7.485,1,0,0,1,1,0,0
+84,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084145.92-172627.5</a>",130.44136,-17.44100,IrS,50012.00,0.166823,SUN,,2.696,1,0,12,2,1,0,0
+223,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 240</a>",130.53304,-17.56460,G,50019.00,0.166847,SUN,,6.716,1,0,0,1,1,0,0
+160,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 084</a>",130.46525,-17.56562,G,50080.00,0.16705,SUN,,4.906,1,0,0,1,1,0,0
+49,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084155.78-172906.6</a>",130.48242,-17.48517,IrS,50089.00,0.16708,SUN,,1.831,1,0,12,2,1,0,0
+16,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084143.28-172916.5</a>",130.43037,-17.48792,IrS,50114.00,0.167162,SUN,,1.161,1,0,12,2,1,0,0
+173,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084151.02-172349.1</a>",130.46276,-17.39693,IrS,50185.00,0.1674,SUN,,5.336,1,0,18,3,1,0,0
+304,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 291</a>",130.56868,-17.61079,G,50189.00,0.167412,SUN,,10.132,1,0,0,1,1,0,0
+125,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 205</a>",130.51795,-17.47332,G,50211.00,0.167486,SUN,,3.928,1,0,0,1,1,0,0
+91,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 097</a>",130.47060,-17.44058,G,50278.00,0.16771,SUN,,2.909,1,0,0,1,1,0,0
+13,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084145.93-172811.9</a>",130.44141,-17.46998,IrS,50297.00,0.167772,SUN,,1.043,1,0,12,2,1,0,0
+94,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084159.65-172747.7</a>",130.49854,-17.46327,IrS,50299.00,0.167781,SUN,,3.049,1,0,12,2,1,0,0
+263,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084205.06-173612.3</a>",130.52102,-17.60337,IrS,50302.00,0.167788,SUN,,8.165,1,0,18,3,1,0,0
+31,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">PSZ1 0818</a>",130.46454,-17.46305,GClstr,50365.00,0.168,UUN,,1.549,3,0,0,2,2,0,0
+108,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084155.59-173158.0</a>",130.48165,-17.53280,IrS,50385.00,0.168065,SUN,,3.374,1,0,18,3,1,0,0
+50,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">PSZRX G241.97+14.86</a>",130.47937,-17.49962,XrayS,50575.00,0.1687,SST,,1.872,1,0,0,1,1,0,0
+35,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411</a>",130.47792,-17.48472,GClstr,50575.00,0.1687,SUN,17.3J,1.573,50,0,0,9,8,0,0
+96,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">PSZ2 G241.98+14.87</a>",130.50050,-17.50297,GClstr,50575.00,0.1687,UUN,,3.06,5,0,0,3,3,0,0
+191,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084148.08-172316.7</a>",130.45035,-17.38797,IrS,50584.00,0.168729,SUN,,5.827,1,0,12,2,1,0,0
+28,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 030</a>",130.43762,-17.46283,G,50584.00,0.16873,SUN,,1.523,1,0,0,1,1,0,0
+272,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 148</a>",130.48964,-17.62392,G,50691.00,0.169087,SUN,,8.627,1,0,0,1,1,0,0
+175,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 131</a>",130.48117,-17.57124,G,50787.00,0.169408,SUN,,5.461,1,0,0,1,1,0,0
+176,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084204.83-173248.4</a>",130.52040,-17.54713,UvS,50796.00,0.169438,SUN,,5.467,1,0,16,3,1,0,0
+137,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 217</a>",130.52353,-17.46606,G,50863.00,0.16966,SUN,,4.336,1,0,0,1,1,0,0
+152,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084205.47-173114.4</a>",130.52283,-17.52067,IrS,50903.00,0.169793,SUN,,4.661,1,0,12,2,1,0,0
+164,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 081</a>",130.46476,-17.56714,G,50949.00,0.169949,SUN,,4.992,1,0,0,1,1,0,0
+240,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 117</a>",130.47737,-17.60180,G,51053.00,0.170294,SUN,,7.171,1,0,0,1,1,0,0
+15,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084146.12-172803.7</a>",130.44220,-17.46770,IrS,51063.00,0.170327,SUN,,1.144,1,0,12,2,1,0,0
+290,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 255</a>",130.54326,-17.61530,G,51095.00,0.170435,SUN,,9.447,1,0,0,1,1,0,0
+157,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084205.24-173137.6</a>",130.52206,-17.52741,UvS,51129.00,0.170547,SUN,,4.822,1,0,16,3,1,0,0
+56,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084150.73-172710.9</a>",130.46140,-17.45304,IrS,51156.00,0.170638,SUN,,2.022,1,0,12,2,1,0,0
+111,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084200.74-172732.5</a>",130.50296,-17.45906,G,51310.00,0.171153,SUN,,3.388,2,0,32,6,2,2,0
+206,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 276</a>",130.55420,-17.51323,G,51338.00,0.171244,SUN,,6.174,1,0,0,1,1,0,0
+46,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">2MASS J08415360-1730194</a>",130.47337,-17.50540,IrS,51402.00,0.171459,SUN,,1.791,1,0,6,2,1,0,0
+232,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084216.51-173041.4</a>",130.56878,-17.51154,IrS,51446.00,0.171607,SUN,,6.956,1,0,34,4,1,0,0
+215,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084213.73-173112.0</a>",130.55726,-17.52001,IrS,51628.00,0.172211,SUN,,6.462,1,0,18,3,1,0,0
+251,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 293</a>",130.56931,-17.53802,G,51750.00,0.172619,SUN,,7.507,1,0,0,1,1,0,0
+102,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 181</a>",130.50559,-17.49105,G,51815.00,0.172836,SUN,,3.177,1,0,0,1,1,0,0
+80,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 135</a>",130.48252,-17.51548,G,52343.00,0.174599,SUN,,2.588,1,0,0,1,1,0,0
+166,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 185</a>",130.50796,-17.55002,G,52409.00,0.174816,SUN,,5.101,1,0,0,1,1,0,0
+150,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 126</a>",130.48034,-17.41352,G,53259.00,0.177654,SUN,,4.622,1,0,0,1,1,0,0
+292,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 310</a>",130.58913,-17.57480,G,53298.00,0.177784,SUN,,9.589,1,0,0,1,1,0,0
+71,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 034</a>",130.44098,-17.44682,G,55376.00,0.184716,SUN,,2.359,1,0,0,1,1,0,0
+55,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084142.60-173037.4</a>",130.42754,-17.51039,IrS,55862.00,0.186336,SUN,,2.005,1,0,12,2,1,0,0
+185,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 223</a>",130.52535,-17.54713,G,61266.00,0.204361,SUN,,5.678,1,0,0,1,1,0,0
+227,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 175</a>",130.50358,-17.58617,G,62807.00,0.2095,SUN,,6.785,1,0,0,1,1,0,0
+64,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084140.14-173023.1</a>",130.41738,-17.50652,IrS,64547.00,0.215307,SUN,,2.287,1,0,18,3,1,0,0
+119,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084153.43-173236.0</a>",130.47263,-17.54334,IrS,64558.00,0.215342,SUN,,3.719,1,0,12,2,1,0,0
+188,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084207.15-173239.6</a>",130.52980,-17.54435,IrS,64677.00,0.21574,SUN,,5.768,1,0,12,2,1,0,0
+248,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084159.32-173605.3</a>",130.49718,-17.60148,IrS,64686.00,0.215769,SUN,,7.478,1,0,12,2,1,0,0
+284,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084219.72-173413.7</a>",130.58220,-17.57047,IrS,64876.00,0.216404,SUN,,9.115,1,0,12,2,1,0,0
+221,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 189</a>",130.50973,-17.58032,G,64954.00,0.216662,SUN,,6.645,1,0,0,1,1,0,0
+316,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 311</a>",130.58957,-17.61058,G,64989.00,0.216779,SUN,,10.957,1,0,0,1,1,0,0
+301,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 285</a>",130.56661,-17.60677,G,77302.00,0.257853,SUN,,9.874,1,0,0,1,1,0,0
+68,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084144.42-172656.6</a>",130.43509,-17.44913,UvS,77713.00,0.259224,SUN,,2.329,1,0,16,3,1,0,0
+97,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084152.98-172615.9</a>",130.47078,-17.43775,IrS,77795.00,0.259495,SUN,,3.069,1,0,12,2,1,0,0
+104,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 004</a>",130.41003,-17.44509,G,81117.00,0.270576,SUN,,3.332,1,0,0,1,1,0,0
+314,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 304</a>",130.58346,-17.61223,G,87528.00,0.291963,SUN,,10.776,1,0,0,1,1,0,0
+34,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 094</a>",130.46753,-17.46465,G,87810.00,0.292902,SUN,,1.569,1,0,0,1,1,0,0
+162,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 210</a>",130.51975,-17.53486,G,88499.00,0.295201,SUN,,4.965,1,0,0,1,1,0,0
+33,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 119</a>",130.47783,-17.48585,G,94087.00,0.313842,SUN,,1.568,1,0,0,1,1,0,0
+289,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 312</a>",130.59149,-17.56590,G,97272.00,0.324466,SUN,,9.415,1,0,0,1,1,0,0
+145,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 166</a>",130.50125,-17.54186,G,101486.00,0.338521,SUN,,4.479,1,0,0,1,1,0,0
+132,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 111</a>",130.47355,-17.54993,G,101770.00,0.339469,SUN,,4.109,1,0,0,1,1,0,0
+182,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 077</a>",130.46371,-17.57747,G,101787.00,0.339525,SUN,,5.595,1,0,0,1,1,0,0
+315,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 176</a>",130.50377,-17.65806,G,102136.00,0.340688,SUN,,10.818,1,0,0,1,1,0,0
+184,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">2CXO J084211.1-173034</a>",130.54583,-17.50944,XrayS,102217.00,0.34096,SUN,,5.652,2,0,17,3,1,1,0
+270,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 272</a>",130.55249,-17.59004,G,102332.00,0.341343,SUN,,8.588,1,0,0,1,1,0,0
+225,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084202.06-172315.4</a>",130.50861,-17.38763,IrS,102354.00,0.341417,SUN,,6.729,1,0,12,2,1,0,0
+193,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084210.60-173129.4</a>",130.54418,-17.52485,IrS,102637.00,0.34236,SUN,,5.871,1,0,12,2,1,0,0
+198,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084210.00-173156.3</a>",130.54169,-17.53232,IrS,102751.00,0.342742,SUN,,5.942,1,0,12,2,1,0,0
+126,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 113</a>",130.47488,-17.54692,G,102859.00,0.343101,SUN,,3.965,1,0,0,1,1,0,0
+266,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 284</a>",130.56567,-17.57005,G,103090.00,0.343871,SUN,,8.335,1,0,0,1,1,0,0
+291,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 290</a>",130.56846,-17.59572,G,105963.00,0.353453,SUN,,9.469,1,0,0,1,1,0,0
+109,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 013</a>",130.42382,-17.43491,G,107998.00,0.360242,SUN,,3.374,1,0,0,1,1,0,0
+135,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084137.64-172542.3</a>",130.40686,-17.42842,IrS,108322.00,0.361324,SUN,,4.216,1,0,12,2,1,0,0
+203,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084147.21-172301.5</a>",130.44672,-17.38375,IrS,108412.00,0.361624,SUN,,6.084,1,0,12,2,1,0,0
+205,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 267</a>",130.55087,-17.52224,G,108415.00,0.361632,SUN,,6.165,1,0,0,1,1,0,0
+122,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 001</a>",130.40246,-17.44138,G,108680.00,0.362519,SUN,,3.797,1,0,0,1,1,0,0
+121,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084136.75-172631.4</a>",130.40315,-17.44207,IrS,108694.00,0.362563,SUN,,3.739,1,0,12,2,1,0,0
+300,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 305</a>",130.58347,-17.58922,G,117091.00,0.390572,SUN,,9.847,1,0,0,1,1,0,0
+243,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084206.01-173454.2</a>",130.52508,-17.58175,IrS,117180.00,0.390869,SUN,,7.203,1,0,12,2,1,0,0
+214,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084204.87-173409.8</a>",130.52022,-17.56944,IrS,117234.00,0.391049,SUN,,6.447,1,0,18,3,1,0,0
+37,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 011</a>",130.42231,-17.48838,G,117432.00,0.391712,SUN,,1.621,1,0,0,1,1,0,0
+231,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084206.53-173429.6</a>",130.52724,-17.57490,IrS,117552.00,0.392112,SUN,,6.954,1,0,12,2,1,0,0
+167,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 165</a>",130.50080,-17.55525,G,117673.00,0.392515,SUN,,5.102,1,0,0,1,1,0,0
+220,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 215</a>",130.52245,-17.57180,G,117737.00,0.392729,SUN,,6.637,1,0,0,1,1,0,0
+217,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084203.88-173425.5</a>",130.51619,-17.57376,IrS,117765.00,0.392821,SUN,,6.516,1,0,12,2,1,0,0
+285,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 271</a>",130.55239,-17.60290,G,117778.00,0.392864,SUN,,9.165,1,0,0,1,1,0,0
+201,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 169</a>",130.50212,-17.57210,G,117849.00,0.393103,SUN,,6.0,1,0,0,1,1,0,0
+99,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 155</a>",130.49290,-17.45282,G,118377.00,0.394862,SUN,,3.108,1,0,0,1,1,0,0
+260,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 265</a>",130.54882,-17.58234,G,118396.00,0.394926,SUN,,8.108,1,0,0,1,1,0,0
+294,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 298</a>",130.58062,-17.58889,G,118476.00,0.395192,SUN,,9.71,1,0,0,1,1,0,0
+103,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 184</a>",130.50788,-17.47925,G,118492.00,0.395246,SUN,,3.306,1,0,0,1,1,0,0
+48,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084147.49-173054.9</a>",130.44858,-17.51498,UvS,118527.00,0.395363,SUN,,1.797,1,0,16,3,1,0,0
+14,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084151.82-172945.3</a>",130.46592,-17.49592,IrS,118950.00,0.396773,SUN,,1.099,1,0,12,2,1,0,0
+280,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 275</a>",130.55363,-17.59596,G,119780.00,0.399544,SUN,,8.895,1,0,0,1,1,0,0
+67,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084150.91-173119.8</a>",130.46213,-17.52219,IrS,119959.00,0.400139,SUN,,2.325,1,0,12,2,1,0,0
+11,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 087</a>",130.46592,-17.49358,G,121100.00,0.403947,SUN,,1.023,1,0,0,1,1,0,0
+279,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 238</a>",130.53302,-17.60953,G,135568.00,0.452205,SUN,,8.836,1,0,0,1,1,0,0
+118,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 050</a>",130.44957,-17.54623,G,139686.00,0.465943,SUN,,3.669,1,0,0,1,1,0,0
+283,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 270</a>",130.55234,-17.60040,G,140506.00,0.468677,SUN,,9.048,1,0,0,1,1,0,0
+44,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084140.79-172921.1</a>",130.41997,-17.48920,IrS,140554.00,0.468838,SUN,,1.761,1,0,12,2,1,0,0
+212,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 264</a>",130.54862,-17.53421,G,142983.00,0.476941,SUN,,6.345,1,0,0,1,1,0,0
+303,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 315</a>",130.59809,-17.57301,G,149316.00,0.498063,SUN,,9.96,1,0,0,1,1,0,0
+59,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084157.00-172927.9</a>",130.48754,-17.49109,IrS,157136.00,0.52415,SUN,,2.154,1,0,12,2,1,0,0
+4,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084147.83-172932.3</a>",130.44929,-17.49231,IrS,159284.00,0.531313,SUN,,0.439,1,0,12,2,1,0,0
+58,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 142</a>",130.48647,-17.49476,G,159404.00,0.531713,SUN,,2.142,1,0,0,1,1,0,0
+274,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084204.47-173651.1</a>",130.51864,-17.61422,IrS,161794.00,0.539688,SUN,,8.675,1,0,12,2,1,0,0
+204,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 237</a>",130.53289,-17.54956,G,161853.00,0.539883,SUN,,6.101,1,0,0,1,1,0,0
+313,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 307</a>",130.58541,-17.60987,G,165461.00,0.551919,SUN,,10.756,1,0,0,1,1,0,0
+26,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 075</a>",130.46288,-17.46381,G,172372.00,0.57497,SUN,,1.462,1,0,0,1,1,0,0
+73,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 060</a>",130.45729,-17.44569,G,173425.00,0.578485,SUN,,2.396,1,0,0,1,1,0,0
+144,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 198</a>",130.51353,-17.52889,G,173640.00,0.579199,SUN,,4.466,1,0,0,1,1,0,0
+169,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 078</a>",130.46392,-17.39885,G,175112.00,0.58411,SUN,,5.231,1,0,0,1,1,0,0
+82,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">2CXO J084158.1-173020</a>",130.49208,-17.50556,XrayS,194850.00,0.649949,SUN,,2.681,2,0,13,3,1,0,0
+141,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 127</a>",130.48085,-17.41786,G,195627.00,0.652542,SUN,,4.393,1,0,0,1,1,0,0
+311,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 295</a>",130.57561,-17.61505,G,201532.00,0.672239,SUN,,10.588,1,0,0,1,1,0,0
+128,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 194</a>",130.51135,-17.51737,G,201605.00,0.672483,SUN,,3.988,1,0,0,1,1,0,0
+9,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 076</a>",130.46316,-17.49209,G,202893.00,0.676777,SUN,,0.841,1,0,0,1,1,0,0
+140,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 193</a>",130.51094,-17.52937,G,203930.00,0.680236,SUN,,4.365,1,0,0,1,1,0,0
+237,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 268</a>",130.55152,-17.55394,G,204974.00,0.683718,SUN,,7.108,1,0,0,1,1,0,0
+159,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 190</a>",130.50981,-17.54297,G,222196.00,0.741165,SUN,,4.859,1,0,0,1,1,0,0
+277,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 144</a>",130.48742,-17.62664,G,222588.00,0.742475,SUN,,8.753,1,0,0,1,1,0,0
+115,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084140.50-172602.0</a>",130.41878,-17.43389,IrS,224620.00,0.74925,SUN,,3.566,1,0,12,2,1,0,0
+318,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084204.60-173928.5</a>",130.51922,-17.65796,IrS,225205.00,0.751202,SUN,,11.094,1,0,18,3,1,0,0
+24,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084144.23-172801.6</a>",130.43432,-17.46712,IrS,236341.00,0.78835,SUN,,1.418,1,0,12,2,1,0,0
+70,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 149</a>",130.49046,-17.49334,G,243681.00,0.812831,SUN,,2.344,1,0,0,1,1,0,0
+211,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J084206.87-173335.0</a>",130.52863,-17.55973,IrS,260542.00,0.869075,SUN,,6.331,1,0,12,2,1,0,0
+148,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 027</a>",130.43683,-17.40994,G,266090.00,0.88758,SUN,,4.575,1,0,0,1,1,0,0
+262,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL 3411:[GDW2019] 186</a>",130.50876,-17.60827,G,323782.00,1.080022,SUN,,8.11,1,0,0,1,1,0,0

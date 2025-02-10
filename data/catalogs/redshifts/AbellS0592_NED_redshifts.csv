@@ -1,0 +1,28 @@
+No.,Object Name,RA,DEC,Type,Velocity,Redshift,Redshift Flag,Magnitude and Filter,Separation,References,Notes,Photometry Points,Positions,Redshift Points,Diameter Points,Associations
+1,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063841.83-535813.5</a>",99.67429,-53.97039,G,68373.00,0.228067,SLS,,0.642,1,0,12,2,1,0,0
+2,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">[GSB2009] J063838.16-535807.7 </a>",99.65900,-53.96881,*,376.00,0.001254,SLS,,0.831,1,0,0,1,1,0,0
+3,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">2MASS J06384627-5358154</a>",99.69292,-53.97089,G,69858.00,0.233021,SLS,,0.874,1,0,6,2,1,0,0
+4,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063845.15-535822.4</a>",99.68821,-53.97289,G,67035.00,0.223604,SLS,,0.882,7,0,35,7,3,2,0
+5,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">PSZRX G263.13-23.43</a>",99.69936,-53.96638,XrayS,67933.00,0.2266,SST,,0.887,1,0,0,1,1,0,0
+6,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">PLCKESZ G263.1-23:[AJF2017] S </a>",99.68453,-53.97413,GClstr,68053.00,0.227,UUN,,0.901,1,0,0,1,1,0,0
+7,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063847.92-535814.8</a>",99.69958,-53.97069,G,66480.00,0.221753,SLS,,1.034,1,0,12,2,1,0,0
+8,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063835.48-535812.5</a>",99.64792,-53.97019,G,69209.00,0.230856,SLS,,1.198,1,0,20,4,1,0,0
+9,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">PLCKESZ G263.1-23:[AJF2017] P </a>",99.70225,-53.97391,GClstr,68053.00,0.227,UUN,,1.233,1,0,0,1,1,0,0
+10,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063848.65-535824.4</a>",99.70279,-53.97361,G,67935.00,0.226606,SLS,,1.234,5,0,26,6,3,2,0
+11,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063849.95-535810.3</a>",99.70808,-53.96950,G,68037.00,0.226947,SLS,,1.246,1,0,12,2,1,0,0
+12,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">ABELL S0592</a>",99.69167,-53.97917,GClstr,67303.00,0.2245,UUN,17.3J,1.274,53,0,2,18,18,0,0
+13,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063851.48-535822.0</a>",99.71450,-53.97289,G,65282.00,0.217757,SLS,,1.543,1,0,12,2,1,0,0
+14,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063836.95-535900.5</a>",99.65392,-53.98361,G,67225.00,0.224238,SLS,,1.643,1,0,12,2,1,0,0
+15,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063843.41-535918.8</a>",99.68092,-53.98861,G,68387.00,0.228114,SLS,,1.735,1,0,18,3,1,0,0
+16,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">PSZ2 G263.14-23.41</a>",99.72435,-53.98139,GClstr,67933.00,0.2266,UUN,,2.118,5,0,0,1,1,0,0
+17,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063839.12-535942.0</a>",99.66308,-53.99500,G,66953.00,0.223331,SLS,,2.168,1,0,12,2,1,0,0
+18,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063857.58-535534.2</a>",99.74008,-53.92608,G,72305.00,0.241183,PUN,,3.012,1,0,27,4,1,2,0
+19,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">2MASS J06382075-5400033</a>",99.58648,-54.00092,IrS,24981.00,0.083327,PUN,,4.033,0,0,6,2,1,0,0
+20,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063816.66-540026.7</a>",99.56933,-54.00750,G,25334.00,0.084505,PUN,14.84,4.753,1,0,27,4,1,2,0
+21,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063936.34-540150.0</a>",99.90150,-54.03081,G,27942.00,0.093204,PUN,,8.996,1,0,27,4,1,2,0
+22,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063806.81-534948.6</a>",99.52904,-53.82997,G,42846.00,0.142918,PUN,,9.38,1,0,27,4,1,2,0
+23,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063907.95-540638.8</a>",99.78308,-54.11078,G,47600.00,0.158776,PUN,,9.802,2,0,27,4,1,2,0
+24,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063951.00-540101.5</a>",99.96263,-54.01703,G,42312.00,0.141138,PUN,,10.649,1,0,33,5,1,2,0
+25,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063727.71-540356.9</a>",99.36554,-54.06578,G,54745.00,0.182609,PUN,,12.686,1,0,27,4,1,2,0
+26,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J063817.26-534431.3</a>",99.57192,-53.74178,G,30917.00,0.103128,SLS,17.4b,13.598,2,0,27,4,3,2,0
+27,"<a HREF=""#"" onclick=""getObjectSearchInfo(jQuery, 2, this); return false;"">WISEA J064018.03-535853.6</a>",100.07525,-53.98167,G,31001.00,0.103408,SLS,17.8b,14.12,1,0,27,4,3,2,0
