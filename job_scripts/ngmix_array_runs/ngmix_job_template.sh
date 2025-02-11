@@ -21,7 +21,7 @@ export ARRAROUTDIR= #should be automatically edited
 # Ensure ARRAROUTDIR exists
 mkdir -p $ARRAROUTDIR
 
-python $CODEDIR/superbit_lensing/metacalibration/ngmix_v2_fit_superbit.py \
+python $CODEDIR/superbit_lensing/metacalibration/ngmix_fit.py \
 -outdir=$ARRAROUTDIR \
 -n 48 \
 -seed=701428541 \

@@ -370,7 +370,7 @@ def check_obj_flags(obj, min_cutouts=1):
 def mp_run_fit(i, obj, obslist, prior,
                logprint, rng, psf_model='gauss', gal_model='gauss', mcal_pars= {'psf': 'dilate', 'mcal_shear': 0.01}):
     '''
-    parallelized version of original ngmix_fit_superbit3 code
+    parallelized version of original ngmix_fit code
 
     i: MEDS indx
 

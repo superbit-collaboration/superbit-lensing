@@ -344,13 +344,13 @@ class AnnularCatalog():
                             & (mcal['redshift'] > min_redshift)
                             ]
 
-        # assuming delta_shear in ngmix_fit_superbit is 0.01
+        # assuming delta_shear in ngmix_fit is 0.01
         r11_gamma = (np.mean(noshear_selection['g_1p'][:,0]) -
                      np.mean(noshear_selection['g_1m'][:,0])) / (2.*mcal_shear)
         r22_gamma = (np.mean(noshear_selection['g_2p'][:,1]) -
                      np.mean(noshear_selection['g_2m'][:,1])) / (2.*mcal_shear)
 
-        # assuming delta_shear in ngmix_fit_superbit is 0.01
+        # assuming delta_shear in ngmix_fit is 0.01
         r11_S = (np.mean(selection_1p['g_noshear'][:,0]) -
                  np.mean(selection_1m['g_noshear'][:,0])) / (2.*mcal_shear)
         r22_S = (np.mean(selection_2p['g_noshear'][:,1]) -

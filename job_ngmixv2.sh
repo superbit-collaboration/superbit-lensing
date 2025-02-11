@@ -69,7 +69,7 @@ python $CODEDIR/superbit_lensing/medsmaker/scripts/process_2023.py \
 echo "process_2023.py code is done, now moving to Metacal"
 #: '
 ### Metacal
-python $CODEDIR/superbit_lensing/metacalibration/ngmix_v2_fit_superbit.py \
+python $CODEDIR/superbit_lensing/metacalibration/ngmix_fit.py \
 -outdir=$OUTDIR \
 -n 48 \
 -seed=4225165605 \
@@ -80,7 +80,7 @@ $OUTDIR/${cluster_name}_${band_name}_meds.fits \
 $OUTDIR/${cluster_name}_${band_name}_mcal.fits #-start 2000 -end 2200
 #'
 #: '
-echo "ngmix_fit_superbit.py code is done, now moving to make_annular_catalog.py"
+echo "ngmix_fit.py code is done, now moving to make_annular_catalog.py"
 
 ### Annular & shear
 python $CODEDIR/superbit_lensing/shear_profiles/make_annular_catalog.py \
