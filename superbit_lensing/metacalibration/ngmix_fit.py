@@ -435,6 +435,7 @@ def main():
     gal_model = args.gal_model
     overwrite = args.overwrite
     use_coadd = args.use_coadd
+    use_coadd_only = args.use_coadd_only
     rng  = np.random.RandomState(seed)
     mcal_pars= {'psf': 'dilate', 'mcal_shear': 0.01}
 
@@ -455,6 +456,7 @@ def main():
     config['make_plots'] = make_plots
     config['nproc'] = nproc
     config['use_coadd'] = use_coadd
+    config['use_coadd_only'] = use_coadd_only
 
     if seed is not None:
         config['seed'] = seed
