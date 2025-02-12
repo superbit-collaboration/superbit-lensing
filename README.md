@@ -53,7 +53,7 @@ cd /path/to/repos/meds
 
 Build the meds repo:
 ```bash
-python setup.py install
+pip install .
 ```
 
 cd to this repo:
