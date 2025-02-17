@@ -789,9 +789,7 @@ def main():
                             i,
                             index_start,
                             setup_obj(i, BITfitter.medsObj[i]),
-                            BITfitter._get_source_observations(
-                                i, logprint=logprint
-                                ),
+                            BITfitter._get_source_observations(i),
                             priors,
                             imc_list[i-index_start],
                             plotter,
@@ -808,9 +806,7 @@ def main():
                                         [(i,
                                           index_start,
                                           setup_obj(i, BITfitter.medsObj[i]),
-                                          BITfitter._get_source_observations(
-                                              i, logprint=logprint
-                                              ),
+                                          BITfitter._get_source_observations(i),
                                           priors,
                                           imc_list[i-index_start],
                                           plotter,

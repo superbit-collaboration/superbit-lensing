@@ -5,7 +5,7 @@ import os
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument('-nrun', type=int, default=50, help='Number of realisations to combine')
+    parser.add_argument('-nrun', type=int, default=50, help='Number of realizations to combine')
     parser.add_argument('-data_dir', type=str, required=True, help='Path to cluster data')
     parser.add_argument('-run_name', type=str, required=True, help='Cluster Name')
     parser.add_argument('-band', type=str, required=True, help='Band name')
@@ -27,12 +27,26 @@ def main(args):
     # Ensure output directory exists
     os.makedirs(outdir, exist_ok=True)
 
-    # Generate file paths for 50 runs
+    # Generate file paths
     mcal_files = [f"{data_dir}/{run_name}/{band}/arr/run{i}/{run_name}_{band}_mcal.fits" for i in range(1, nrun+1)]
 
-    # Load the mcal tables
-    mcal_tables = [Table.read(f, format="fits") for f in mcal_files]
+    # Check which files exist
+    existing_files = [f for f in mcal_files if os.path.exists(f)]
+    missing_files = [f for f in mcal_files if not os.path.exists(f)]
 
+    # Print warnings for missing files
+    print(f"Using {len(existing_files)} out of {nrun} expected files.")
+    if missing_files:
+        print("Warning: The following files are missing and will be skipped:")
+        for f in missing_files:
+            print(f"  - {f}")
+
+    # Proceed only if at least one file exists
+    if not existing_files:
+        raise FileNotFoundError("No mcal files found. Cannot proceed.")
+
+    # Load the mcal tables
+    mcal_tables = [Table.read(f, format="fits") for f in existing_files]
 
     # Extract and find common "id" values across all files
     common_ids = set(mcal_tables[0]["id"])
@@ -95,4 +109,4 @@ if __name__ == '__main__':
     if rc == 0:
         print("Final combined table saved successfully!")
     else:
-        print(f'combine_mcal.py has failed w/ rc={rc}')    
+        print(f'combine_mcal.py has failed w/ rc={rc}')
