@@ -277,7 +277,6 @@ dependencies:
     - piff==1.4.1
     - pillow==11.0.0
     - protobuf==5.28.2
-    - psfex==0.4.0
     - psutil==6.1.0
     - pyerfa==2.0.1.5
     - pyyaml==6.0.2
@@ -293,7 +292,6 @@ dependencies:
     - sep==1.2.1
     - setuptools==71.1.0
     - shapely==2.0.6
-    - shapenet==0.1
     - simplejson==3.19.3
     - statsmodels==0.14.4
     - tensorboard-data-server==0.7.0
