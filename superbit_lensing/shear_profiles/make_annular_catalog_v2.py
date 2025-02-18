@@ -284,8 +284,8 @@ class AnnularCatalog():
         min_Tpsf = 20
         max_sn = 1000
         min_sn = 20
-        min_T = 2.0
-        max_T = 100
+        min_T = 1.0
+        max_T = 60
 
         if self.cluster_redshift != None:
             # Add in a little bit of a safety margin -- maybe a bad call for simulated data?
