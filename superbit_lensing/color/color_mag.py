@@ -22,9 +22,27 @@ def main(args):
     redshift_file = os.path.join(datadir, f'catalogs/redshifts/{cluster_name}_NED_redshifts.csv')
     file_b = f"{base_path}/{bands[0]}/coadd/{cluster_name}_coadd_{bands[0]}_cat.fits"
     file_g = f"{base_path}/{bands[1]}/coadd/{cluster_name}_coadd_{bands[1]}_cat.fits"
-    file_b_stars = f"{base_path}/{bands[0]}/coadd/{cluster_name}_coadd_{bands[0]}_starcat_union.fits"
-    file_g_stars = f"{base_path}/{bands[1]}/coadd/{cluster_name}_coadd_{bands[1]}_starcat_union.fits"
-    output_file = f"{base_path}/color_magnitude_diagram.png"
+    # Construct file paths
+    file_b_stars_union = f"{base_path}/{bands[0]}/coadd/{cluster_name}_coadd_{bands[0]}_starcat_union.fits"
+    file_b_stars_fallback = f"{base_path}/{bands[0]}/coadd/{cluster_name}_coadd_{bands[0]}_starcat.fits"
+
+    file_g_stars_union = f"{base_path}/{bands[1]}/coadd/{cluster_name}_coadd_{bands[1]}_starcat_union.fits"
+    file_g_stars_fallback = f"{base_path}/{bands[1]}/coadd/{cluster_name}_coadd_{bands[1]}_starcat.fits"
+
+    # Check for starcat_union first, else fall back to starcat
+    if os.path.exists(file_b_stars_union):
+        file_b_stars = file_b_stars_union
+    else:
+        file_b_stars = file_b_stars_fallback
+        print(f"Warning: Using fallback star catalog for band {bands[0]}: {file_b_stars}")
+
+    if os.path.exists(file_g_stars_union):
+        file_g_stars = file_g_stars_union
+    else:
+        file_g_stars = file_g_stars_fallback
+        print(f"Warning: Using fallback star catalog for band {bands[1]}: {file_g_stars}")
+
+    output_file = f"{base_path}/{cluster_name}_{bands[0]}_{bands[1]}_color_magnitude.png"
 
     # Ensure input files exist
     if not os.path.exists(file_b) or not os.path.exists(file_g):
@@ -170,13 +188,14 @@ def main(args):
     plt.grid(True, linestyle='--', alpha=0.5)
     plt.legend(loc='upper left')
     plt.savefig(output_file, dpi=300)
+    print(f"Plot saved to '{output_file}'")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Combine bands for a given cluster.")
     parser.add_argument("cluster_name", type=str, help="Name of the cluster (e.g., AbellS0592)")
     parser.add_argument("bands", type=str, nargs=2, help="Two bands to combine (e.g., b g)")
-    parser.add_argument("--datadir", type=str, default="/work/mccleary_group/saha/data/", help="Directory containing the data files")
+    parser.add_argument("--datadir", type=str, default=os.getenv("DATADIR", ""), help="Directory containing the data files")
     parser.add_argument("--tolerance", type=float, default=1e-4, help="Angular tolerance in degrees (default: 1e-4)")
     parser.add_argument("--redshift", type=float, default=0.5, help="Redshift threshold for classification (default: 0.5)")
     parser.add_argument("--plot_stars", action="store_true", help="Plot stars in the color-magnitude diagram")

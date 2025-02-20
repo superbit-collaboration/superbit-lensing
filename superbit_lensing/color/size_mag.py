@@ -7,11 +7,12 @@ import matplotlib.pyplot as plt
 from superbit_lensing.match import SkyCoordMatcher
 
 def main(cluster_name, band, datadir, save_union_catalog, mag_low, mag_high, radius_low, tolerance_deg):
+    print(f"Processing {cluster_name} for band {band} in {datadir}")
     # Define file paths
     sex_cat_path = f"{datadir}/{cluster_name}/{band}/coadd/{cluster_name}_coadd_{band}_cat.fits"
     gaia_cat_path = f"{datadir}/catalogs/stars/{cluster_name}_gaia_starcat.fits"
     output_filename = f"{datadir}/{cluster_name}/{band}/coadd/{cluster_name}_coadd_{band}_starcat_union.fits"
-    plot_filename = f"{datadir}/{cluster_name}/{band}/coadd/{cluster_name}_coadd_{band}_plot.png"
+    plot_filename = f"{datadir}/{cluster_name}/{band}/coadd/{cluster_name}_coadd_{band}_size_mag_plot.png"
     
     # Check if sex_cat exists
     if not os.path.exists(sex_cat_path):
@@ -47,6 +48,10 @@ def main(cluster_name, band, datadir, save_union_catalog, mag_low, mag_high, rad
     union_catalog = vstack([filtered_catalog, gaia_cat])  # Merge tables
     union_catalog = unique(union_catalog, keys=["ALPHAWIN_J2000", "DELTAWIN_J2000"])
 
+    # Union catalog objects
+    union_flux_radius = union_catalog["FLUX_RADIUS"]
+    union_mag = -2.5 * np.log10(union_catalog["FLUX_AUTO"])
+
     # Create a primary HDU (empty, required for FITS format)
     primary_hdu = fits.PrimaryHDU()
     empty_hdu1 = fits.BinTableHDU(name="EMPTY_HDU_1")
@@ -79,10 +84,10 @@ def main(cluster_name, band, datadir, save_union_catalog, mag_low, mag_high, rad
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Filter and merge astronomical catalogs.")
-    parser = argparse.ArgumentParser(description="Combine bands for a given cluster.")
+    
     parser.add_argument("cluster_name", type=str, help="Name of the cluster (e.g., AbellS0592)")
-    parser.add_argument("bands", type=str, help="Band (e.g., b)")
-    parser.add_argument("--datadir", type=str, default="/work/mccleary_group/saha/data", help="Data directory")
+    parser.add_argument("bands", nargs="+", type=str, help="Bands (e.g., b g r i)")  # Allows any number of bands
+    parser.add_argument("--datadir", type=str, default=os.getenv("DATADIR", ""), help="Directory containing the data files")
     parser.add_argument("--save_union_catalog", action='store_true', help="Flag to save the union catalog")
     parser.add_argument("--mag_low", type=float, default=-13, help="Lower magnitude threshold")
     parser.add_argument("--mag_high", type=float, default=-9, help="Upper magnitude threshold")
@@ -90,6 +95,8 @@ if __name__ == "__main__":
     parser.add_argument("--tolerance_deg", type=float, default=1e-4, help="Matching tolerance in degrees")
     
     args = parser.parse_args()
-    
-    main(args.cluster_name, args.band, args.datadir, args.save_union_catalog,
-         args.mag_low, args.mag_high, args.radius_low, args.tolerance_deg)
+
+    # Run the script for each band provided
+    for band in args.bands:
+        main(args.cluster_name, band, args.datadir, args.save_union_catalog,
+             args.mag_low, args.mag_high, args.radius_low, args.tolerance_deg)
