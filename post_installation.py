@@ -9,11 +9,20 @@ def update_truth_filename(yaml_file, datadir):
     with open(yaml_file, 'w') as file:
         for line in lines:
             if line.strip().startswith("truth_filename:"):
-                # Replace anything before `/catalogs/stars/` with `datadir`
-                new_line = re.sub(r'^truth_filename:\s*.*?/catalogs/stars/', 
-                                  f'truth_filename: {datadir}/catalogs/stars/', line)
-                file.write(new_line)
-                print(f"Updated {yaml_file}: {new_line.strip()}")
+                # Match the truth_filename line, capturing any quotes around the path
+                match = re.match(r'^(truth_filename:\s*)(["\']?)(.*?/catalogs/stars/)([^"\']+)(["\']?)\s*$', line)
+                
+                if match:
+                    prefix, opening_quote, _, filename, closing_quote = match.groups()
+                    
+                    # Ensure that the new line retains the original quote style (single/double) if present
+                    quote = opening_quote if opening_quote else "'"  # Default to single quote if none exist
+                    
+                    new_line = f"{prefix}{quote}{datadir}/catalogs/stars/{filename}{quote}\n"
+                    file.write(new_line)
+                    print(f"Updated {yaml_file}: {new_line.strip()}")
+                else:
+                    file.write(line)
             else:
                 file.write(line)
 
@@ -21,7 +30,7 @@ def main():
     # Resolve the absolute path of the current directory
     current_dir = os.getcwd()
     default_path = os.path.join(current_dir, 'data')
-    save_path = input(f"Enter the directory to save trained models and plots (default: {default_path}): ").strip()
+    save_path = input(f"Enter the absolute path of your data directory (default: {default_path}): ").strip()
     
     # Use the default path if the user doesn't provide input
     if not save_path:
