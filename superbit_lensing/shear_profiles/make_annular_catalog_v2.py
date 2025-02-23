@@ -500,10 +500,10 @@ def get_xray_center(run_name, csv_path='superbit-lensing/data/catalogs/superbit_
     """
     try:
         centers = Table.read(csv_path)
-        mask = centers['name'] == run_name
+        mask = centers['Name'] == run_name
         if not any(mask):
             raise ValueError(f"No X-ray center found for cluster {run_name}")
-        return centers['ra'][mask][0], centers['dec'][mask][0]
+        return centers['RA'][mask][0], centers['Dec'][mask][0]
     except Exception as e:
         print(f"Error reading X-ray centers: {e}")
         raise
