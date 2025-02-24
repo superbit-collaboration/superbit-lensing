@@ -1,7 +1,9 @@
 import numpy as np
 from astropy.table import Table
 from argparse import ArgumentParser
+from superbit_lensing.match import SkyCoordMatcher
 import os
+import ipdb
 
 def parse_args():
     parser = ArgumentParser()
@@ -10,6 +12,8 @@ def parse_args():
     parser.add_argument('-run_name', type=str, required=True, help='Cluster Name')
     parser.add_argument('-band', type=str, required=True, help='Band name')
     parser.add_argument('-outdir', type=str, help='Output directory')
+    parser.add_argument('--isolate_stars', type=lambda x: x.lower() == 'true', default=True, help='Flag to isolate stars (default: True)')
+    parser.add_argument('--isolate_redseq', type=lambda x: x.lower() == 'true', default=False, help='Flag to isolate red-seq galaxies (default: False)')
     return parser.parse_args()
 
 
@@ -96,6 +100,69 @@ def main(args):
 
     # Convert to an Astropy table and save
     mcal_combined_table = Table(mcal_combined)
+    if args.isolate_stars:
+        base_path = os.path.join(data_dir, run_name, band)
+        file_stars_union = f"{base_path}/coadd/{run_name}_coadd_{band}_starcat_union.fits"
+        file_stars_fallback = f"{base_path}/coadd/{run_name}_coadd_{band}_starcat.fits"
+        if os.path.exists(file_stars_union):
+            starcat = Table.read(file_stars_union, format="fits", hdu=2)
+            print(f"Using union star catalog: {file_stars_union}")
+        elif os.path.exists(file_stars_fallback):
+            starcat = Table.read(file_stars_fallback, format="fits", hdu=2)
+            print(f"Using fallback star catalog: {file_stars_fallback}")
+        else:
+            raise FileNotFoundError("Star catalog not found. Cannot proceed.")
+
+        tolerance_deg = 1e-6
+
+        matcher = SkyCoordMatcher(mcal_combined_table, starcat, cat1_ratag='ra', cat1_dectag='dec',
+                cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', match_radius=5 * tolerance_deg)
+        mcal_discard, matched_stars = matcher.get_matched_pairs()
+        total_mcal = len(mcal_combined_table)
+        total_discard = len(mcal_discard)
+
+        mask = np.isin(mcal_combined_table['id'], mcal_discard['id'])
+        num_discarded = np.sum(mask)
+        num_remaining = total_mcal - num_discarded
+
+        print(f"Total objects in mcal: {total_mcal}")
+        print(f"Number of objects discarded as stars: {num_discarded}")
+        print(f"Number of objects remaining: {num_remaining}")
+
+        filtered_mcal = mcal_combined_table[~mask]
+        mcal_combined_table = filtered_mcal
+        mcal_discard.write(f"{outdir}/{run_name}_{band}_mcal_stars.fits", format="fits", overwrite=True)
+        print(f"Stars Mcal saved to {outdir}/{run_name}_{band}_mcal_stars.fits")
+
+    if args.isolate_redseq:
+        base_path = os.path.join(data_dir, run_name, band)
+        red_seq_file = f"{base_path}/coadd/{run_name}_coadd_redseq.fits"
+        if os.path.exists(red_seq_file):
+            redseq = Table.read(red_seq_file, format="fits")
+            print(f"Using Red-seq galaxy catalog: {red_seq_file}")
+            tolerance_deg = 1e-6
+            matcher = SkyCoordMatcher(mcal_combined_table, redseq, cat1_ratag='ra', cat1_dectag='dec',
+                    cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', match_radius=5 * tolerance_deg)
+            mcal_discard, matched_galaxies = matcher.get_matched_pairs()
+            total_mcal = len(mcal_combined_table)
+            total_discard = len(mcal_discard)
+
+            mask = np.isin(mcal_combined_table['id'], mcal_discard['id'])
+            num_discarded = np.sum(mask)
+            num_remaining = total_mcal - num_discarded
+
+            print(f"Total objects in mcal: {total_mcal}")
+            print(f"Number of objects discarded as red-seq galaxies: {num_discarded}")
+            print(f"Number of objects remaining: {num_remaining}")
+
+            filtered_mcal = mcal_combined_table[~mask]
+            mcal_combined_table = filtered_mcal
+            mcal_discard.write(f"{outdir}/{run_name}_{band}_mcal_redseq.fits", format="fits", overwrite=True)
+            print(f"Red Seq Galaxies Mcal saved to {outdir}/{run_name}_{band}_mcal_redseq.fits")            
+        else:
+            print(f"WARNING: Red Seq Galaxy catalog '{red_seq_file}' not found, skipping the discarding process.")
+
+
     mcal_combined_table.write(f"{outdir}/{run_name}_{band}_mcal_combined.fits", format="fits", overwrite=True)
 
     return 0
