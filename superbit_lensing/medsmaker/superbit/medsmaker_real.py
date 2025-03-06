@@ -39,7 +39,8 @@ class BITMeasurement():
         self.outdir = outdir
         self.vb = vb
         self.band = band
-        self.detection_bandpass = detection_bandpass 
+        self.detection_bandpass = detection_bandpass
+        self.exposure_mask_fname = "/work/mccleary_group/superbit/union/masks/mask_dark_55percent_300.npy" 
 
         self.image_cats = []
         self.detect_img_path = None
@@ -108,7 +109,7 @@ class BITMeasurement():
         utils.make_dir(cat_dir)
         self.logprint(f'made catalog directory {cat_dir}')
         for image_file in self.image_files:
-            sexcat = self._run_sextractor(image_file=image_file,
+            sexcat = self._run_sextractor_on_exposure(image_file=image_file,
                                           config_dir=config_dir,
                                           cat_dir=cat_dir)
             self.image_cats.append(sexcat)
@@ -121,6 +122,7 @@ class BITMeasurement():
         '''
         
         img_names = self.image_files
+        mask = np.load(self.exposure_mask_fname)
 
         for img_name in img_names:
             # Read in the BACKGROUND_RMS image
@@ -134,6 +136,7 @@ class BITMeasurement():
 
                 # Make a weight map
                 weight_map = 1 / (background_rms_map**2)
+                weight_map[mask] = 0
 
                 # Save the weight_map to a new file
                 wgt_file_name = img_name.replace('.fits', '.weight.fits')
@@ -168,6 +171,108 @@ class BITMeasurement():
                          '-WEIGHT_TYPE MAP_WEIGHT'
         else:
             weight_arg = '-WEIGHT_TYPE NONE'
+
+        cmd = ' '.join([
+                    'sex', image_arg, weight_arg, name_arg,  checkname_arg,
+                    param_arg, nnw_arg, filter_arg, bg_sub_arg, config_arg
+                    ])
+
+        self.logprint("sex cmd is " + cmd)
+        os.system(cmd)
+
+        print(f'cat_name is {cat_file} \n')
+        return cat_file
+
+    def make_sextractor_weight(self):
+        '''
+        Make inverse-variance weight maps because ngmix needs them and we 
+        don't have them for SuperBIT.
+        Use the SExtractor BACKGROUND_RMS check-image as a basis
+        '''
+        
+        img_names = self.image_files
+        mask = np.load(self.exposure_mask_fname)
+
+        for img_name in img_names:
+            
+            with fits.open(img_name) as img:
+                # Assuming the image data is in the primary HDU
+                img_data = img[0].data  
+                # Keep the original header to use for the weight map
+                header = img[0].header  
+
+                # Initialize weight_map with ones
+                weight_map = np.ones_like(img_data, dtype=np.float32)
+
+                # Set weight to 0 where mask is True
+                weight_map[mask] = 0
+
+                # Save the weight_map to a new file
+                sex_wgt_file_name = img_name.replace('.fits', '.sex_weight.fits')
+                hdu = fits.PrimaryHDU(weight_map, header=header)
+                hdu.writeto(sex_wgt_file_name, overwrite=True)
+
+            print(f'Weight map saved to {sex_wgt_file_name}')
+
+    def make_exposure_bmask(self):
+        '''
+        Make inverse-variance weight maps because ngmix needs them and we 
+        don't have them for SuperBIT.
+        Use the SExtractor BACKGROUND_RMS check-image as a basis
+        '''
+        
+        img_names = self.image_files
+        mask = np.load(self.exposure_mask_fname)
+
+        for img_name in img_names:
+            
+            with fits.open(img_name) as img:
+                # Assuming the image data is in the primary HDU
+                img_data = img[0].data  
+                # Keep the original header to use for the weight map
+                header = img[0].header  
+
+                # Initialize weight_map with ones
+                bmask_map = np.zeros_like(img_data, dtype=np.float32)
+
+                # Set weight to 1e30 where mask is True
+                bmask_map[mask] = 1.0
+
+                # Save the weight_map to a new file
+                bmask_file_name = img_name.replace('.fits', '.bmask.fits')
+                hdu = fits.PrimaryHDU(bmask_map, header=header)
+                hdu.writeto(bmask_file_name, overwrite=True)
+
+            print(f'bmask map saved to {bmask_file_name}')                               
+
+    def _run_sextractor_on_exposure(self, image_file, cat_dir, config_dir,
+                        weight_file=None, back_type='AUTO'):
+        '''
+        Utility method to invoke Source Extractor on supplied detection file
+        Returns: file path of catalog
+        '''
+        cat_name = os.path.basename(image_file).replace('.fits','_cat.fits')
+        cat_file = os.path.join(cat_dir, cat_name)
+
+        image_arg  = f'"{image_file}[0]"'
+        name_arg   = '-CATALOG_NAME ' + cat_file
+        config_arg = f'-c {os.path.join(config_dir, "sextractor.real.config")}'
+        param_arg  = f'-PARAMETERS_NAME {os.path.join(config_dir, "sextractor.param")}'
+        nnw_arg    = f'-STARNNW_NAME {os.path.join(config_dir, "default.nnw")}'
+        filter_arg = f'-FILTER_NAME {os.path.join(config_dir, "gauss_2.0_3x3.conv")}'
+        bg_sub_arg = f'-BACK_TYPE {back_type}'
+        bkg_name   = image_file.replace('.fits','.sub.fits')
+        seg_name   = image_file.replace('.fits','.sgm.fits')
+        rms_name   = image_file.replace('.fits','.bkg_rms.fits')
+        checkname_arg = f'-CHECKIMAGE_NAME  {bkg_name},{seg_name},{rms_name}'
+
+        if weight_file is not None:
+            weight_arg = f'-WEIGHT_IMAGE "{weight_file}[0]" ' + \
+                         '-WEIGHT_TYPE MAP_RMS'
+        else:
+            weight_file = image_file.replace('.fits','.sex_weight.fits')
+            weight_arg = f'-WEIGHT_IMAGE "{weight_file}[0]" ' + \
+                         '-WEIGHT_TYPE MAP_WEIGHT'
 
         cmd = ' '.join([
                     'sex', image_arg, weight_arg, name_arg,  checkname_arg,
@@ -712,7 +817,7 @@ class BITMeasurement():
             matches, starmatches, dist = \
                                 star_matcher.match(ra=ss['ALPHAWIN_J2000'],
                                 dec=ss['DELTAWIN_J2000'],
-                                radius=2/3600., maxmatch=1
+                                radius=1/3600., maxmatch=1
                                 )
 
             og_len = len(ss); ss = ss[matches]
@@ -746,20 +851,37 @@ class BITMeasurement():
         # is particularly long
 
         image_files = []; weight_files = []
+        bmask_files = []
         
         coadd_image  = self.detect_img_file
         coadd_weight = self.detect_img_file.replace('.fits', '.weight.fits') 
         coadd_segmap = self.detect_img_file.replace('.fits', '.sgm.fits') 
+        coadd_bmask = self.detect_img_file.replace('.fits', '.bmask.fits') 
+
+        with fits.open(coadd_image) as img:
+            img_data = img[0].data  
+            header = img[0].header  # Preserve the header
+
+            # Create an array of zeros with the same shape as the image
+            bmask_data = np.zeros_like(img_data, dtype=np.float32)
+
+            # Save the bmask file
+            fits.PrimaryHDU(bmask_data, header=header).writeto(coadd_bmask, overwrite=True)
+            print(f'Binary mask file saved to {coadd_bmask}')
+
         
         for img in self.image_files:
             bkgsub_name = img.replace('.fits','.sub.fits')
             weight_name = img.replace('.fits', '.weight.fits')
+            bmask_name = img.replace('.fits', '.bmask.fits')
             image_files.append(bkgsub_name)
             weight_files.append(weight_name)
+            bmask_files.append(bmask_name)
 
         if use_coadd == True:
             image_files.insert(0, coadd_image)
             weight_files.insert(0, coadd_weight)
+            bmask_files.insert(0, coadd_bmask)
 
         # If used, will be put first
         Nim = len(image_files)
@@ -771,8 +893,8 @@ class BITMeasurement():
             image_info[i]['image_ext']   =  0
             image_info[i]['weight_path'] =  weight_files[i]
             image_info[i]['weight_ext']  =  0
-            #image_info[i]['bmask_path']  =  None
-            #image_info[i]['bmask_ext']   =  0
+            image_info[i]['bmask_path']  =  bmask_files[i]
+            image_info[i]['bmask_ext']   =  0
             image_info[i]['seg_path']    =  coadd_segmap # Use coadd segmap for uberseg!
             image_info[i]['seg_ext']     =  0
 

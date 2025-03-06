@@ -164,8 +164,10 @@ def main(args):
         #hcs.make_dual_image_catalogs(detection_bandpass)
 
         logprint('Making single-exposure catalogs... \n')
+        bm.make_sextractor_weight()
         bm.make_exposure_catalogs(astro_config_dir)
         bm.make_exposure_weights()
+        bm.make_exposure_bmask()
         
         # Set image catalogs attribute
         bm.set_image_cats()

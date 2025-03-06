@@ -13,7 +13,7 @@ def parse_args():
     parser.add_argument('-band', type=str, required=True, help='Band name')
     parser.add_argument('-outdir', type=str, help='Output directory')
     parser.add_argument('--isolate_stars', type=lambda x: x.lower() == 'true', default=True, help='Flag to isolate stars (default: True)')
-    parser.add_argument('--isolate_redseq', type=lambda x: x.lower() == 'true', default=False, help='Flag to isolate red-seq galaxies (default: False)')
+    parser.add_argument('--isolate_redseq', type=lambda x: x.lower() == 'true', default=True, help='Flag to isolate red-seq galaxies (default: False)')
     return parser.parse_args()
 
 
