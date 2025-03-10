@@ -36,31 +36,6 @@ Activate new env:
 conda activate sblens
 ```
 
-Conda install ngmix:
-```bash
-conda install conda-forge::ngmix
-```
-
-Clone the meds repo outside of this repo:
-```bash
-git clone https://github.com/esheldon/meds.git
-```
-
-cd to meds repo:
-```bash
-cd /path/to/repos/meds
-```
-
-Build the meds repo:
-```bash
-pip install .
-```
-
-cd to this repo:
-```bash
-cd /path/to/repos/superbit-lensing
-```
-
 pip install repo:
 ```bash
 pip install -e . 
