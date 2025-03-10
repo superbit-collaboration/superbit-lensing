@@ -85,9 +85,9 @@ class AnnularCatalog():
         self.coadd_center = annular_info['coadd_center']
 
         if self.outdir is not None:
-           self.outfile = os.path.join(self.outdir, self.outfile)
+            self.outfile = os.path.join(self.outdir, self.outfile)
         else:
-           self.outdir = ''
+            self.outdir = ''
 
         self.det_cat = Table.read(self.detect_cat, hdu=2)
         self.mcal = Table.read(self.mcal_file)
