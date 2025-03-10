@@ -1,6 +1,7 @@
 import numpy as np
 import ipdb
 from astropy.table import Table, vstack, hstack, join
+from astropy.wcs import WCS
 import glob
 import sys, os
 from astropy.io import fits
@@ -44,6 +45,8 @@ def parse_args():
                         help='Seed for nfw redshift resampling')
     parser.add_argument('-nbins', type=int, default=18,
                         help='Number of radial bins')
+    parser.add_argument('--center', type=str, default='image',
+                    help='Center type for shear profile calculation; image or xray')
     parser.add_argument('--overwrite', action='store_true', default=False,
                         help='Set to overwrite output files')
     parser.add_argument('--vb', action='store_true', default=False,
@@ -284,8 +287,8 @@ class AnnularCatalog():
         min_Tpsf = 20
         max_sn = 1000
         min_sn = 20
-        min_T = 2.0
-        max_T = 100
+        min_T = 1.0
+        max_T = 60
 
         if self.cluster_redshift != None:
             # Add in a little bit of a safety margin -- maybe a bad call for simulated data?
@@ -491,6 +494,20 @@ class AnnularCatalog():
         self.make_table(overwrite=overwrite)
 
     
+def get_xray_center(run_name, csv_path='superbit-lensing/data/catalogs/superbit_xray_centers.csv'):
+    """
+    Get X-ray center coordinates from CSV file
+    """
+    try:
+        centers = Table.read(csv_path)
+        mask = centers['Name'] == run_name
+        if not any(mask):
+            raise ValueError(f"No X-ray center found for cluster {run_name}")
+        return centers['RA'][mask][0], centers['Dec'][mask][0]
+    except Exception as e:
+        print(f"Error reading X-ray centers: {e}")
+        raise
+
 def main(args):
 
     data_dir = args.data_dir
@@ -525,17 +542,30 @@ def main(args):
     print(f'using detection catalog {detect_cat}')
     print(f'using detection image {detect_im}')
 
-    try:
-        assert os.path.exists(detect_im) is True
-        hdr = fits.getheader(detect_im)
-        #This is the image center:
-        xcen = hdr['CRPIX1']; ycen = hdr['CRPIX2']
-        coadd_center = [xcen, ycen]
-        print(f'Read image data and setting image NFW center to ({xcen},{ycen})')
-
-    except Exception as e:
-        print('\n\n\nNo coadd image center found, cannot calculate tangential shear\n\n.')
-        raise e
+    if args.center == 'image':
+        try:
+            assert os.path.exists(detect_im) is True
+            hdr = fits.getheader(detect_im)
+            #This is the image center:
+            xcen = hdr['CRPIX1']; ycen = hdr['CRPIX2']
+            coadd_center = [xcen, ycen]
+            print(f'Read image data and setting image center to ({xcen},{ycen})')
+        except Exception as e:
+            print('\n\n\nNo coadd image center found, cannot calculate tangential shear\n\n.')
+            raise e
+    else:  # xray center
+        try:
+            ra, dec = get_xray_center(target_name)
+            # Convert RA/Dec to pixel coordinates using WCS from image header
+            hdr = fits.getheader(detect_im)
+            wcs = WCS(hdr)
+            xcen, ycen = wcs.all_world2pix(ra, dec, 0)
+            coadd_center = [xcen, ycen]
+            print(f'Using X-ray center at RA,Dec = ({ra},{dec})')
+            print(f'Converted to pixel coordinates: ({xcen},{ycen})')
+        except Exception as e:
+            print('\n\n\nError getting X-ray center coordinates\n\n.')
+            raise e
 
     ## Make dummy redshift catalog -- should be a flag!
     print("Making redshift catalog")
