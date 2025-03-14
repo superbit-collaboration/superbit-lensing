@@ -14,10 +14,4 @@ source "$SLURM_SUBMIT_DIR/config.sh"
 date
 which python
 
-python $CODEDIR/superbit_lensing/color/color_color_v2.py \
--outdir=$OUTDIR \
--psf_mode=psfex \
--psf_seed=$psf_seed \
--detection_bandpass=${detection_band} \
--star_config_dir $CODEDIR/superbit_lensing/medsmaker/configs \
---meds_coadd --use_ext_header ${cluster_name} ${band_name} $DATADIR
+python $CODEDIR/superbit_lensing/color/color_color_v2.py ${cluster_name} --datadir=$DATADIR --redshift=$cluster_redshift 
