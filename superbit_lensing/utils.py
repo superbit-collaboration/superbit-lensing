@@ -454,6 +454,42 @@ def get_test_dir():
     base_dir = get_base_dir()
     return os.path.join(base_dir, 'tests')
 
+def analyze_mcal_fits(file_path):
+    # Read the FITS file
+    data = Table.read(file_path, format='fits')
+
+    # Extract RA and Dec
+    ra = data['ra']
+    dec = data['dec']
+
+    # Compute min and max boundaries
+    ra_min, ra_max = np.min(ra), np.max(ra)
+    dec_min, dec_max = np.min(dec), np.max(dec)
+
+    # Compute the sky area in arcmin²
+    # Approximate area assuming small angles: ΔRA * ΔDec in arcmin²
+    area_arcmin2 = (ra_max - ra_min) * 60 * (dec_max - dec_min) * 60
+
+    # Compute object density
+    num_objects = len(data)
+    density_per_arcmin2 = num_objects / area_arcmin2 if area_arcmin2 > 0 else np.inf
+
+    # Print results
+    print(f"RA range: {ra_min:.6f}° to {ra_max:.6f}°")
+    print(f"Dec range: {dec_min:.6f}° to {dec_max:.6f}°")
+    print(f"Total number of objects: {num_objects}")
+    print(f"Survey area: {area_arcmin2:.2f} arcmin²")
+    print(f"Density: {density_per_arcmin2:.2f} objects per arcmin²")
+
+    return {
+        "ra_range": (ra_min, ra_max),
+        "dec_range": (dec_min, dec_max),
+        "num_objects": num_objects,
+        "area_arcmin2": area_arcmin2,
+        "density_per_arcmin2": density_per_arcmin2
+    }
+
+
 BASE_DIR = get_base_dir()
 MODULE_DIR = get_module_dir()
 TEST_DIR = get_test_dir()

@@ -27,7 +27,7 @@ Goals:
 class BITMeasurement():
     def __init__(self, image_files, data_dir, target_name, 
                 band, detection_bandpass, outdir, work_dir=None, 
-                log=None, vb=False):
+                log=None, vb=False, ext_header=False):
         '''
         data_path: path to the image data not including target name
         coadd: Set to true if the first image file is a coadd image (must be first)
@@ -38,6 +38,7 @@ class BITMeasurement():
         self.target_name = target_name
         self.outdir = outdir
         self.vb = vb
+        self.ext_header = ext_header
         self.band = band
         self.detection_bandpass = detection_bandpass
         self.exposure_mask_fname = "/work/mccleary_group/superbit/union/masks/mask_dark_55percent_300.npy" 
@@ -143,7 +144,35 @@ class BITMeasurement():
                 hdu = fits.PrimaryHDU(weight_map, header=header)
                 hdu.writeto(wgt_file_name, overwrite=True)
 
-            print(f'Weight map saved to {wgt_file_name}')        
+            print(f'Weight map saved to {wgt_file_name}')
+
+    def make_coadd_weight(self):
+        '''
+        Make inverse-variance weight maps because ngmix needs them and we 
+        don't have them for SuperBIT.
+        Use the SExtractor BACKGROUND_RMS check-image as a basis
+        '''
+        
+        coadd_img_name = self.coadd_img_file
+
+        # Read in the BACKGROUND_RMS image
+        rms_name = coadd_img_name.replace('.fits', '.bkg_rms.fits')
+        
+        with fits.open(rms_name) as rms:
+            # Assuming the image data is in the primary HDU
+            background_rms_map = rms[0].data  
+            # Keep the original header to use for the weight map
+            header = rms[0].header  
+
+            # Make a weight map
+            weight_map = 1 / (background_rms_map**2)
+
+            # Save the weight_map to a new file
+            wgt_file_name = coadd_img_name.replace('.fits', '.weight.fits')
+            hdu = fits.PrimaryHDU(weight_map, header=header)
+            hdu.writeto(wgt_file_name, overwrite=True)
+
+        print(f'Weight map saved to {wgt_file_name}')        
         
     def _run_sextractor(self, image_file, cat_dir, config_dir,
                         weight_file=None, back_type='AUTO'):
@@ -192,6 +221,8 @@ class BITMeasurement():
         
         img_names = self.image_files
         mask = np.load(self.exposure_mask_fname)
+
+        self.sex_wgt_files = [img_name.replace('.fits', '.sex_weight.fits') for img_name in img_names]
 
         for img_name in img_names:
             
@@ -309,6 +340,9 @@ class BITMeasurement():
         weight_file = os.path.join(coadd_dir, weight_outname)
 
         image_args = ' '.join(self.image_files)
+        sex_weight_files = ' '.join(self.sex_wgt_files)
+        weight_arg = f'-WEIGHT_IMAGE "{sex_weight_files}" ' + \
+                      '-WEIGHT_TYPE MAP_WEIGHT'        
         config_arg = f'-c {config_dir}/swarp.config'
         resamp_arg = f'-RESAMPLE_DIR {coadd_dir}'
         cliplog_arg = f'CLIP_LOGNAME {coadd_dir}'
@@ -316,14 +350,16 @@ class BITMeasurement():
                       f'-WEIGHTOUT_NAME {weight_file} '
 
         cmd_arr = {'swarp': 'swarp', 
-                    'image_arg': image_args, 
+                    'image_arg': image_args,
+                    'weight_arg': weight_arg, 
                     'resamp_arg': resamp_arg,
                     'outfile_arg': outfile_arg, 
                     'config_arg': config_arg
                     }
        
         # Make external headers if band == detection
-        #self._make_external_headers(cmd_arr)
+        if self.ext_header:
+            self._make_external_headers(cmd_arr)
 
         # Actually run the command
         cmd = ' '.join(cmd_arr.values())
