@@ -15,7 +15,6 @@ dist/
 tests/
 get_avg_alpha.py
 get_mean_shearprofile.py
-job_scripts/
 lib/
 make_job_scripts.py
 runs/
