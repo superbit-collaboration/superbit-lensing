@@ -1,7 +1,7 @@
 import os
 import argparse
 from astropy.io import fits
-from astropy.table import Table
+from astropy.table import Table, vstack
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 import numpy as np
@@ -11,15 +11,21 @@ from superbit_lensing.match import SkyCoordMatcher
 from superbit_lensing.color import sextractor_dual as sex
 
 def main(args):
+    print("=== Arguments Passed to the Script ===")
+    for arg, value in vars(args).items():
+        print(f"{arg}: {value}")
+    print("======================================\n")
     # Construct file paths based on the inputs
     cluster_name = args.cluster_name
     datadir = args.datadir
+    config_dir = args.config_dir
     tolerance_deg = args.tolerance
     redshift = args.redshift
     delz = 0.02
 
     base_path = os.path.join(datadir, cluster_name)
     redshift_file = os.path.join(datadir, f'catalogs/redshifts/{cluster_name}_NED_redshifts.csv')
+    lovoccs_file = os.path.join(datadir, f'catalogs/lovoccs/{cluster_name}_lovoccs_redhifts.fits')
 
     # Construct file paths
     file_b_stars_union = f"{base_path}/b/coadd/{cluster_name}_coadd_b_starcat_union.fits"
@@ -34,11 +40,24 @@ def main(args):
 
     star_data_b = Table.read(file_b_stars, format='fits', hdu=2)
     ned_cat = Table.read(redshift_file, format='csv')
+    ned_cat = ned_cat['RA', 'DEC', 'Redshift']
+
+    if args.plot_lovoccs:
+        try:
+            # Read the Lovoccs catalog
+            lovoccs = Table.read(lovoccs_file, format='fits', hdu=1)
+            lovoccs = lovoccs['RA', 'DEC', 'Redshift']
+            
+            # Combine both catalogs
+            ned_cat = vstack([ned_cat, lovoccs])  
+            print("Successfully combined NED and Lovoccs catalogs.")
+        except Exception as e:
+            print(f"No Lovoccs file found, skipping... ({e})")
+
 
     # Ensure output directory exists
-    config_dir = "../medsmaker/superbit/astro_config"
-    config_dir = os.path.abspath(config_dir)
-    dual_mode_path = f"{base_path}/sextractor_dualmode/"
+
+    dual_mode_path = f"{base_path}/sextractor_dualmode"
     output_file = f"{dual_mode_path}/{cluster_name}_ubg_color_color.png"
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     diag_path = os.path.join(dual_mode_path, "diags")
@@ -46,7 +65,7 @@ def main(args):
     os.makedirs(diag_path, exist_ok=True)
     os.makedirs(dual_cat_path, exist_ok=True)
     
-    swarp = sex.make_coadds_for_dualmode(datadir, cluster_name, config_dir=config_dir)
+    swarp = sex.make_coadds_for_dualmode(datadir, cluster_name, config_dir=config_dir, overwrite_coadds=args.overwrite_coadds)
     coadd_files = swarp.coadd_file_names
     file_b, file_g, file_u = coadd_files['b'], coadd_files['g'], coadd_files['u']
 
@@ -56,6 +75,11 @@ def main(args):
     file_b_cat = f"{dual_cat_path}/{cluster_name}_coadd_b_cat.fits"
     file_g_cat = f"{dual_cat_path}/{cluster_name}_coadd_g_cat.fits"
     file_u_cat = f"{dual_cat_path}/{cluster_name}_coadd_u_cat.fits"
+
+    if args.overwrite_cats:
+        print("WARNING: Overwriting catalogs, this may take a while...")
+        os.command(f"rm -rf {dual_cat_path}/*")
+
     try:
         # Read the FITS files
         data_b = Table.read(file_b_cat, format='fits', hdu=2)
@@ -63,7 +87,7 @@ def main(args):
 
     except:
         print("WARNING: source extractor has not been run for band b, so running it again")
-        sex._run_sextractor_single(file_b, dual_cat_path, config_dir)
+        sex._run_sextractor_single(file_b, dual_cat_path, config_dir, diag_dir=diag_path)
         data_b = Table.read(file_b_cat, format='fits', hdu=2)
         ra_b = data_b["ALPHAWIN_J2000"]
 
@@ -144,9 +168,9 @@ def main(args):
     high_z_b = matched_data_b_ned[high_z_indices]
     low_z_b = matched_data_b_ned[low_z_indices]
 
-    print(f"Galaxies with z > {cluster_redshift_up}: {len(high_z_indices)}")
-    print(f'Galaxies with {cluster_redshift_down} < z ≤ {cluster_redshift_up}: {len(mid_z_indices)}')
-    print(f"Galaxies with z ≤ {cluster_redshift_down}: {len(low_z_indices)}")
+    print(f"Galaxies with z > {cluster_redshift_up:.2f}: {len(high_z_indices)}")
+    print(f'Galaxies with {cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}: {len(mid_z_indices)}')
+    print(f"Galaxies with z ≤ {cluster_redshift_down:.2f}: {len(low_z_indices)}")
 
     # Step 6: Compute Magnitudes for NED Matches
     flux_b_high = high_z_b['FLUX_AUTO']
@@ -208,9 +232,14 @@ def main(args):
         plt.scatter(color_bg_stars, color_ub_stars, s=5, alpha=0.10, color='red', label='Stars')
 
     if args.plot_ned:
+        plt.scatter(color_index_bg_high, color_index_ub_high, s=10, alpha=0.3, color='orange', label=f'High-z (z > {cluster_redshift_up:.2f}): : {len(high_z_indices)}')
+        plt.scatter(color_index_bg_mid, color_index_ub_mid, s=10, alpha=0.3, color='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}): {len(mid_z_indices)}')
+        plt.scatter(color_index_bg_low, color_index_ub_low, s=10, alpha=0.10, color='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
+
+    '''if args.plot_ned:
         plt.scatter(color_index_bg_high, color_index_ub_high, s=10, edgecolors='black', facecolors='orange', label=f'High-z (z > {cluster_redshift_up:.2f})')
         plt.scatter(color_index_bg_mid, color_index_ub_mid, s=10, edgecolors='black', facecolors='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f})')
-        plt.scatter(color_index_bg_low, color_index_ub_low, s=10, edgecolors='black', facecolors='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f})')
+        plt.scatter(color_index_bg_low, color_index_ub_low, s=10, edgecolors='black', facecolors='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f})')'''
 
     #plt.ylim(-4.2, 3.8)
     #plt.xlim(-20, -2)
@@ -225,12 +254,27 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Combine bands for a given cluster.")
-    parser.add_argument("cluster_name", type=str, help="Name of the cluster (e.g., AbellS0592)")
-    parser.add_argument("--datadir", type=str, default=os.getenv("DATADIR", ""), help="Directory containing the data files")
-    parser.add_argument("--tolerance", type=float, default=1e-4, help="Angular tolerance in degrees (default: 1e-4)")
-    parser.add_argument("--redshift", type=float, default=0.5, help="Redshift threshold for classification (default: 0.5)")
+    parser.add_argument("--cluster_name", type=str, 
+                        default=os.getenv("cluster_name", ""), 
+                        help="Name of the cluster (default: value from $cluster_name)")
+    parser.add_argument("--datadir", type=str, 
+                        default=os.getenv("DATADIR", ""), 
+                        help="Directory containing the data files")
+    parser.add_argument("--config_dir", type=str, 
+                        default=os.path.join(os.getenv("CODEDIR", ""), "superbit_lensing/medsmaker/superbit/astro_config"), 
+                        help="Directory containing the config files")
+    parser.add_argument("--tolerance", type=float, 
+                        default=1e-4, 
+                        help="Angular tolerance in degrees (default: 1e-4)")
+    parser.add_argument("--redshift", type=float, 
+                        default=float(os.getenv("cluster_redshift", 0.5)), 
+                        help="Redshift threshold for classification (default: value from $cluster_redshift or 0.5)")
+    parser.add_argument("--overwrite_coadds", action="store_true", help="Overwrite existing coadds")
+    parser.add_argument("--overwrite_cats", action="store_true", help="Overwrite existing catalogs")
     parser.add_argument("--plot_stars", action="store_true", help="Plot stars in the color-magnitude diagram")
     parser.add_argument("--plot_ned", action="store_true", help="Plot NED galaxies in the color-magnitude diagram")
+    parser.add_argument("--plot_lovoccs", action="store_true", help="Plot LOVOCCS galaxies in the color-magnitude diagram")
+    
     args = parser.parse_args()
 
     main(args)

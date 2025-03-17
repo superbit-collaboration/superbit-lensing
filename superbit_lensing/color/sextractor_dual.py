@@ -92,9 +92,16 @@ def _run_sextractor_single(image_file1, cat_dir, config_dir, diag_dir=None, back
     print(f'cat_name is {cat_file} \n')
     return cat_file
 
+def is_valid_fits(file_path):
+    """Check if a file is a valid FITS image."""
+    try:
+        with fits.open(file_path, memmap=True) as hdul:
+            return True  # Successfully opened, so it's a valid FITS file
+    except Exception:
+        return False  # Either doesn't exist or is corrupted
 
 class make_coadds_for_dualmode():
-    def __init__(self, data_dir, cluster_name, config_dir=None):
+    def __init__(self, data_dir, cluster_name, config_dir=None, overwrite_coadds=False):
         '''
         data_path: path to the image data not including target name
         coadd: Set to true if the first image file is a coadd image (must be first)
@@ -106,9 +113,11 @@ class make_coadds_for_dualmode():
         self.bands = ["b", "g", "u"]
         self.image_files = {band: self.set_image_files(band) for band in self.bands}
         self.sex_wgt_files = {band: self.set_weight_files(self.image_files[band]) for band in self.bands}
-        self.base_path = os.path.join(self.datadir, self.cluster_name)
-        self.dual_mode_dir = f"{self.base_path}/sextractor_dualmode/"
+        self.base_path = os.path.join(self.data_dir, self.cluster_name)
+        self.dual_mode_dir = f"{self.base_path}/sextractor_dualmode"
         self.base_coadd_dir = f"{self.dual_mode_dir}/coadd"
+        if overwrite_coadds:
+            os.system(f"rm -rf {self.base_coadd_dir}")
         if config_dir is None:
             config_dir = "../medsmaker/superbit/astro_config"
             config_dir = os.path.abspath(config_dir)
@@ -119,14 +128,18 @@ class make_coadds_for_dualmode():
     def make_coadds(self):
         files = {}
         for band in self.bands:
-            command_arr, coadd_file = self.make_coadd_arguments(band)
-            
-            if band == "b":  # Only run this for the first band
-                self._make_external_headers(command_arr, band)
-            command = ' '.join(command_arr.values())
-            print(f"The SWarp Command is {command}")
-            os.system(command)
-            self.augment_coadd_image(coadd_file)
+            command_arr, coadd_file = self.make_coadd_arguments(band, config_dir=self.config_dir)
+            # Check if the file exists and is a valid FITS image
+            if os.path.exists(coadd_file) and is_valid_fits(coadd_file):
+                print(f"Valid coadd FITS file exists: {coadd_file}")
+            else:
+                print(f"Coadd file does not exist or is invalid: {coadd_file}")
+                if band == "b":  # Only run this for the first band
+                    self._make_external_headers(command_arr, band)
+                command = ' '.join(command_arr.values())
+                print(f"The SWarp Command is {command}")
+                os.system(command)
+                self.augment_coadd_image(coadd_file)
             files[band] = coadd_file
         return files
 
@@ -153,25 +166,29 @@ class make_coadds_for_dualmode():
         sex_wgt_files = [img_name.replace('.fits', '.sex_weight.fits') for img_name in img_names]
 
         for img_name in img_names:
-            
-            with fits.open(img_name) as img:
-                # Assuming the image data is in the primary HDU
-                img_data = img[0].data  
-                # Keep the original header to use for the weight map
-                header = img[0].header  
+            sex_wgt_file_name = img_name.replace('.fits', '.sex_weight.fits')
+            if not os.path.exists(sex_wgt_file_name):
+                print(f'Weight map not found for {img_name}, creating one...')
+                with fits.open(img_name) as img:
+                    # Assuming the image data is in the primary HDU
+                    img_data = img[0].data  
+                    # Keep the original header to use for the weight map
+                    header = img[0].header  
 
-                # Initialize weight_map with ones
-                weight_map = np.ones_like(img_data, dtype=np.float32)
+                    # Initialize weight_map with ones
+                    weight_map = np.ones_like(img_data, dtype=np.float32)
 
-                # Set weight to 0 where mask is True
-                weight_map[mask] = 0
+                    # Set weight to 0 where mask is True
+                    weight_map[mask] = 0
 
-                # Save the weight_map to a new file
-                sex_wgt_file_name = img_name.replace('.fits', '.sex_weight.fits')
-                hdu = fits.PrimaryHDU(weight_map, header=header)
-                hdu.writeto(sex_wgt_file_name, overwrite=True)
+                    # Save the weight_map to a new file
+                    
+                    hdu = fits.PrimaryHDU(weight_map, header=header)
+                    hdu.writeto(sex_wgt_file_name, overwrite=True)
 
-            print(f'Weight map saved to {sex_wgt_file_name}')
+                print(f'Weight map saved to {sex_wgt_file_name}')
+            else:
+                print(f'Weight map found for {img_name}, skipping...')
 
         return sex_wgt_files
         
@@ -230,7 +247,7 @@ class make_coadds_for_dualmode():
         # Now, have to combine the weight and image file into one.
         im = fits.open(coadd_im_file, mode='append'); im[0].name = 'SCI'
         if im.__contains__('WGT') == True:
-            self.logprint(f"\n Coadd image {coadd_im_file} already contains " +
+            print(f"\n Coadd image {coadd_im_file} already contains " +
                           "an extension named 'WGT', skipping...\n")
         else:
             wt = fits.open(coadd_wt_file); wt[0].name = 'WGT'
@@ -264,7 +281,7 @@ class make_coadds_for_dualmode():
         head_arr['outfile_arg'] = header_outfile
         
         swarp_header_cmd = ' '.join(head_arr.values())
-        self.logprint('swarp header-only cmd is ' + swarp_header_cmd)
+        print('swarp header-only cmd is ' + swarp_header_cmd)
         os.system(swarp_header_cmd)
         
         ## Cool, now that's done, create headers for the other bands too.
