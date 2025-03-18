@@ -11,6 +11,10 @@ from superbit_lensing.match import SkyCoordMatcher
 from superbit_lensing.color import sextractor_dual as sex
 
 def main(args):
+    print("=== Arguments Passed to the Script ===")
+    for arg, value in vars(args).items():
+        print(f"{arg}: {value}")
+    print("======================================\n")
     # Construct file paths based on the inputs
     cluster_name = args.cluster_name
     bands = args.bands

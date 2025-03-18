@@ -3,6 +3,24 @@ from glob import glob
 import numpy as np
 from astropy.io import fits
 import copy
+import subprocess
+import multiprocessing
+
+def get_slurm_resources():
+    """Detect available SLURM resources, fallback to local CPU count if not in SLURM."""
+    ntasks = int(os.environ.get("SLURM_NTASKS", 0))  # SLURM tasks
+    ncores = int(os.environ.get("SLURM_CPUS_PER_TASK", 0))  # Cores per task
+
+    if ntasks > 0 and ncores > 0:
+        return ntasks * ncores  # Total available cores in SLURM
+    else:
+        return multiprocessing.cpu_count()  # Use all cores if not in SLURM
+
+def run_command(cmd, cores):
+    """Run a command with allocated cores"""
+    full_cmd = f"OMP_NUM_THREADS={cores} {cmd}"
+    print(f"Running: {full_cmd}")
+    subprocess.run(full_cmd, shell=True)
 
 def _run_sextractor_dual(image_file1, image_file2, cat_dir, config_dir, diag_dir=None, back_type='AUTO'):
     '''
@@ -127,20 +145,45 @@ class make_coadds_for_dualmode():
 
     def make_coadds(self):
         files = {}
+        commands_to_run = []
+
         for band in self.bands:
             command_arr, coadd_file = self.make_coadd_arguments(band, config_dir=self.config_dir)
-            # Check if the file exists and is a valid FITS image
+
             if os.path.exists(coadd_file) and is_valid_fits(coadd_file):
                 print(f"Valid coadd FITS file exists: {coadd_file}")
             else:
                 print(f"Coadd file does not exist or is invalid: {coadd_file}")
-                if band == "b":  # Only run this for the first band
+
+                if band == "b":
                     self._make_external_headers(command_arr, band)
+
                 command = ' '.join(command_arr.values())
                 print(f"The SWarp Command is {command}")
-                os.system(command)
-                self.augment_coadd_image(coadd_file)
+                commands_to_run.append(command)
+
             files[band] = coadd_file
+
+        # **Parallel Execution**
+        total_cores = get_slurm_resources()
+        num_tasks = len(commands_to_run)
+        cores_per_task = max(1, total_cores // num_tasks) if num_tasks > 0 else 1
+
+        # Calculate Efficiency
+        efficiency = (num_tasks / total_cores) if total_cores > 0 else 0
+        print(f"Total Cores: {total_cores}, Number of Tasks: {num_tasks}, Cores per Task: {cores_per_task}")
+        print(f"Efficiency: {efficiency * 100:.2f}%")
+
+        if num_tasks > 0:
+            with multiprocessing.Pool(processes=num_tasks) as pool:
+                pool.starmap(run_command, [(cmd, cores_per_task) for cmd in commands_to_run])
+        
+            # **Augment coadd images**
+            for band, coadd_file in files.items():
+                if os.path.exists(coadd_file):
+                    self.augment_coadd_image(coadd_file)
+                    print(f"Augmented coadd image for band {band}: {coadd_file}")
+
         return files
 
     def set_image_files(self, band):

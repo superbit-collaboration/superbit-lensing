@@ -18,5 +18,7 @@ python $CODEDIR/superbit_lensing/color/color_color_v2.py ${cluster_name} \
 --datadir=$DATADIR \
 --redshift=$cluster_redshift \
 --config_dir=$CODEDIR/superbit_lensing/medsmaker/superbit/astro_config \
+--plot_color_mag \
+--save_fits \
 --plot_ned #--plot_lovoccs
 # Optional flags: --overwrite_coadds --overwrite_cats

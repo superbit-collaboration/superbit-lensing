@@ -25,22 +25,37 @@ def main(args):
 
     base_path = os.path.join(datadir, cluster_name)
     redshift_file = os.path.join(datadir, f'catalogs/redshifts/{cluster_name}_NED_redshifts.csv')
-    lovoccs_file = os.path.join(datadir, f'catalogs/lovoccs/{cluster_name}_lovoccs_redhifts.fits')
+    lovoccs_file = os.path.join(datadir, f'catalogs/lovoccs/{cluster_name}_lovoccs_redshifts.fits')
 
     # Construct file paths
     file_b_stars_union = f"{base_path}/b/coadd/{cluster_name}_coadd_b_starcat_union.fits"
     file_b_stars_fallback = f"{base_path}/b/coadd/{cluster_name}_coadd_b_starcat.fits"
+    file_b_stars_fallback_2nd = os.path.join(datadir, f'catalogs/stars/{cluster_name}_gaia_starcat.fits')
 
     # Check for starcat_union first, else fall back to starcat
     if os.path.exists(file_b_stars_union):
         file_b_stars = file_b_stars_union
-    else:
+    elif os.path.exists(file_b_stars_fallback):
         file_b_stars = file_b_stars_fallback
         print(f"Warning: Using fallback star catalog for band b: {file_b_stars}")
+    else:
+        file_b_stars = file_b_stars_fallback_2nd
+        print(f"Warning: Using Gaia fallback star catalog for band b: {file_b_stars}")
+    
+    try:
+        star_data_b = Table.read(file_b_stars, format='fits', hdu=2)
+        
+    except Exception as e:
+        print(f"Failed to read star catalog for band b ({e}), creating an empty catalog.")
+        star_data_b = Table(names=['ALPHAWIN_J2000', 'DELTAWIN_J2000'], dtype=['f8', 'f8'])
+    print(f"Number of stars in the star catalog: {len(star_data_b)}")
 
-    star_data_b = Table.read(file_b_stars, format='fits', hdu=2)
-    ned_cat = Table.read(redshift_file, format='csv')
-    ned_cat = ned_cat['RA', 'DEC', 'Redshift']
+    try:
+        ned_cat = Table.read(redshift_file, format='csv')
+        ned_cat = ned_cat['RA', 'DEC', 'Redshift']
+    except Exception as e:
+        print(f"Failed to read redshift file ({e}), creating an empty catalog.")
+        ned_cat = Table(names=['RA', 'DEC', 'Redshift'], dtype=['f8', 'f8', 'f8'])
 
     if args.plot_lovoccs:
         try:
@@ -58,8 +73,14 @@ def main(args):
     # Ensure output directory exists
 
     dual_mode_path = f"{base_path}/sextractor_dualmode"
-    output_file = f"{dual_mode_path}/{cluster_name}_ubg_color_color.png"
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    plot_dir = f"{dual_mode_path}/plots"
+    output_dir = f"{dual_mode_path}/out"
+    output_file = f"{plot_dir}/{cluster_name}_ubg_color_color.png"
+    out_file_cm_bg = f"{plot_dir}/{cluster_name}_b_g_color_mag.png"
+    out_file_cm_ub = f"{plot_dir}/{cluster_name}_u_b_color_mag.png"
+    output_fits = f"{output_dir}/{cluster_name}_colors_mags.fits"
+    os.makedirs(plot_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
     diag_path = os.path.join(dual_mode_path, "diags")
     dual_cat_path = os.path.join(dual_mode_path, "cat")
     os.makedirs(diag_path, exist_ok=True)
@@ -78,7 +99,7 @@ def main(args):
 
     if args.overwrite_cats:
         print("WARNING: Overwriting catalogs, this may take a while...")
-        os.command(f"rm -rf {dual_cat_path}/*")
+        os.system(f"rm -rf {dual_cat_path}/*")
 
     try:
         # Read the FITS files
@@ -144,9 +165,21 @@ def main(args):
     color_index_bg = m_b - m_g
     color_index_ub = m_u - m_b
 
-    # Step 4: Match NED Data
-    ra_ned = np.radians(ned_cat['RA'])
-    dec_ned = np.radians(ned_cat['DEC'])
+    if args.save_fits:
+        ra_dec_table = matched_data_b['ALPHAWIN_J2000', 'DELTAWIN_J2000']
+        ra_dec_table.rename_columns(['ALPHAWIN_J2000', 'DELTAWIN_J2000'], ['ra', 'dec'])
+        # Create a new table with the selected columns and computed values
+        final_table = Table()
+        final_table['ra'] = ra_dec_table['ra'][valid_flux]
+        final_table['dec'] = ra_dec_table['dec'][valid_flux]
+        final_table['m_b'] = m_b
+        final_table['m_g'] = m_g
+        final_table['m_u'] = m_u
+        final_table['color_bg'] = color_index_bg
+        final_table['color_ub'] = color_index_ub
+
+        # Save as a FITS file
+        final_table.write(output_fits, format='fits', overwrite=True)        
 
     # Use SkyCoordMatcher for NED matching
     matcher_ned = SkyCoordMatcher(ned_cat, matched_data_b, cat1_ratag='RA', cat1_dectag='DEC',
@@ -236,11 +269,6 @@ def main(args):
         plt.scatter(color_index_bg_mid, color_index_ub_mid, s=10, alpha=0.3, color='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}): {len(mid_z_indices)}')
         plt.scatter(color_index_bg_low, color_index_ub_low, s=10, alpha=0.10, color='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
 
-    '''if args.plot_ned:
-        plt.scatter(color_index_bg_high, color_index_ub_high, s=10, edgecolors='black', facecolors='orange', label=f'High-z (z > {cluster_redshift_up:.2f})')
-        plt.scatter(color_index_bg_mid, color_index_ub_mid, s=10, edgecolors='black', facecolors='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f})')
-        plt.scatter(color_index_bg_low, color_index_ub_low, s=10, edgecolors='black', facecolors='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f})')'''
-
     #plt.ylim(-4.2, 3.8)
     #plt.xlim(-20, -2)
     plt.xlabel(f'$m_b - m_g$')
@@ -251,10 +279,51 @@ def main(args):
     plt.savefig(output_file, dpi=300)
     print(f"Plot saved to '{output_file}'")
 
+    if args.plot_color_mag:
+        plt.figure(figsize=(8, 6))
+        plt.scatter(m_b, color_index_bg, s=5, alpha=0.10, color='blue', label='Galaxies')
+        if args.plot_stars:
+            plt.scatter(m_stars_b, color_bg_stars, s=5, alpha=0.10, color='red', label='Stars')
+
+        if args.plot_ned:
+            plt.scatter(m_b_high, color_index_bg_high, s=10, edgecolors='black', facecolors='orange', label=f'High-z (z > {cluster_redshift_up:.2f}): : {len(high_z_indices)}')
+            plt.scatter(m_b_mid, color_index_bg_mid, s=10, edgecolors='black', facecolors='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}): {len(mid_z_indices)}')
+            plt.scatter(m_b_low, color_index_bg_low, s=10, edgecolors='black', facecolors='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
+
+        #plt.ylim(-4.2, 3.8)
+        #plt.xlim(-20, -2)
+        plt.xlabel(f'$m_b$')
+        plt.ylabel(f'$m_b - m_g')
+        plt.title(f'{cluster_name}, Redshift={redshift}')
+        plt.grid(True, linestyle='--', alpha=0.5)
+        plt.legend(loc='upper left')
+        plt.savefig(out_file_cm_bg, dpi=300)
+        print(f"Plot saved to '{out_file_cm_bg}'")        
+
+        plt.figure(figsize=(8, 6))
+        plt.scatter(m_b, color_index_ub, s=5, alpha=0.10, color='blue', label='Galaxies')
+        if args.plot_stars:
+            plt.scatter(m_stars_b, color_ub_stars, s=5, alpha=0.10, color='red', label='Stars')
+
+        if args.plot_ned:
+            plt.scatter(m_b_high, color_index_ub_high, s=10, edgecolors='black', facecolors='orange', label=f'High-z (z > {cluster_redshift_up:.2f}): : {len(high_z_indices)}')
+            plt.scatter(m_b_mid, color_index_ub_mid, s=10, edgecolors='black', facecolors='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}): {len(mid_z_indices)}')
+            plt.scatter(m_b_low, color_index_ub_low, s=10, edgecolors='black', facecolors='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
+
+        #plt.ylim(-4.2, 3.8)
+        #plt.xlim(-20, -2)
+        plt.xlabel(f'$m_b$')
+        plt.ylabel(f'$m_u - m_b$')
+        plt.title(f'{cluster_name}, Redshift={redshift}')
+        plt.grid(True, linestyle='--', alpha=0.5)
+        plt.legend(loc='upper left')
+        plt.savefig(out_file_cm_ub, dpi=300)
+        print(f"Plot saved to '{out_file_cm_ub}'")   
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Combine bands for a given cluster.")
-    parser.add_argument("--cluster_name", type=str, 
+    parser.add_argument("cluster_name", type=str, 
                         default=os.getenv("cluster_name", ""), 
                         help="Name of the cluster (default: value from $cluster_name)")
     parser.add_argument("--datadir", type=str, 
@@ -271,9 +340,11 @@ if __name__ == "__main__":
                         help="Redshift threshold for classification (default: value from $cluster_redshift or 0.5)")
     parser.add_argument("--overwrite_coadds", action="store_true", help="Overwrite existing coadds")
     parser.add_argument("--overwrite_cats", action="store_true", help="Overwrite existing catalogs")
+    parser.add_argument("--plot_color_mag", action="store_true", help="Plot the color-magnitude diagrams")
     parser.add_argument("--plot_stars", action="store_true", help="Plot stars in the color-magnitude diagram")
     parser.add_argument("--plot_ned", action="store_true", help="Plot NED galaxies in the color-magnitude diagram")
     parser.add_argument("--plot_lovoccs", action="store_true", help="Plot LOVOCCS galaxies in the color-magnitude diagram")
+    parser.add_argument('--save_fits', action='store_true', help='Save the output FITS file')
     
     args = parser.parse_args()
 
