@@ -172,7 +172,7 @@ def main(args):
         bm.make_exposure_catalogs(astro_config_dir)
         bm.make_exposure_weights()
         bm.make_exposure_bmask()
-        #bm.make_coadd_weight()
+        bm.make_coadd_weight()
         
         # Set image catalogs attribute
         bm.set_image_cats()
