@@ -267,7 +267,7 @@ def main(args):
     if args.plot_ned:
         plt.scatter(color_index_bg_high, color_index_ub_high, s=10, alpha=0.3, color='orange', label=f'High-z (z > {cluster_redshift_up:.2f}): : {len(high_z_indices)}')
         plt.scatter(color_index_bg_mid, color_index_ub_mid, s=10, alpha=0.3, color='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}): {len(mid_z_indices)}')
-        plt.scatter(color_index_bg_low, color_index_ub_low, s=10, alpha=0.10, color='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
+        plt.scatter(color_index_bg_low, color_index_ub_low, s=10, alpha=0.3, color='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
 
     #plt.ylim(-4.2, 3.8)
     #plt.xlim(-20, -2)
@@ -286,14 +286,15 @@ def main(args):
             plt.scatter(m_stars_b, color_bg_stars, s=5, alpha=0.10, color='red', label='Stars')
 
         if args.plot_ned:
-            plt.scatter(m_b_high, color_index_bg_high, s=10, edgecolors='black', facecolors='orange', label=f'High-z (z > {cluster_redshift_up:.2f}): : {len(high_z_indices)}')
-            plt.scatter(m_b_mid, color_index_bg_mid, s=10, edgecolors='black', facecolors='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}): {len(mid_z_indices)}')
-            plt.scatter(m_b_low, color_index_bg_low, s=10, edgecolors='black', facecolors='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
+            plt.scatter(m_b_high, color_index_bg_high, s=10, alpha=0.3, facecolors='orange', label=f'High-z (z > {cluster_redshift_up:.2f}): : {len(high_z_indices)}')
+            plt.scatter(m_b_low, color_index_bg_low, s=10, alpha=0.3, facecolors='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
+            plt.scatter(m_b_mid, color_index_bg_mid, s=10, alpha=0.3, facecolors='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}): {len(mid_z_indices)}')
+
 
         #plt.ylim(-4.2, 3.8)
         #plt.xlim(-20, -2)
         plt.xlabel(f'$m_b$')
-        plt.ylabel(f'$m_b - m_g')
+        plt.ylabel(f'$m_b - m_g$')
         plt.title(f'{cluster_name}, Redshift={redshift}')
         plt.grid(True, linestyle='--', alpha=0.5)
         plt.legend(loc='upper left')

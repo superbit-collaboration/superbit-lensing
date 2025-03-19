@@ -462,32 +462,42 @@ def analyze_mcal_fits(file_path):
     ra = data['ra']
     dec = data['dec']
 
-    # Compute min and max boundaries
+    # Compute full min and max boundaries
     ra_min, ra_max = np.min(ra), np.max(ra)
     dec_min, dec_max = np.min(dec), np.max(dec)
 
-    # Compute the sky area in arcmin²
-    # Approximate area assuming small angles: ΔRA * ΔDec in arcmin²
-    area_arcmin2 = (ra_max - ra_min) * 60 * (dec_max - dec_min) * 60
+    # Compute middle 50% boundaries
+    ra_lower = ra_min + 0.25 * (ra_max - ra_min)
+    ra_upper = ra_max - 0.25 * (ra_max - ra_min)
+    dec_lower = dec_min + 0.25 * (dec_max - dec_min)
+    dec_upper = dec_max - 0.25 * (dec_max - dec_min)
+
+    # Filter data within middle 50%
+    mask = (ra >= ra_lower) & (ra <= ra_upper) & (dec >= dec_lower) & (dec <= dec_upper)
+    filtered_data = data[mask]
+
+    # Compute new area in arcmin²
+    area_arcmin2 = (ra_upper - ra_lower) * 60 * (dec_upper - dec_lower) * 60
 
     # Compute object density
-    num_objects = len(data)
+    num_objects = len(filtered_data)
     density_per_arcmin2 = num_objects / area_arcmin2 if area_arcmin2 > 0 else np.inf
 
     # Print results
-    print(f"RA range: {ra_min:.6f}° to {ra_max:.6f}°")
-    print(f"Dec range: {dec_min:.6f}° to {dec_max:.6f}°")
-    print(f"Total number of objects: {num_objects}")
-    print(f"Survey area: {area_arcmin2:.2f} arcmin²")
+    print(f"Middle 50% RA range: {ra_lower:.6f}° to {ra_upper:.6f}°")
+    print(f"Middle 50% Dec range: {dec_lower:.6f}° to {dec_upper:.6f}°")
+    print(f"Total number of objects in middle 50%: {num_objects}")
+    print(f"Survey area (middle 50%): {area_arcmin2:.2f} arcmin²")
     print(f"Density: {density_per_arcmin2:.2f} objects per arcmin²")
 
     return {
-        "ra_range": (ra_min, ra_max),
-        "dec_range": (dec_min, dec_max),
+        "ra_range": (ra_lower, ra_upper),
+        "dec_range": (dec_lower, dec_upper),
         "num_objects": num_objects,
         "area_arcmin2": area_arcmin2,
         "density_per_arcmin2": density_per_arcmin2
     }
+
 
 
 BASE_DIR = get_base_dir()

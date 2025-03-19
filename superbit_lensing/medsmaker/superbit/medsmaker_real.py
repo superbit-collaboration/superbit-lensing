@@ -480,7 +480,7 @@ class BITMeasurement():
             weight_file=self.coadd_img_file,
             cat_dir=coadd_dir,
             config_dir=config_dir, 
-            back_type='MANUAL'
+            back_type='AUTO'
         )
 
         try:
