@@ -165,6 +165,18 @@ def main(args):
     color_index_bg = m_b - m_g
     color_index_ub = m_u - m_b
 
+    # Use SkyCoordMatcher for NED matching
+    matcher_ned = SkyCoordMatcher(ned_cat, matched_data_b, cat1_ratag='RA', cat1_dectag='DEC',
+                 cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', return_idx=True, match_radius=1 * tolerance_deg)
+    matched_ned, matched_data_b_ned, idx1, idx2 = matcher_ned.get_matched_pairs()
+
+    print(f"Number of matched galaxies with known redshifts: {len(matched_ned)}")
+    # Initialize redshift array with NaNs for all objects
+    redshifts = np.full(len(matched_data_b), np.nan)
+
+    # Assign redshifts to matched indices
+    redshifts[idx2] = matched_ned["Redshift"]
+
     if args.save_fits:
         ra_dec_table = matched_data_b['ALPHAWIN_J2000', 'DELTAWIN_J2000']
         ra_dec_table.rename_columns(['ALPHAWIN_J2000', 'DELTAWIN_J2000'], ['ra', 'dec'])
@@ -177,16 +189,10 @@ def main(args):
         final_table['m_u'] = m_u
         final_table['color_bg'] = color_index_bg
         final_table['color_ub'] = color_index_ub
-
+        final_table['redshift'] = redshifts[valid_flux]
         # Save as a FITS file
         final_table.write(output_fits, format='fits', overwrite=True)        
 
-    # Use SkyCoordMatcher for NED matching
-    matcher_ned = SkyCoordMatcher(ned_cat, matched_data_b, cat1_ratag='RA', cat1_dectag='DEC',
-                 cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', return_idx=True, match_radius=1 * tolerance_deg)
-    matched_ned, matched_data_b_ned, idx1, idx2 = matcher_ned.get_matched_pairs()
-
-    print(f"Number of matched galaxies with known redshifts: {len(matched_ned)}")
 
     # Step 5: Classify NED Matches by Redshift
     cluster_redshift = redshift
