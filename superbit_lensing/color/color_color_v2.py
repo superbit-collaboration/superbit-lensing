@@ -187,12 +187,52 @@ def main(args):
         final_table['m_b'] = m_b
         final_table['m_g'] = m_g
         final_table['m_u'] = m_u
+        final_table['R_b'] = matched_data_b["FLUX_RADIUS"][valid_flux]
+        final_table['R_g'] = matched_data_g["FLUX_RADIUS"][valid_flux]
+        final_table['R_u'] = matched_data_u["FLUX_RADIUS"][valid_flux]
+        final_table['R_b_prepsf'] = 0.6 * matched_data_b["FLUX_RADIUS"][valid_flux]
+        final_table['R_g_prepsf'] = 0.6 * matched_data_g["FLUX_RADIUS"][valid_flux]
+        final_table['R_u_prepsf'] = 0.6 * matched_data_u["FLUX_RADIUS"][valid_flux]
+        final_table['FLUX_AUTO_b'] = flux_b[valid_flux]
+        final_table['FLUX_AUTO_g'] = flux_g[valid_flux]
+        final_table['FLUX_AUTO_u'] = flux_u[valid_flux]
+        final_table['MAG_AUTO_b'] = matched_data_b["MAG_AUTO"][valid_flux]
+        final_table['MAG_AUTO_g'] = matched_data_g["MAG_AUTO"][valid_flux]
+        final_table['MAG_AUTO_u'] = matched_data_u["MAG_AUTO"][valid_flux]
         final_table['color_bg'] = color_index_bg
         final_table['color_ub'] = color_index_ub
         final_table['redshift'] = redshifts[valid_flux]
+
         # Save as a FITS file
         final_table.write(output_fits, format='fits', overwrite=True)        
+        # Modify the FITS header to store descriptions inline
+        with fits.open(output_fits, mode='update') as hdul:
+            hdr = hdul[1].header  # Access the table header
 
+            # Add descriptions to column definitions
+            hdr['TTYPE1'] = ('ra', 'Right Ascension (J2000) [degree]')
+            hdr['TTYPE2'] = ('dec', 'Declination (J2000) [degree]')
+            hdr['TTYPE3'] = ('m_b', 'Magnitude in b-band')
+            hdr['TTYPE4'] = ('m_g', 'Magnitude in g-band')
+            hdr['TTYPE5'] = ('m_u', 'Magnitude in u-band')
+            hdr['TTYPE6'] = ('R_b', 'Half-light radius in b-band [arcsec]')
+            hdr['TTYPE7'] = ('R_g', 'Half-light radius in g-band [arcsec]')
+            hdr['TTYPE8'] = ('R_u', 'Half-light radius in u-band [arcsec]')
+            hdr['TTYPE9'] = ('R_b_prepsf', 'pre-PSF Half-light radius in b-band [arcsec]')
+            hdr['TTYPE10'] = ('R_g_prepsf', 'pre-PSF Half-light radius in g-band [arcsec]')
+            hdr['TTYPE11'] = ('R_u_prepsf', 'pre-PSF Half-light radius in u-band [arcsec]')
+            hdr['TTYPE12'] = ('FLUX_AUTO_b', 'SE flux measurement in b-band')
+            hdr['TTYPE13'] = ('FLUX_AUTO_g', 'SE flux measurement in g-band')
+            hdr['TTYPE14'] = ('FLUX_AUTO_u', 'SE flux measurement in u-band')
+            hdr['TTYPE15'] = ('MAG_AUTO_b', 'SE magnitude in b-band')
+            hdr['TTYPE16'] = ('MAG_AUTO_g', 'SE magnitude in g-band')
+            hdr['TTYPE17'] = ('MAG_AUTO_u', 'SE magnitude in u-band')
+            hdr['TTYPE18'] = ('color_bg', 'Color index (m_b - m_g)')
+            hdr['TTYPE19'] = ('color_ub', 'Color index (m_u - m_b)')
+            hdr['TTYPE20'] = ('redshift', 'Available redshift')
+
+            # Save changes
+            hdul.flush()
 
     # Step 5: Classify NED Matches by Redshift
     cluster_redshift = redshift
