@@ -966,7 +966,7 @@ def main(args):
             M.barrier()
 
         outnum = str(i).zfill(3)
-        outname = f'{run_name}_{outnum}.fits'
+        outname = f'{run_name}_{outnum}_{sbparams.bandpass.replace("crates_", "")}_sim.fits'
         file_name = os.path.join(sbparams.outdir, outname)
 
         # Set up a truth catalog during first image generation
@@ -1300,10 +1300,10 @@ def main(args):
 
     # Log file was created before outdir is setup in some cases
     # If so, move from temp location to there
-    if temp_log is True:
-        oldfile = os.path.join(logdir, logfile)
-        newfile = os.path.join(sbparams.outdir, logfile)
-        os.replace(oldfile, newfile)
+    #if temp_log is True:
+    #    oldfile = os.path.join(logdir, logfile)
+    #    newfile = os.path.join(sbparams.outdir, logfile)
+    #    os.replace(oldfile, newfile)
 
     if (mpi is False) or (M.is_mpi_root()):
         logprint('\nDone!\n')
