@@ -19,6 +19,7 @@ import os
 import math
 import logging
 import time
+from datetime import datetime, timezone
 import galsim
 import galsim.des
 import galsim.convolve
@@ -48,6 +49,8 @@ def parse_args():
                         help='Name of mock simulation run')
     parser.add_argument('-outdir', action='store', type=str,
                         help='Output directory of simulated files')
+    parser.add_argument('-data_dir', action='store', type=str,
+                        help='Base directory where run_name directory structure will be created')
     parser.add_argument('-ncores', action='store', type=int, default=1,
                         help='Number of cores to use for multiproessing')
     parser.add_argument('--mpi', action='store_true', default=False,
@@ -462,13 +465,19 @@ class SuperBITParameters:
         """
 
         self.logprint = logprint
-
+        self.use_dir_structure = True  # Default to using directory structure
+        
         self.logprint(f'Loading parameters from {config_file}')
         self._load_config_file(config_file)
 
         # Check for command line args to overwrite config_file and / or defaults
         if args is not None:
             self._load_command_line(args)
+            
+            # If outdir was explicitly provided in command line args, bypass directory structure
+            if 'outdir' in args and args.outdir is not None:
+                self.use_dir_structure = False
+                self.logprint('Outdir explicitly provided, bypassing directory structure creation')
 
         # Check that certain params are set either on command line or in config
         utils.check_req_params(self, self.__req_params, self.__req_defaults)
@@ -477,6 +486,9 @@ class SuperBITParameters:
 
         # Setup stellar injection
         self._setup_stars()
+        
+        # Create directory structure if needed
+        self._create_outdir_structure()
 
         return
 
@@ -590,6 +602,8 @@ class SuperBITParameters:
                 self.bp_file = str(value)
             elif option == "outdir":
                 self.outdir = str(value)
+            elif option == "data_dir":
+                self.data_dir = str(value)
             elif option == "master_seed":
                 self.master_seed = int(value)
             elif option == "noise_seed":
@@ -754,13 +768,29 @@ class SuperBITParameters:
         return
 
     # TODO: This should be updated to be sensible. see issue #10
-    def make_mask_files(self, logprint, clobber):
-        mask_dir = os.path.join(self.outdir, 'mask_files')
+    def make_mask_files(self, logprint, clobber, cal_dir=None):
+        """
+        Create mask files for the simulation.
+        
+        Parameters:
+        -----------
+        logprint : function
+            Function to log messages
+        clobber : bool
+            Whether to overwrite existing files
+        cal_dir : str, optional
+            Directory to save mask files. If None, uses self.run_outdir
+        """
+        # Determine directory to use
+        base_dir = cal_dir if cal_dir is not None else self.run_outdir
+        
+        mask_dir = os.path.join(base_dir, 'mask_files')
         mask_file = 'forecast_mask.fits'
         mask_outfile = os.path.join(mask_dir, mask_file)
 
         if not os.path.exists(mask_dir):
-            os.mkdir(mask_dir)
+            os.makedirs(mask_dir)
+            self.logprint(f'Created mask directory: {mask_dir}')
 
         if os.path.exists(mask_outfile):
             self.logprint('Removing old mask file...')
@@ -785,13 +815,29 @@ class SuperBITParameters:
         return
 
     # TODO: This should be updated to be sensible. see issue #10
-    def make_weight_files(self, logprint, clobber):
-        weight_dir = os.path.join(self.outdir, 'weight_files')
+    def make_weight_files(self, logprint, clobber, cal_dir=None):
+        """
+        Create weight files for the simulation.
+        
+        Parameters:
+        -----------
+        logprint : function
+            Function to log messages
+        clobber : bool
+            Whether to overwrite existing files
+        cal_dir : str, optional
+            Directory to save weight files. If None, uses self.run_outdir
+        """
+        # Determine directory to use
+        base_dir = cal_dir if cal_dir is not None else self.run_outdir
+        
+        weight_dir = os.path.join(base_dir, 'weight_files')
         weight_file = 'forecast_weight.fits'
         weight_outfile = os.path.join(weight_dir, weight_file)
 
         if not os.path.exists(weight_dir):
-            os.mkdir(weight_dir)
+            os.makedirs(weight_dir)
+            self.logprint(f'Created weight directory: {weight_dir}')
 
         if os.path.exists(weight_outfile):
             self.logprint('Removing old weight file...')
@@ -814,6 +860,90 @@ class SuperBITParameters:
                 raise e
 
         return
+
+    def _create_outdir_structure(self):
+        """
+        Create the required directory structure for the output files.
+        Directory structure follows the pattern:
+        
+        data_dir/run_name/
+        data_dir/run_name/b/cal
+        data_dir/run_name/b/cat
+        data_dir/run_name/b/coadd
+        data_dir/run_name/b/out
+        data_dir/run_name/det/cat
+        data_dir/run_name/det/coadd
+        data_dir/run_name/g/cal
+        data_dir/run_name/g/cat
+        data_dir/run_name/g/coadd
+        data_dir/run_name/g/out
+        data_dir/run_name/u/cal
+        data_dir/run_name/u/cat
+        data_dir/run_name/u/coadd
+        data_dir/run_name/u/out
+        
+        If use_dir_structure is False, skips creating directories and just 
+        ensures outdir exists and sets run_outdir to outdir.
+        
+        If data_dir is specified and use_dir_structure is True, it will be used as the base directory,
+        otherwise outdir will be used as base.
+        """
+        # When not using directory structure, just ensure outdir exists and return
+        if not self.use_dir_structure:
+            if not os.path.exists(self.outdir):
+                self.logprint(f'Creating output directory: {self.outdir}')
+                os.makedirs(self.outdir)
+            
+            # Set run_outdir to outdir so all files get written there
+            self.run_outdir = self.outdir
+            self.logprint(f'Using {self.outdir} as output directory')
+            return
+            
+        # Otherwise create the full directory structure
+        # Determine base directory
+        base_dir = getattr(self, 'data_dir', None) or self.outdir
+        
+        if not os.path.exists(base_dir):
+            self.logprint(f'Creating base directory: {base_dir}')
+            os.makedirs(base_dir)
+            
+        # Define the directory structure
+        bands = ['b', 'g', 'u']
+        subdirs = ['cal', 'cat', 'coadd', 'out']
+        det_subdirs = ['cat', 'coadd']
+        
+        # Create main run directory
+        run_dir = os.path.join(base_dir, self.run_name)
+        if not os.path.exists(run_dir):
+            os.makedirs(run_dir)
+            self.logprint(f'Created run directory: {run_dir}')
+            
+        # Create band directories with subdirectories
+        for band in bands:
+            band_dir = os.path.join(run_dir, band)
+            if not os.path.exists(band_dir):
+                os.makedirs(band_dir)
+                
+            for subdir in subdirs:
+                full_dir = os.path.join(band_dir, subdir)
+                if not os.path.exists(full_dir):
+                    os.makedirs(full_dir)
+                    self.logprint(f'Created directory: {full_dir}')
+        
+        # Create detection directories
+        det_dir = os.path.join(run_dir, 'det')
+        if not os.path.exists(det_dir):
+            os.makedirs(det_dir)
+            
+        for subdir in det_subdirs:
+            full_dir = os.path.join(det_dir, subdir)
+            if not os.path.exists(full_dir):
+                os.makedirs(full_dir)
+                self.logprint(f'Created directory: {full_dir}')
+                
+        # Store the final run directory path for later use
+        self.run_outdir = run_dir
+        self.logprint(f'Completed directory structure setup at {run_dir}')
 
 # function to help with reducing MPI results from each process to single result
 def combine_images(im1, im2):
@@ -848,14 +978,21 @@ def main(args):
 
     start_time = time.time()
 
-    # If outdir is None, will need to move it later after it is set
-    if args.outdir is None:
-        temp_log = True
-    else:
-        temp_log = False
-
+    # Determine where to create the log file
     logfile = f'generate_mocks.log'
-    log = utils.setup_logger(logfile, logdir=args.outdir)
+    temp_log = False
+    logdir = None
+    
+    if args.outdir is not None:
+        # When outdir is provided, save log there directly
+        logdir = args.outdir
+    elif args.data_dir is not None:
+        # When data_dir is provided, we'll want to save in the band/out dir later
+        # but we don't know the band yet, so create a temporary log and move it later
+        temp_log = True
+        
+    # Initialize the log
+    log = utils.setup_logger(logfile, logdir=logdir)
     logprint = utils.LogPrint(log, vb)
 
     if mpi is True:
@@ -960,28 +1097,82 @@ def main(args):
     ### ITERATE n TIMES TO MAKE n SEPARATE IMAGES
     ###
 
+    # Get current band for directory structure
+    band = sbparams.bandpass.replace("crates_", "")
+    
+    # Determine output directory based on whether we're using directory structure
+    if sbparams.use_dir_structure:
+        # Use the band/cal directory in the hierarchical structure
+        output_dir = os.path.join(sbparams.run_outdir, band, "cal")
+        
+        # Also prepare the out directory path for logging when using data_dir
+        out_dir = os.path.join(sbparams.run_outdir, band, "out")
+        
+        # Ensure the cal directory exists (should already be created, but just in case)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            logprint(f'Created directory: {output_dir}')
+            
+        # Ensure the out directory exists
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+            logprint(f'Created directory: {out_dir}')
+    else:
+        # Use the outdir directly with no subdirectories
+        output_dir = sbparams.run_outdir
+        out_dir = output_dir
+        
+    # Set up truth catalog path
+    truth_file_name = os.path.join(output_dir, f'{run_name}_truth_{band}.fits')
+    
+    # Move the log file to the correct location if using data_dir
+    if temp_log and args.data_dir is not None:
+        handler = log.handlers[0]  # Get the file handler
+        old_log_path = handler.baseFilename
+        new_log_path = os.path.join(out_dir, logfile)
+        
+        # Close the current log file
+        handler.close()
+        log.removeHandler(handler)
+        
+        # Move the file
+        os.makedirs(os.path.dirname(new_log_path), exist_ok=True)
+        if os.path.exists(old_log_path):
+            # Copy content rather than move in case there are permission issues
+            with open(old_log_path, 'r') as old_log, open(new_log_path, 'w') as new_log:
+                new_log.write(old_log.read())
+            
+            # Try to remove the old log file, but don't fail if we can't
+            try:
+                os.remove(old_log_path)
+            except:
+                pass
+                
+        # Setup new logger pointed at the new location
+        log = utils.setup_logger(logfile, logdir=out_dir)
+        logprint = utils.LogPrint(log, vb)
+        logprint(f'Moved log file to {new_log_path}')
+    
+    # Initialize truth catalog during first run
+    if mpi is False or M.is_mpi_root():
+        names = ['gal_num', 'cosmos_index','x_image', 'y_image',
+                 'ra', 'dec', 'nfw_g1', 'nfw_g2',
+                 'nfw_mu', 'redshift', 'flux',
+                 'truth_fwhm','truth_mom', 'n',
+                 'hlr', 'scale_h_over_r', 'obj_class']
+        types = [int, int, float, float, float, float, float,
+                 float, float, float, float, float, float,
+                 float, float, float, str]
+        truth_catalog = galsim.OutputCatalog(names, types)
+
     for i in np.arange(1, sbparams.nexp+1):
         if mpi is True:
             # get MPI processes in sync at start of each image
             M.barrier()
 
         outnum = str(i).zfill(3)
-        outname = f'{run_name}_{outnum}_{sbparams.bandpass.replace("crates_", "")}_sim.fits'
-        file_name = os.path.join(sbparams.outdir, outname)
-
-        # Set up a truth catalog during first image generation
-        if i == 1:
-            truth_file_name = os.path.join(sbparams.outdir,
-                                           f'{run_name}_truth.fits')
-            names = ['gal_num', 'cosmos_index','x_image', 'y_image',
-                     'ra', 'dec', 'nfw_g1', 'nfw_g2',
-                     'nfw_mu', 'redshift', 'flux',
-                     'truth_fwhm','truth_mom', 'n',
-                     'hlr', 'scale_h_over_r', 'obj_class']
-            types = [int, int, float, float, float, float, float,
-                     float, float, float, float, float, float,
-                     float, float, float, str]
-            truth_catalog = galsim.OutputCatalog(names, types)
+        outname = f'{run_name}_{outnum}_{band}_sim.fits'
+        file_name = os.path.join(output_dir, outname)
 
         # Set up the image:
         full_image = galsim.ImageF(sbparams.image_xsize, sbparams.image_ysize)
@@ -1255,8 +1446,9 @@ def main(args):
             full_image.addNoise(noise)
 
             logprint.debug('Added noise to final output image')
-            if not os.path.exists(os.path.dirname(file_name)):
-                os.makedirs(os.path.dirname(file_name))
+            
+            # Make sure the output directory exists
+            os.makedirs(os.path.dirname(file_name), exist_ok=True)
 
             try:
                 full_image.write(file_name, clobber=clobber)
@@ -1265,8 +1457,8 @@ def main(args):
                 logprint(f'OSError: {e}')
                 raise e
 
-            # Write truth catalog to file.
-            if i == 1:
+            # Write truth catalog to file after all exposures
+            if i == sbparams.nexp:
                 try:
                     truth_catalog.write(truth_file_name)
                     logprint(f'Wrote truth to {truth_file_name}')
@@ -1275,7 +1467,7 @@ def main(args):
                     # later tests. So we pickle it now and save the filename
                     # into the truth catalog header
                     psf_outfile = os.path.join(
-                        sbparams.outdir, 'true_psf.pkl'
+                        output_dir, f'true_psf_{band}.pkl'
                         )
                     with open(psf_outfile, 'wb') as psf_pfile:
                         pickle.dump(psf, psf_pfile)
@@ -1290,13 +1482,14 @@ def main(args):
     logprint('\nCompleted all images\n')
 
     if (mpi is False) or (M.is_mpi_root()):
+        # Create mask and weight files in the output directory
         logprint('Creating masks')
         logprint.warning('For now, we just write a simple mask file with all 1s')
-        sbparams.make_mask_files(logprint, clobber)
+        sbparams.make_mask_files(logprint, clobber, cal_dir=output_dir)
 
         logprint('Creating weights')
         logprint.warning('For now, we just write a simple weight file with all 1s')
-        sbparams.make_weight_files(logprint, clobber)
+        sbparams.make_weight_files(logprint, clobber, cal_dir=output_dir)
 
     # Log file was created before outdir is setup in some cases
     # If so, move from temp location to there
@@ -1309,7 +1502,10 @@ def main(args):
         logprint('\nDone!\n')
 
     end_time = time.time()
-    logprint('\n\ngalsim execution time = {end_time - start_time}\n\n')
+    logprint(f'\n\ngalsim execution time = {end_time - start_time}\n\n')
+    
+    current_time_utc = datetime.now(timezone.utc)
+    logprint(f"Current time in UTC: {current_time_utc.strftime('%Y-%m-%d %H:%M:%S')}")
 
     return
 
