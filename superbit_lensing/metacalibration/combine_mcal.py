@@ -80,19 +80,19 @@ def main(args):
     N = len(filtered_tables)
 
     for t in types:
-        g1_mean = np.mean([table[f"g_{t}"][:, 0] for table in filtered_tables], axis=0)
-        g2_mean = np.mean([table[f"g_{t}"][:, 1] for table in filtered_tables], axis=0)
+        g1_mean = np.median([table[f"g_{t}"][:, 0] for table in filtered_tables], axis=0)
+        g2_mean = np.median([table[f"g_{t}"][:, 1] for table in filtered_tables], axis=0)
         mcal_combined[f"g_{t}"] = np.column_stack((g1_mean, g2_mean))
-        mcal_combined[f"T_{t}"] = np.mean([table[f"T_{t}"] for table in filtered_tables], axis=0)
-        mcal_combined[f"flux_{t}"] = np.mean([table[f"flux_{t}"] for table in filtered_tables], axis=0)
+        mcal_combined[f"T_{t}"] = np.median([table[f"T_{t}"] for table in filtered_tables], axis=0)
+        mcal_combined[f"flux_{t}"] = np.median([table[f"flux_{t}"] for table in filtered_tables], axis=0)
 
         mcal_combined[f"g_cov_{t}"] = np.median([table[f"g_cov_{t}"] for table in filtered_tables], axis=0)
         mcal_combined[f"T_err_{t}"] = np.median([table[f"T_err_{t}"] for table in filtered_tables], axis=0)
         mcal_combined[f"flux_err_{t}"] = np.median([table[f"flux_err_{t}"] for table in filtered_tables], axis=0)
         
         # Unweighted average for Tpsf
-        mcal_combined[f"Tpsf_{t}"] = np.mean([table[f"Tpsf_{t}"] for table in filtered_tables], axis=0) 
-        mcal_combined[f"gpsf_{t}"] = np.mean([table[f"gpsf_{t}"] for table in filtered_tables], axis=0)
+        mcal_combined[f"Tpsf_{t}"] = np.median([table[f"Tpsf_{t}"] for table in filtered_tables], axis=0) 
+        mcal_combined[f"gpsf_{t}"] = np.median([table[f"gpsf_{t}"] for table in filtered_tables], axis=0)
 
         # Average S/N
         s2n_avg = np.median([table[f"s2n_{t}"] for table in filtered_tables], axis=0)
@@ -141,8 +141,11 @@ def main(args):
             redseq = Table.read(red_seq_file, format="fits")
             print(f"Using Red-seq galaxy catalog: {red_seq_file}")
             tolerance_deg = 1e-6
-            matcher = SkyCoordMatcher(mcal_combined_table, redseq, cat1_ratag='ra', cat1_dectag='dec',
-                    cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', match_radius=5 * tolerance_deg)
+            try:
+                matcher = SkyCoordMatcher(mcal_combined_table, redseq, cat1_ratag='ra', cat1_dectag='dec',
+                        cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', match_radius=5 * tolerance_deg)
+            except:
+                matcher = SkyCoordMatcher(mcal_combined_table, redseq, cat1_ratag='ra', cat1_dectag='dec', match_radius=5 * tolerance_deg)
             mcal_discard, matched_galaxies = matcher.get_matched_pairs()
             total_mcal = len(mcal_combined_table)
             total_discard = len(mcal_discard)

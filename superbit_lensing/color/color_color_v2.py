@@ -199,6 +199,9 @@ def main(args):
         final_table['MAG_AUTO_b'] = matched_data_b["MAG_AUTO"][valid_flux]
         final_table['MAG_AUTO_g'] = matched_data_g["MAG_AUTO"][valid_flux]
         final_table['MAG_AUTO_u'] = matched_data_u["MAG_AUTO"][valid_flux]
+        final_table['VIGNET_b'] = matched_data_b["VIGNET"][valid_flux]
+        final_table['VIGNET_g'] = matched_data_g["VIGNET"][valid_flux]
+        final_table['VIGNET_u'] = matched_data_u["VIGNET"][valid_flux]
         final_table['color_bg'] = color_index_bg
         final_table['color_ub'] = color_index_ub
         final_table['redshift'] = redshifts[valid_flux]
@@ -227,9 +230,12 @@ def main(args):
             hdr['TTYPE15'] = ('MAG_AUTO_b', 'SE magnitude in b-band')
             hdr['TTYPE16'] = ('MAG_AUTO_g', 'SE magnitude in g-band')
             hdr['TTYPE17'] = ('MAG_AUTO_u', 'SE magnitude in u-band')
-            hdr['TTYPE18'] = ('color_bg', 'Color index (m_b - m_g)')
-            hdr['TTYPE19'] = ('color_ub', 'Color index (m_u - m_b)')
-            hdr['TTYPE20'] = ('redshift', 'Available redshift')
+            hdr['TTYPE18'] = ('VIGNET_b', 'VIGNET in b-band')
+            hdr['TTYPE19'] = ('VIGNET_g', 'VIGNET in g-band')
+            hdr['TTYPE20'] = ('VIGNET_u', 'VIGNET in u-band')
+            hdr['TTYPE21'] = ('color_bg', 'Color index (m_b - m_g)')
+            hdr['TTYPE22'] = ('color_ub', 'Color index (m_u - m_b)')
+            hdr['TTYPE23'] = ('redshift', 'Available redshift')
 
             # Save changes
             hdul.flush()
