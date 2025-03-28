@@ -1,0 +1,60 @@
+# SuperBIT parameters
+# -------------------
+pixel_scale:        0.141       # Pixel scale                               [arcsec/px]
+gain:               0.343       # Camera gain                               [e- / ADU]
+read_noise:         1.8         # Read noise                                [e-]
+dark_current:       0.0022      # mean dark current                         [e- / px / s]
+dark_current_std:   0.001       # standard deviation dark current           [ADU /px / s]
+image_xsize:        9568        # Horizontal image size                     [px]
+image_ysize:        6380        # Vertical image size                       [px]
+exp_time:           600         # Exposure time per image                   [s]
+tel_diam:           0.5         # Telescope aperture diameter               [m]
+# Define strut parameters. BIT has four orthogonal struts that
+# are ~12mm wide, and the exit pupil diameter is 137.4549 mm (Zemax)
+nstruts:            4           # Number of M2 struts                       []
+strut_thick:        0.087       # Fraction of diameter strut thickness      [m/m]
+strut_theta:        90          # Angle between vertical and nearest        [deg]
+obscuration:        0.380       # Fraction of aperture obscured by M2       []
+
+
+# Simulated image parameters
+# --------------------------
+center_ra:          13.3        # Central Right Ascension                   [hrs]
+center_dec:         33.1        # Central Declination                       [deg]
+sky_bkg:            0.0519      # mean sky background from AG's paper       [e- / s / px]
+sky_sigma:          0.02        # standard deviation of sky background      [e- / s / px]
+nobj:               50         # Number of galaxies (COSMOS 25.2 depth)    []
+nstars:                        # Number of stars in the field              []
+nexp:               3          # Number of exposures per PSF model         []
+nclustergal:        50         # Number of cluster galaxies (arbitrary)    []
+bandpass:     'crates_b'        # Catalog filter name for simulation        []
+jitter_fwhm:        0.24         # Kernel size of SuperBIT jitter            [arcsec]
+use_optics:         False       # Add optics model to PSF? (default: True)  [True/False]
+run_name:         'pipe_test'   # Root for exposure name creation           []
+
+# Simulated cluster parameters
+# ----------------------------
+lam:                475         # Fiducial wavelength for abberations       [nm]
+mass:               7e14      # Cluster mass                              [Msol / h]
+nfw_z_halo:         0.44         # redshift of the halo                      []
+nfw_conc:           4           # Concentration parameter = virial radius / NFW scale radius
+omega_m:            0.3         # Omega matter for the background cosmology []
+omega_lam:          0.7         # Omega lambda for the background cosmology []
+
+# Run parameters
+# --------------
+# Define some paths and filenames
+cosmosdir:         '/Users/vassig/research/superbit-lensing/superbit_lensing/galsim/data/galsim_cosmos_catalogs' # Path to COSMOS data directory
+datadir:           '/Users/vassig/research/superbit-lensing/superbit_lensing/galsim/data' # Path to repo/galsim data directory
+cat_file_name:     'cosmos15_superbit2023_phot_shapes.csv' #'cosmos2015_cam2021_filt2021.csv' catalog file name for COSMOS (in cosmosdir)
+cluster_cat_name:  'real_galaxy_catalog_23.5_example.fits' # path to cluster catalog
+star_cat_name:      'APRA_cluster_GAIA_starcats/GAIAstars_1E0657.csv' #'master_gaiastar_cat.fits' # File containing GAIA star fluxes
+outdir:            './forecasting/sim_test' # directory where output images and truth catalogs are saved
+
+
+# Misc parameters
+# ---------------
+#stars_seed:             # Random number seed for stars
+#galobj_seed:            # Random number seed for galaxy objects
+#cluster_seed:           # Random number seed for cluster galaxies
+#noise_seed:             # Random number seed for sky noise
