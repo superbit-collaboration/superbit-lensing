@@ -1,0 +1,49 @@
+################################################################################
+#                            CONFIGURATION FILE                               #
+################################################################################
+
+# Description:
+# This configuration file allows you to customize the lensing (metacal)
+# selection cuts for make_annular_catalog.py.
+
+# Note:
+# - Do not change the variable names (the text before the colon).
+# - Only modify the values on the right side of the colon.
+
+# Metacal-specific selection cuts:
+# Note:
+# - "T" parametrizes object size as an area in arcsec^2
+# - Photometric quanties from SExtractor are also included
+# -----------------
+mcal_cuts:
+  # Minimum ratio of galaxy size relative to PSF size
+  min_Tpsf: 0.5
+  # Maximum galaxy SNR
+  max_sn: 1000
+  # Minimum galaxy SNR
+  min_sn: 5
+  # Minimum galaxy size
+  min_T: 0.0
+  # Maximum galaxy size
+  max_T: 100
+  # How faint of aperture mag to keep; helps cut out junk
+  max_mag_aper: 26
+  # How faint of MAG_AUTO to keep; helps cut out junk
+  max_mag_auto: 26
+  # Maximum SEXtractor flag value allowed
+  max_sex_flags: 1
+
+# Miscellaneous parameters:
+# -------------------------
+# Galaxy shape noise for calculating weights
+shape_noise: 0.2
+# Denominator for responsivity calculation
+mcal_shear: 0.01
+
+# Boolean Flags:
+# --------------
+# Flag1: Description of Flag1. (e.g., Flag1 = TRUE)
+# Flag2: Description of Flag2. (e.g., Flag2 = FALSE)
+
+
+################################################################################
