@@ -287,6 +287,13 @@ class AnnularCatalog():
         mcal_shear = self.config['mcal_shear']
         shape_noise = self.config['shape_noise']
 
+        # Define individual selection cuts
+        min_Tpsf = qual_cuts['min_Tpsf']
+        max_sn = qual_cuts['max_sn']
+        min_sn = qual_cuts['min_sn']
+        min_T = qual_cuts['min_T']
+        max_T = qual_cuts['max_T']
+
         if self.cluster_redshift != None:
             # Add in a little bit of a safety margin -- maybe a bad call for simulated data?
             min_redshift = float(self.cluster_redshift) + 0.025
@@ -294,55 +301,55 @@ class AnnularCatalog():
             min_redshift = 0
 
         print(
-            f"#\n# cuts applied: Tpsf_ratio > {qual_cuts['min_Tpsf']:.2f}"
-            + f"\n# SN > {qual_cuts['min_sn']:.1f} T > {qual_cuts['min_T']:.2f}"
+            f"#\n# cuts applied: Tpsf_ratio > {min_Tpsf:.2f}"
+            + f"\n# SN > {min_sn:.1f} T > {min_T:.2f}"
             + f"\n# redshift = {min_redshift:.3f} \n#\n"
         )
 
         mcal = self.joined_gals
 
         noshear_selection = mcal[
-            (mcal['T_noshear'] >= qual_cuts['min_Tpsf'] * mcal['Tpsf_noshear'])\
-            & (mcal['T_noshear'] < qual_cuts['max_T']) \
-            & (mcal['T_noshear'] >= qual_cuts['min_T']) \
-            & (mcal['s2n_noshear'] > qual_cuts['min_sn']) \
-            & (mcal['s2n_noshear'] < qual_cuts['max_sn']) \
+            (mcal['T_noshear'] >= min_Tpsf * mcal['Tpsf_noshear'])\
+            & (mcal['T_noshear'] < max_T) \
+            & (mcal['T_noshear'] >= min_T) \
+            & (mcal['s2n_noshear'] > min_sn) \
+            & (mcal['s2n_noshear'] < max_sn) \
             & (mcal['redshift'] > min_redshift)
         ]
 
         selection_1p = mcal[
-            (mcal['T_1p'] >= qual_cuts['min_Tpsf'] * mcal['Tpsf_1p']) \
-            & (mcal['T_1p'] <= qual_cuts['max_T']) \
-            & (mcal['T_1p'] >= qual_cuts['min_T']) \
-            & (mcal['s2n_1p'] > qual_cuts['min_sn']) \
-            & (mcal['s2n_1p'] < qual_cuts['max_sn']) \
+            (mcal['T_1p'] >= min_Tpsf * mcal['Tpsf_1p']) \
+            & (mcal['T_1p'] <= max_T) \
+            & (mcal['T_1p'] >= min_T) \
+            & (mcal['s2n_1p'] > min_sn) \
+            & (mcal['s2n_1p'] < max_sn) \
             & (mcal['redshift'] > min_redshift)
         ]
 
         selection_1m = mcal[
-            (mcal['T_1m'] >= qual_cuts['min_Tpsf'] * mcal['Tpsf_1m']) \
-            & (mcal['T_1m'] <= qual_cuts['max_T']) \
-            & (mcal['T_1m'] >= qual_cuts['min_T']) \
-            & (mcal['s2n_1m'] > qual_cuts['min_sn']) \
-            & (mcal['s2n_1m'] < qual_cuts['max_sn']) \
+            (mcal['T_1m'] >= min_Tpsf * mcal['Tpsf_1m']) \
+            & (mcal['T_1m'] <= max_T) \
+            & (mcal['T_1m'] >= min_T) \
+            & (mcal['s2n_1m'] > min_sn) \
+            & (mcal['s2n_1m'] < max_sn) \
             & (mcal['redshift'] > min_redshift)
         ]
 
         selection_2p = mcal[
-            (mcal['T_2p'] >= qual_cuts['min_Tpsf'] * mcal['Tpsf_2p']) \
-            & (mcal['T_2p'] <= qual_cuts['max_T']) \
-            & (mcal['T_2p'] >= qual_cuts['min_T']) \
-            & (mcal['s2n_2p'] > qual_cuts['min_sn']) \
-            & (mcal['s2n_2p'] < qual_cuts['max_sn']) \
+            (mcal['T_2p'] >= min_Tpsf * mcal['Tpsf_2p']) \
+            & (mcal['T_2p'] <= max_T) \
+            & (mcal['T_2p'] >= min_T) \
+            & (mcal['s2n_2p'] > min_sn) \
+            & (mcal['s2n_2p'] < max_sn) \
             & (mcal['redshift'] > min_redshift)
         ]
 
         selection_2m = mcal[
-            (mcal['T_2m'] >= qual_cuts['min_Tpsf']*mcal['Tpsf_2m']) \
-            & (mcal['T_2m'] <= qual_cuts['max_T']) \
-            & (mcal['T_2m'] >= qual_cuts['min_T']) \
-            & (mcal['s2n_2m'] > qual_cuts['min_sn']) \
-            & (mcal['s2n_2m'] < qual_cuts['max_sn']) \
+            (mcal['T_2m'] >= min_Tpsf*mcal['Tpsf_2m']) \
+            & (mcal['T_2m'] <= max_T) \
+            & (mcal['T_2m'] >= min_T) \
+            & (mcal['s2n_2m'] > min_sn) \
+            & (mcal['s2n_2m'] < max_sn) \
             & (mcal['redshift'] > min_redshift)
         ]
 
