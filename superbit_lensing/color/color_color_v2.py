@@ -79,6 +79,7 @@ def main(args):
     out_file_cm_bg = f"{plot_dir}/{cluster_name}_b_g_color_mag.png"
     out_file_cm_ub = f"{plot_dir}/{cluster_name}_u_b_color_mag.png"
     output_fits = f"{output_dir}/{cluster_name}_colors_mags.fits"
+    output_star_fits = f"{output_dir}/{cluster_name}_colors_mags_stars.fits"
     os.makedirs(plot_dir, exist_ok=True)
     os.makedirs(output_dir, exist_ok=True)
     diag_path = os.path.join(dual_mode_path, "diags")
@@ -129,22 +130,27 @@ def main(args):
         data_u = Table.read(file_u_cat, format='fits', hdu=2)
     
     print("Star matching and object discarding is starting...")
-    matcher_b_stars = SkyCoordMatcher(data_b, star_data_b, match_radius=tolerance_deg)
-    # Use SkyCoordMatcher for star matching in band b
-    matched_data_b_stars, matched_star_data_b = matcher_b_stars.get_matched_pairs()
+    try:
+        matcher_b_stars = SkyCoordMatcher(data_b, star_data_b, match_radius=tolerance_deg)
+        # Use SkyCoordMatcher for star matching in band b
+        matched_data_b_stars, matched_star_data_b = matcher_b_stars.get_matched_pairs()
 
-    # Filter out stars from the main catalogs using both RA and DEC
-    data_b_coords = list(zip(data_b['ALPHAWIN_J2000'], data_b['DELTAWIN_J2000']))
-    matched_b_stars_coords = list(zip(matched_data_b_stars['ALPHAWIN_J2000'], matched_data_b_stars['DELTAWIN_J2000']))
-    mask = np.array([(ra, dec) not in matched_b_stars_coords for ra, dec in data_b_coords])
+        # Filter out stars from the main catalogs using both RA and DEC
+        data_b_coords = list(zip(data_b['ALPHAWIN_J2000'], data_b['DELTAWIN_J2000']))
+        matched_b_stars_coords = list(zip(matched_data_b_stars['ALPHAWIN_J2000'], matched_data_b_stars['DELTAWIN_J2000']))
+        mask = np.array([(ra, dec) not in matched_b_stars_coords for ra, dec in data_b_coords])
+    except Exception as e:
+        print(f"Error during star matching in band b: {e}")
+        mask = np.ones(len(data_b), dtype=bool)
     data_b_filtered = data_b[mask]
     data_g_filtered = data_g[mask]
     data_u_filtered = data_u[mask]
 
+    discarded_count = np.sum(~mask)
 
-    print(f"Band b - Total objects: {len(data_b)}, Stars: {len(star_data_b)}, Discarded: {len(matched_data_b_stars)}, Proceeding to next step: {len(data_b_filtered)}")
-    print(f"Band g - Total objects: {len(data_g)}, Stars: {len(star_data_b)}, Discarded: {len(matched_data_b_stars)}, Proceeding to next step: {len(data_g_filtered)}")
-    print(f"Band u - Total objects: {len(data_u)}, Stars: {len(star_data_b)}, Discarded: {len(matched_data_b_stars)}, Proceeding to next step: {len(data_u_filtered)}")
+    print(f"Band b - Total objects: {len(data_b)}, Stars: {len(star_data_b)}, Discarded: {discarded_count}, Proceeding to next step: {len(data_b_filtered)}")
+    print(f"Band g - Total objects: {len(data_g)}, Stars: {len(star_data_b)}, Discarded: {discarded_count}, Proceeding to next step: {len(data_g_filtered)}")
+    print(f"Band u - Total objects: {len(data_u)}, Stars: {len(star_data_b)}, Discarded: {discarded_count}, Proceeding to next step: {len(data_u_filtered)}")
 
 
     # Step 2: Interband Matching
@@ -304,11 +310,74 @@ def main(args):
     flux_stars_u = matched_star_data_u['FLUX_AUTO']
 
     valid_flux_stars = (flux_stars_b > 0) & (flux_stars_g > 0) & (flux_stars_u > 0)
+    discard_count = np.sum(~valid_flux_stars)
+    print(f"Number of stars discarded due to invalid flux: {discard_count}")
     m_stars_b = -2.5 * np.log10(flux_stars_b[valid_flux_stars])
     m_stars_g = -2.5 * np.log10(flux_stars_g[valid_flux_stars])
     m_stars_u = -2.5 * np.log10(flux_stars_u[valid_flux_stars])
     color_bg_stars = m_stars_b - m_stars_g
     color_ub_stars = m_stars_u - m_stars_b
+
+    if args.save_fits:
+        ra_dec_table = matched_star_data_b['ALPHAWIN_J2000', 'DELTAWIN_J2000']
+        ra_dec_table.rename_columns(['ALPHAWIN_J2000', 'DELTAWIN_J2000'], ['ra', 'dec'])
+        # Create a new table with the selected columns and computed values
+        final_table = Table()
+        final_table['ra'] = ra_dec_table['ra'][valid_flux_stars]
+        final_table['dec'] = ra_dec_table['dec'][valid_flux_stars]
+        final_table['m_b'] = m_stars_b
+        final_table['m_g'] = m_stars_g
+        final_table['m_u'] = m_stars_u
+        final_table['R_b'] = matched_star_data_b["FLUX_RADIUS"][valid_flux_stars]
+        final_table['R_g'] = matched_star_data_g["FLUX_RADIUS"][valid_flux_stars]
+        final_table['R_u'] = matched_star_data_u["FLUX_RADIUS"][valid_flux_stars]
+        final_table['R_b_prepsf'] = 0.6 * matched_star_data_b["FLUX_RADIUS"][valid_flux_stars]
+        final_table['R_g_prepsf'] = 0.6 * matched_star_data_g["FLUX_RADIUS"][valid_flux_stars]
+        final_table['R_u_prepsf'] = 0.6 * matched_star_data_u["FLUX_RADIUS"][valid_flux_stars]
+        final_table['FLUX_AUTO_b'] = flux_stars_b[valid_flux_stars]
+        final_table['FLUX_AUTO_g'] = flux_stars_g[valid_flux_stars]
+        final_table['FLUX_AUTO_u'] = flux_stars_u[valid_flux_stars]
+        final_table['MAG_AUTO_b'] = matched_star_data_b["MAG_AUTO"][valid_flux_stars]
+        final_table['MAG_AUTO_g'] = matched_star_data_g["MAG_AUTO"][valid_flux_stars]
+        final_table['MAG_AUTO_u'] = matched_star_data_u["MAG_AUTO"][valid_flux_stars]
+        final_table['VIGNET_b'] = matched_star_data_b["VIGNET"][valid_flux_stars]
+        final_table['VIGNET_g'] = matched_star_data_g["VIGNET"][valid_flux_stars]
+        final_table['VIGNET_u'] = matched_star_data_u["VIGNET"][valid_flux_stars]
+        final_table['color_bg'] = color_bg_stars
+        final_table['color_ub'] = color_ub_stars
+
+        # Save as a FITS file
+        final_table.write(output_star_fits, format='fits', overwrite=True)        
+        # Modify the FITS header to store descriptions inline
+        with fits.open(output_star_fits, mode='update') as hdul:
+            hdr = hdul[1].header  # Access the table header
+
+            # Add descriptions to column definitions
+            hdr['TTYPE1'] = ('ra', 'Right Ascension (J2000) [degree]')
+            hdr['TTYPE2'] = ('dec', 'Declination (J2000) [degree]')
+            hdr['TTYPE3'] = ('m_b', 'Magnitude in b-band')
+            hdr['TTYPE4'] = ('m_g', 'Magnitude in g-band')
+            hdr['TTYPE5'] = ('m_u', 'Magnitude in u-band')
+            hdr['TTYPE6'] = ('R_b', 'Half-light radius in b-band [arcsec]')
+            hdr['TTYPE7'] = ('R_g', 'Half-light radius in g-band [arcsec]')
+            hdr['TTYPE8'] = ('R_u', 'Half-light radius in u-band [arcsec]')
+            hdr['TTYPE9'] = ('R_b_prepsf', 'pre-PSF Half-light radius in b-band [arcsec]')
+            hdr['TTYPE10'] = ('R_g_prepsf', 'pre-PSF Half-light radius in g-band [arcsec]')
+            hdr['TTYPE11'] = ('R_u_prepsf', 'pre-PSF Half-light radius in u-band [arcsec]')
+            hdr['TTYPE12'] = ('FLUX_AUTO_b', 'SE flux measurement in b-band')
+            hdr['TTYPE13'] = ('FLUX_AUTO_g', 'SE flux measurement in g-band')
+            hdr['TTYPE14'] = ('FLUX_AUTO_u', 'SE flux measurement in u-band')
+            hdr['TTYPE15'] = ('MAG_AUTO_b', 'SE magnitude in b-band')
+            hdr['TTYPE16'] = ('MAG_AUTO_g', 'SE magnitude in g-band')
+            hdr['TTYPE17'] = ('MAG_AUTO_u', 'SE magnitude in u-band')
+            hdr['TTYPE18'] = ('VIGNET_b', 'VIGNET in b-band')
+            hdr['TTYPE19'] = ('VIGNET_g', 'VIGNET in g-band')
+            hdr['TTYPE20'] = ('VIGNET_u', 'VIGNET in u-band')
+            hdr['TTYPE21'] = ('color_bg', 'Color index (m_b - m_g)')
+            hdr['TTYPE22'] = ('color_ub', 'Color index (m_u - m_b)')
+
+            # Save changes
+            hdul.flush()
 
     # Step 8: Plot the Color-Magnitude Diagram
     plt.figure(figsize=(8, 6))

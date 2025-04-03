@@ -33,8 +33,8 @@ def main(cluster_name, band, datadir, save_union_catalog, mag_low, mag_high, rad
     valid_indices = (flux_auto > 0) & (flux_radius > 0)
 
     # Compute magnitudes only for valid entries
-    #mag_calc = -2.5 * np.log10(flux_auto[valid_indices])
-    mag_calc = sex_cat["MAG_AUTO"]
+    mag_calc = -2.5 * np.log10(flux_auto[valid_indices])
+    #mag_calc = sex_cat["MAG_AUTO"]
     flux_radius_filtered = flux_radius[valid_indices]
 
     # Apply selection criteria
@@ -52,7 +52,7 @@ def main(cluster_name, band, datadir, save_union_catalog, mag_low, mag_high, rad
     # Union catalog objects
     union_flux_radius = union_catalog["FLUX_RADIUS"]
     union_mag = -2.5 * np.log10(union_catalog["FLUX_AUTO"])
-    union_mag = union_catalog["MAG_AUTO"]
+    #union_mag = union_catalog["MAG_AUTO"]
 
     # Create a primary HDU (empty, required for FITS format)
     primary_hdu = fits.PrimaryHDU()
@@ -69,10 +69,10 @@ def main(cluster_name, band, datadir, save_union_catalog, mag_low, mag_high, rad
     plt.scatter(flux_radius_filtered, mag_calc, s=5, alpha=0.3, color='blue', label="Original Data")
     #plt.scatter(gaia_cat["FLUX_RADIUS"], -2.5 * np.log10(gaia_cat["FLUX_AUTO"]), s=5, alpha=0.3, color='red', label="Gaia Catalog")
     plt.scatter(union_flux_radius, union_mag, s=5, alpha=0.3, color='red', label="Union Catalog")
-    #plt.axvline(x=radius_low, color='red', linestyle='--', label=f'Half-light radius={radius_low}')
-    #plt.axhline(y=mag_high, color='green', linestyle='--', label=f'Magnitude={mag_high}')
-    #plt.axhline(y=mag_low, color='orange', linestyle='--', label=f'Magnitude={mag_low}')
-    plt.xlim(0, 7)
+    plt.axvline(x=radius_low, color='red', linestyle='--', label=f'Half-light radius={radius_low}')
+    plt.axhline(y=mag_high, color='green', linestyle='--', label=f'Magnitude={mag_high}')
+    plt.axhline(y=mag_low, color='orange', linestyle='--', label=f'Magnitude={mag_low}')
+    plt.xlim(0, 50)
     #plt.ylim(-20, 2.5)
     plt.xlabel("Half-light radius")
     plt.ylabel(f"$m_{band}$")

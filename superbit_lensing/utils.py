@@ -466,6 +466,15 @@ def analyze_mcal_fits(file_path):
     ra_min, ra_max = np.min(ra), np.max(ra)
     dec_min, dec_max = np.min(dec), np.max(dec)
 
+     # Compute the center of the field of view
+    ra_center = (ra_max + ra_min) / 2
+    dec_center = (dec_max + dec_min) / 2
+
+    # Compute the radius needed to cover the entire field
+    ra_extent = (ra_max - ra_min) / 2
+    dec_extent = (dec_max - dec_min) / 2
+    covering_radius = np.sqrt(ra_extent**2 + dec_extent**2)  # Approximate max distance
+
     # Compute middle 50% boundaries
     ra_lower = ra_min + 0.25 * (ra_max - ra_min)
     ra_upper = ra_max - 0.25 * (ra_max - ra_min)
@@ -482,6 +491,11 @@ def analyze_mcal_fits(file_path):
     # Compute object density
     num_objects = len(filtered_data)
     density_per_arcmin2 = num_objects / area_arcmin2 if area_arcmin2 > 0 else np.inf
+
+    print(f"Full RA range: {ra_min} to {ra_max}")
+    print(f"Full Dec range: {dec_min} to {dec_max}")
+    print(f"Field center: RA = {ra_center}, Dec = {dec_center}")
+    print(f"Covering circle radius: {covering_radius} degrees")
 
     # Print results
     print(f"Middle 50% RA range: {ra_lower:.6f}° to {ra_upper:.6f}°")
