@@ -2,6 +2,7 @@
 *.pyc
 GalSim/data/*.csv
 #notebooks/*
+notebooks/simulations/*
 superbit_lensing.egg-info/
 superbit_lensing/medsmaker/configs
 .DS_Store

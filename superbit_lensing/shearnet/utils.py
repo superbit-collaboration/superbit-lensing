@@ -41,22 +41,49 @@ def fft_ifft(psf):
 
 def convolve2d(image, psf, mode='same', boundary='wrap'):
     """
-    Convolve an image with a PSF using 2D convolution.
+    Convolve an image with a PSF using 2D FFT-based convolution.
+    Always returns an image of the same dimensions as the input.
 
     Parameters:
     image (np.ndarray): The input image.
     psf (np.ndarray): The PSF.
-    mode (str): The mode for convolution. Default is 'same'.
-    boundary (str): The boundary condition for convolution. Default is 'wrap'.
+    mode (str): Not used in FFT implementation, kept for API consistency.
+    boundary (str): Not used in FFT implementation, kept for API consistency.
 
     Returns:
-    np.ndarray: The convolved image.
+    np.ndarray: The convolved image with same dimensions as input.
     """
+    # Ensure PSF is centered in an array of the same size as the image
+    psf_padded = np.zeros(image.shape, dtype=psf.dtype)
+    psf_center = np.array(psf.shape) // 2
+    image_center = np.array(image.shape) // 2
+    
+    # Calculate the corner positions for placing the PSF
+    top = image_center[0] - psf_center[0]
+    left = image_center[1] - psf_center[1]
+    
+    # Handle PSFs larger than the image
+    psf_top = max(0, -top)
+    psf_left = max(0, -left)
+    psf_bottom = min(psf.shape[0], image.shape[0] - top)
+    psf_right = min(psf.shape[1], image.shape[1] - left)
+    
+    # Handle image boundaries
+    img_top = max(0, top)
+    img_left = max(0, left)
+    img_bottom = min(image.shape[0], top + psf.shape[0])
+    img_right = min(image.shape[1], left + psf.shape[1])
+    
+    # Place the PSF in the padded array
+    psf_padded[img_top:img_bottom, img_left:img_right] = psf[psf_top:psf_bottom, psf_left:psf_right]
+    
+    # Perform FFT convolution
     ft_image = np.fft.fft2(image)
-    ft_psf = np.fft.fft2(psf, s=image.shape)
+    ft_psf = np.fft.fft2(psf_padded)
     ft_result = ft_image * ft_psf
-    result = np.fft.ifft2(ft_result).real
-    return result
+    result = np.abs(np.fft.ifft2(ft_result))
+    
+    return np.fft.fftshift(result)
 
 def sample_half_gaussian(size=1, sigma=0.5):
     """

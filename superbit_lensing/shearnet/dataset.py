@@ -3,7 +3,7 @@ import galsim
 import ngmix
 import sys
 from scipy.signal import convolve2d
-from .utils import fft_ifft, get_memory_usage
+from .utils import fft_ifft, get_memory_usage #, convolve2d
 import ipdb
 
 psf_fnmae = '/work/mccleary_group/saha/codes/.empty/psf_cutouts_superbit.npy'
