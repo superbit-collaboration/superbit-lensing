@@ -99,7 +99,7 @@ def main(args):
             star_config = None
 
         # Load in the science frames
-        endings = ["cal", "clean"]
+        endings = ["cal", "clean", "sim"]
         science = []
 
         for ending in endings:
