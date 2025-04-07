@@ -17,15 +17,15 @@
 # -----------------
 mcal_cuts:
   # Minimum ratio of galaxy size relative to PSF size
-  min_Tpsf: 0.0
+  min_Tpsf: 0.6
   # Maximum galaxy SNR
   max_sn: 1000
   # Minimum galaxy SNR
-  min_sn: 0.0
+  min_sn: 7.0
   # Minimum galaxy size
   min_T: 0.0
   # Maximum galaxy size
-  max_T: 1000
+  max_T: 100
   # How faint of aperture mag to keep; helps cut out junk
   max_mag_aper: 26
   # How faint of MAG_AUTO to keep; helps cut out junk

@@ -19,7 +19,7 @@ from superbit_lensing.match import SkyCoordMatcher
 
 
 def parse_args():
-
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     parser = ArgumentParser()
 
     parser.add_argument('data_dir', type=str,
@@ -33,7 +33,7 @@ def parse_args():
     parser.add_argument('-outdir', type=str, default=None,
                         help='Output directory')
     parser.add_argument('-config', '-c', type=str,
-                        default='configs/default_annular_config_sims.yaml',
+                        default=os.path.join(script_dir, 'configs/default_annular_config_sims.yaml'),
                         help='Configuration file with annular cuts etc.')
     parser.add_argument('-detection_band', type=str, default='b',
                         help='Detection bandpass [default: b]')

@@ -105,26 +105,29 @@ def sample_half_gaussian(size=1, sigma=0.5):
         samples = np.concatenate((samples, extra_samples))
     return samples
 
-def g1_g2_sigma_sample(num_samples=10000):
+def g1_g2_sigma_sample(num_samples=10000, g_std=0.26, sigma_std=0.5):
     """
-    Generate samples for g1, g2, and sigma from a half-Gaussian distribution.
+    Generate samples for g1, g2, and sigma. g1 and g2 are sampled from a Gaussian 
+    distribution with specified standard deviation, and sigma from a half-Gaussian distribution.
 
     Parameters:
     num_samples (int): Number of samples to generate.
+    g_std (float): Standard deviation for the Gaussian distribution of g1 and g2. Default is 0.26.
 
     Returns:
     tuple: Arrays of sampled g1, g2, and sigma values.
     """
-
-    sigma = sample_half_gaussian(size=num_samples, sigma=0.5)
-    # Generate g1 and g2 ensuring |g1 + 1j * g2| <= 1
+    sigma = sample_half_gaussian(size=num_samples, sigma=sigma_std)
+    
+    # Generate g1 and g2 from Gaussian distribution with specified std
     g1_selected = np.zeros(num_samples)
     g2_selected = np.zeros(num_samples)
 
     for i in range(num_samples):
         while True:
-            g1, g2 = np.random.uniform(-1, 1, 2)  # Generate g1 and g2
-            if np.abs(g1 + 1j * g2) <= 0.5:  # Check the constraint
+            # Sample from Gaussian with specified std (mean=0)
+            g1, g2 = np.random.normal(0, g_std, 2)
+            if np.abs(g1 + 1j * g2) < 1.0:  # Check the constraint
                 g1_selected[i] = g1
                 g2_selected[i] = g2
                 break  # Accept only valid values

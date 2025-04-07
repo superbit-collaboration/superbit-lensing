@@ -15,6 +15,9 @@ from superbit_lensing import utils
 
 def parse_args():
 
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    default_config = os.path.join(script_dir, 'configs/default_annular_config.yaml')
+    
     parser = ArgumentParser()
 
     parser.add_argument('data_dir', type=str,
@@ -28,7 +31,7 @@ def parse_args():
     parser.add_argument('-outdir', type=str, default=None,
                         help='Output directory')
     parser.add_argument('-config', '-c', type=str,
-                        default='configs/default_annular_config.yaml',
+                        default=default_config,
                         help='Configuration file with annular cuts etc.')
     parser.add_argument('-detection_band', type=str, default='b',
                         help='Detection bandpass [default: b]')

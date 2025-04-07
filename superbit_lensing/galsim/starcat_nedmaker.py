@@ -9,7 +9,8 @@ def process_fits(run_name, band, datadir, codedir):
     ned_outname = f"{datadir}/catalogs/redshifts/{run_name}_NED_redshifts.csv"
     starcat_outname = f"{datadir}/catalogs/stars/{run_name}_gaia_starcat.fits"
     config_path = f"{codedir}/superbit_lensing/medsmaker/configs/{run_name}_{band}_starparams.yaml"
-
+    os.makedirs(os.path.dirname(ned_outname), exist_ok=True)
+    os.makedirs(os.path.dirname(starcat_outname), exist_ok=True)
     with fits.open(fname) as hdul:
         data = hdul[1].data  # Access table data from HDU=1
         
