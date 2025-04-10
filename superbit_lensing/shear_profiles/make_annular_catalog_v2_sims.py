@@ -300,6 +300,7 @@ class AnnularCatalog():
         print(f"Number of objects joined from truth file : {len(self.selected_with_truth)}")
 
         self.selected_with_truth.write(self.outfile_w_truth, format='fits', overwrite=overwrite)
+        print(f'The final file with object truth values: {self.outfile_w_truth}')
 
         return
 
@@ -460,12 +461,16 @@ class AnnularCatalog():
             r12 = ( noshear_selection['g_2p'][:,0] - noshear_selection['g_2m'][:,0] ) / (2.*mcal_shear)
             r21 = ( noshear_selection['g_1p'][:,1] - noshear_selection['g_1m'][:,1] ) / (2.*mcal_shear)
             r22 = ( noshear_selection['g_2p'][:,1] - noshear_selection['g_2m'][:,1] ) / (2.*mcal_shear)
+            c1_psf = ( (noshear_selection['g_1p_psf'][:,0] + noshear_selection['g_1m_psf'][:,0])/2 - noshear_selection['g_noshear'][:,0])
+            c2_psf = ((noshear_selection['g_2p_psf'][:, 1] + noshear_selection['g_2m_psf'][:, 1])/2 - noshear_selection['g_noshear'][:, 1])
+            c1_gamma = ((noshear_selection['g_1p'][:, 0] + noshear_selection['g_1m'][:, 0])/2 - noshear_selection['g_noshear'][:, 0])
+            c2_gamma = ((noshear_selection['g_2p'][:, 1] + noshear_selection['g_2m'][:, 1])/2 - noshear_selection['g_noshear'][:, 1])
 
             #---------------------------------
             # Now add value-adds to table
             self.selected.add_columns(
-                [r11, r12, r21, r22],
-                names=['r11', 'r12', 'r21', 'r22']
+                [r11, r12, r21, r22, c1_gamma, c2_gamma, c1_psf, c2_psf],
+                names=['r11', 'r12', 'r21', 'r22', 'c1', 'c2', 'c1_psf', 'c2_psf']
                 )
 
         except ValueError as e:

@@ -23,7 +23,7 @@ mcal_cuts:
   # Minimum galaxy SNR
   min_sn: 7.0
   # Minimum galaxy size
-  min_T: 0.0
+  min_T: 0.04  # atleast bigger than a pixel, i.e. 2*(0.141**2) = 0.039
   # Maximum galaxy size
   max_T: 100
   # How faint of aperture mag to keep; helps cut out junk
