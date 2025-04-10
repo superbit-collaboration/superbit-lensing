@@ -6,8 +6,8 @@
 #SBATCH --partition=short
 #SBATCH -J meds
 #SBATCH -v
-#SBATCH -o out.log
-#SBATCH -e err.log
+#SBATCH -o logs/medout.log
+#SBATCH -e logs/mederr.log
 
 # Load configuration file
 source "$SLURM_SUBMIT_DIR/config.sh"
@@ -34,14 +34,3 @@ python $CODEDIR/superbit_lensing/medsmaker/scripts/process_2023.py \
 -detection_bandpass=${detection_band} \
 -star_config_dir $CODEDIR/superbit_lensing/medsmaker/configs \
 --meds_coadd ${cluster_name} ${band_name} $DATADIR
-
-
-
-# Check if the Python script ran successfully
-'''if [ $? -eq 0 ]; then
-    echo "Python script executed successfully. Running multiple_ngmixrun.sh..."
-    bash "$SLURM_SUBMIT_DIR/multiple_ngmixrun.sh"
-else
-    echo "Python script failed. Exiting without running multiple_ngmixrun.sh."
-    exit 1
-fi'''
