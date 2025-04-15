@@ -13,4 +13,4 @@ source "$SLURM_SUBMIT_DIR/config.sh"
 
 which python
 
-python $CODEDIR/superbit_lensing/galsim/mock_superBIT_data_withadmom.py $SLURM_SUBMIT_DIR/galsim_config.yaml -run_name ${cluster_name} -data_dir $DATADIR -ncores 18 --clobber --vb
+python $CODEDIR/superbit_lensing/galsim/mock_superBIT_data_backcast.py $SLURM_SUBMIT_DIR/galsim_config.yaml -run_name ${cluster_name} -data_dir $DATADIR -ncores 18 --clobber --vb

@@ -302,6 +302,9 @@ class AnnularCatalog():
         self.selected_with_truth.write(self.outfile_w_truth, format='fits', overwrite=overwrite)
         print(f'The final file with object truth values: {self.outfile_w_truth}')
 
+        print("==Some Stats==\n")
+        _ = utils.analyze_mcal_fits(self.outfile_w_truth, update_header=True)
+
         return
 
     def _compute_metacal_quantities(self):

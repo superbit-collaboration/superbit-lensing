@@ -27,11 +27,11 @@ mcal_cuts:
   # Maximum galaxy size
   max_T: 100
   # How faint of aperture mag to keep; helps cut out junk
-  max_mag_aper: 26
+  #max_mag_aper: 26
   # How faint of MAG_AUTO to keep; helps cut out junk
-  max_mag_auto: 26
+  #max_mag_auto: 26
   # Maximum SEXtractor flag value allowed
-  max_sex_flags: 1
+  #max_sex_flags: 1
 
 # Miscellaneous parameters:
 # -------------------------

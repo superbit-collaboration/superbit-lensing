@@ -454,63 +454,205 @@ def get_test_dir():
     base_dir = get_base_dir()
     return os.path.join(base_dir, 'tests')
 
-def analyze_mcal_fits(file_path):
+def extract_ra_dec(data):
+    """Try to extract RA and Dec from known column name options."""
+    for ra_col, dec_col in [
+        ('ra', 'dec'),
+        ('ra_mcal', 'dec_mcal'),
+        ('ALPHAWIN_J2000', 'DELTAWIN_J2000')
+    ]:
+        if ra_col in data.colnames and dec_col in data.colnames:
+            return data[ra_col], data[dec_col]
+    raise KeyError("No suitable RA/Dec columns found in the data.")
+
+def analyze_mcal_fits(file_path, hdu=None, verbose=True, update_header=False):
+    """
+    Analyze a FITS file containing astronomical data with RA/Dec coordinates.
+    
+    Parameters:
+    -----------
+    file_path : str
+        Path to the FITS file
+    hdu : int, optional
+        HDU index to read. If None, will try default and then HDU=2
+    verbose : bool, default=True
+        Whether to print results
+        
+    Returns:
+    --------
+    dict
+        Dictionary containing analysis results
+    """
+    import numpy as np
+    from astropy.table import Table
+    import os.path
+    
+    # Input validation
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
+    
     # Read the FITS file
-    data = Table.read(file_path, format='fits')
-
+    try:
+        if hdu is not None:
+            data = Table.read(file_path, format='fits', hdu=hdu)
+        else:
+            try:
+                data = Table.read(file_path, format='fits')
+            except Exception:
+                data = Table.read(file_path, format='fits', hdu=2)
+                if verbose:
+                    print("Using HDU=2 for FITS reading")
+    except Exception as e:
+        raise IOError(f"Failed to read FITS file: {e}")
+    
+    # Known column names for RA and Dec
+    ra_column_names = ['ra', 'ra_mcal', 'ALPHAWIN_J2000', 'RA']
+    dec_column_names = ['dec', 'dec_mcal', 'DELTAWIN_J2000', 'DEC']
+    
     # Extract RA and Dec
-    ra = data['ra']
-    dec = data['dec']
-
+    ra, dec = None, None
+    
+    # Try to find RA column
+    for col_name in ra_column_names:
+        if col_name in data.colnames:
+            ra = data[col_name]
+            ra_col_used = col_name
+            break
+    
+    # Try to find Dec column
+    for col_name in dec_column_names:
+        if col_name in data.colnames:
+            dec = data[col_name]
+            dec_col_used = col_name
+            break
+    
+    if ra is None or dec is None:
+        available_cols = ", ".join(data.colnames)
+        raise KeyError(f"RA/Dec columns not found. Available columns: {available_cols}")
+    
+    if verbose:
+        print(f"Using columns: RA={ra_col_used}, Dec={dec_col_used}")
+    
+    # Check for NaN values and filter them
+    valid_mask = ~(np.isnan(ra) | np.isnan(dec))
+    if np.sum(~valid_mask) > 0 and verbose:
+        print(f"Filtered out {np.sum(~valid_mask)} rows with NaN values")
+    
+    ra = ra[valid_mask]
+    dec = dec[valid_mask]
+    filtered_data = data[valid_mask]
+    
     # Compute full min and max boundaries
     ra_min, ra_max = np.min(ra), np.max(ra)
     dec_min, dec_max = np.min(dec), np.max(dec)
-
-     # Compute the center of the field of view
+    
+    # Compute the center of the field of view
     ra_center = (ra_max + ra_min) / 2
     dec_center = (dec_max + dec_min) / 2
-
+    
     # Compute the radius needed to cover the entire field
+    # Using Haversine formula for spherical coordinates would be more accurate
+    # But this approximation works for small fields
     ra_extent = (ra_max - ra_min) / 2
     dec_extent = (dec_max - dec_min) / 2
-    covering_radius = np.sqrt(ra_extent**2 + dec_extent**2)  # Approximate max distance
-
+    covering_radius = np.sqrt(ra_extent**2 + dec_extent**2)
+    
     # Compute middle 50% boundaries
     ra_lower = ra_min + 0.25 * (ra_max - ra_min)
     ra_upper = ra_max - 0.25 * (ra_max - ra_min)
     dec_lower = dec_min + 0.25 * (dec_max - dec_min)
     dec_upper = dec_max - 0.25 * (dec_max - dec_min)
-
+    
     # Filter data within middle 50%
     mask = (ra >= ra_lower) & (ra <= ra_upper) & (dec >= dec_lower) & (dec <= dec_upper)
-    filtered_data = data[mask]
-
-    # Compute new area in arcmin²
-    area_arcmin2 = (ra_upper - ra_lower) * 60 * (dec_upper - dec_lower) * 60
-
+    central_data = filtered_data[mask]
+    
+    # Handle spherical coordinates properly for area calculation
+    # For small fields, this approximation is reasonable
+    # cos(dec_center) factor accounts for RA convergence at the poles
+    area_arcmin2 = (ra_upper - ra_lower) * np.cos(np.radians(dec_center)) * 60 * (dec_upper - dec_lower) * 60
+    
     # Compute object density
-    num_objects = len(filtered_data)
-    density_per_arcmin2 = num_objects / area_arcmin2 if area_arcmin2 > 0 else np.inf
-
-    print(f"Full RA range: {ra_min} to {ra_max}")
-    print(f"Full Dec range: {dec_min} to {dec_max}")
-    print(f"Field center: RA = {ra_center}, Dec = {dec_center}")
-    print(f"Covering circle radius: {covering_radius} degrees")
-
-    # Print results
-    print(f"Middle 50% RA range: {ra_lower:.6f}° to {ra_upper:.6f}°")
-    print(f"Middle 50% Dec range: {dec_lower:.6f}° to {dec_upper:.6f}°")
-    print(f"Total number of objects in middle 50%: {num_objects}")
-    print(f"Survey area (middle 50%): {area_arcmin2:.2f} arcmin²")
-    print(f"Density: {density_per_arcmin2:.2f} objects per arcmin²")
-
-    return {
-        "ra_range": (ra_lower, ra_upper),
-        "dec_range": (dec_lower, dec_upper),
-        "num_objects": num_objects,
-        "area_arcmin2": area_arcmin2,
-        "density_per_arcmin2": density_per_arcmin2
+    num_objects = len(central_data)
+    density_per_arcmin2 = num_objects / area_arcmin2 if area_arcmin2 > 0 else 0
+    # Calculate recommended pixel size for convergence maps
+    min_objects_per_pixel = 5
+    pixel_size_arcmin = np.sqrt(min_objects_per_pixel / density_per_arcmin2) if density_per_arcmin2 > 0 else np.inf    
+    # Prepare results dictionary
+    
+    # Print results if verbose
+    if verbose:
+        print(f"Full RA range: {ra_min:.6f}° to {ra_max:.6f}°")
+        print(f"Full Dec range: {dec_min:.6f}° to {dec_max:.6f}°")
+        print(f"Field center: RA = {ra_center:.6f}°, Dec = {dec_center:.6f}°")
+        print(f"Covering circle radius: {covering_radius:.6f}°")
+        print(f"Middle 50% RA range: {ra_lower:.6f}° to {ra_upper:.6f}°")
+        print(f"Middle 50% Dec range: {dec_lower:.6f}° to {dec_upper:.6f}°")
+        print(f"Total number of objects in middle 50%: {num_objects}")
+        print(f"Survey area (middle 50%): {area_arcmin2:.2f} arcmin²")
+        print(f"Density: {density_per_arcmin2:.2f} objects per arcmin²")
+        print(f"Recommended pixel size for convergence map (≥5 objects/pixel): {pixel_size_arcmin:.2f} arcmin")
+        print(f"Expected objects per pixel: {density_per_arcmin2 * pixel_size_arcmin * pixel_size_arcmin:.2f}")
+    
+    # Create results dictionary
+    results = {
+        "RA_MIN": ra_min, 
+        "RA_MAX": ra_max,
+        "DEC_MIN": dec_min,
+        "DEC_MAX": dec_max,
+        "RA_CENTER": ra_center,
+        "DEC_CENTER": dec_center,
+        "COVER_RAD": covering_radius,
+        "RA_50_MIN": ra_lower,
+        "RA_50_MAX": ra_upper,
+        "DEC_50_MIN": dec_lower,
+        "DEC_50_MAX": dec_upper,
+        "N_OBJ_50P": num_objects,
+        "AREA_AMIN": area_arcmin2,
+        "DENS_AMIN": density_per_arcmin2,
+        "TOT_OBJS": len(data),
+        "recommended_pixel_size_arcmin": pixel_size_arcmin,
     }
+    
+    # Update the FITS header if requested
+    if update_header:
+        # Open the FITS file to update its header
+        with fits.open(file_path, mode='update') as hdul:
+            # Determine which HDU has the data
+            data_hdu = 0  # Primary HDU by default
+            for i, hdu in enumerate(hdul):
+                if hasattr(hdu, 'data') and hdu.data is not None and len(hdu.data) > 0:
+                    data_hdu = i
+                    break
+            
+            # Add metadata to header
+            header = hdul[data_hdu].header
+            header['HISTORY'] = 'Analysis metadata added by analyze_mcal_fits function'
+            
+            # Add all results to header with comments
+            header['RA_MIN'] = (ra_min, 'Minimum RA value in dataset')
+            header['RA_MAX'] = (ra_max, 'Maximum RA value in dataset')
+            header['DEC_MIN'] = (dec_min, 'Minimum Dec value in dataset')
+            header['DEC_MAX'] = (dec_max, 'Maximum Dec value in dataset')
+            header['RA_CNTR'] = (ra_center, 'Center RA of field')
+            header['DEC_CNTR'] = (dec_center, 'Center Dec of field')
+            header['CVR_RAD'] = (covering_radius, 'Covering radius in degrees')
+            #header['RA50_MIN'] = (ra_lower, 'Minimum RA of middle 50% region')
+            #header['RA50_MAX'] = (ra_upper, 'Maximum RA of middle 50% region')
+            #header['DEC50_MIN'] = (dec_lower, 'Minimum Dec of middle 50% region')
+            #header['DEC50_MAX'] = (dec_upper, 'Maximum Dec of middle 50% region')
+            header['NOBJ_50P'] = (num_objects, 'Number of objects in middle 50% region')
+            header['AREA_AM2'] = (area_arcmin2, 'Area in middle 50% region (arcmin^2)')
+            header['DENS_AM2'] = (density_per_arcmin2, 'Object density per arcmin^2')
+            header['TOT_OBJS'] = (len(data), 'Total number of objects in dataset')
+            header['PIX_AMIN'] = (pixel_size_arcmin, 'Recommended pixel size (arcmin)')
+            header['OBJ_PIX'] = (density_per_arcmin2 * pixel_size_arcmin * pixel_size_arcmin, 
+                                    'Expected objects per pixel')
+            # Save changes
+            hdul.flush()
+            print(f"Updated FITS header in {file_path} with analysis metadata")
+    
+    return results
 
 
 

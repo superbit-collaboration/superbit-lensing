@@ -275,6 +275,8 @@ class AnnularCatalog():
             self.selected.meta[key] = val
 
         self.selected.write(self.outfile, format='fits', overwrite=overwrite)
+        print("==Some Stats==\n")
+        _ = utils.analyze_mcal_fits(self.outfile, update_header=True)        
 
         return
 
