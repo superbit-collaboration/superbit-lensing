@@ -19,6 +19,7 @@ import os
 import math
 import logging
 import time
+import signal
 from datetime import datetime, timezone
 import galsim
 import galsim.des
@@ -62,6 +63,37 @@ def parse_args():
 
     return parser.parse_args()
 
+def timeout_handler(signum, frame):
+    raise TimeoutError("Function execution timed out")
+
+# Set up the try block with a timeout
+def calculate_admoms_with_timeout(gal, wcs, image_pos, galaxy_truth, sbparams, timeout_seconds=10):
+    # Set up the timeout
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(timeout_seconds)
+    
+    try:
+        #print("Yay made a new change! Hiiiiiiiii")
+        admoms = galsim.hsm.FindAdaptiveMom(gal.drawImage(wcs=wcs.local(image_pos)))
+        galaxy_truth.admom_g1 = admoms.observed_shape.g1
+        galaxy_truth.admom_g2 = admoms.observed_shape.g2
+        galaxy_truth.admom_sigma = admoms.moments_sigma * sbparams.pixel_scale
+        galaxy_truth.admom_flag = 1
+        return True
+    except (galsim.errors.GalSimError, TimeoutError) as e:
+        if isinstance(e, TimeoutError):
+            print('sigma calculation timed out')
+        else:
+            print('sigma calculation failed')
+        galaxy_truth.admom_g1 = -9999.
+        galaxy_truth.admom_g2 = -9999.
+        galaxy_truth.admom_sigma = -9999.
+        galaxy_truth.admom_flag = 0
+        return False
+    finally:
+        # Cancel the alarm
+        signal.alarm(0)
+
 class truth():
 
     def __init__(self):
@@ -81,6 +113,7 @@ class truth():
         self.dec = None
         self.g1 = 0.0
         self.g2 = 0.0
+        self.kappa = 0.0
         self.cosmos_g1 =0.0
         self.cosmos_g2 = 0.0
         self.admom_g1 = 0.0
@@ -107,6 +140,7 @@ def nfw_lensing(nfw_halo, pos, nfw_z_source):
     g1,g2 = nfw_halo.getShear( pos , nfw_z_source )
     nfw_shear = galsim.Shear(g1=g1,g2=g2)
     nfw_mu = nfw_halo.getMagnification( pos , nfw_z_source )
+    nfw_kappa = nfw_halo.getConvergence(pos, nfw_z_source)
 
     if nfw_mu < 0:
         print("Warning: mu < 0 means strong lensing!  Using mu=25.")
@@ -115,7 +149,7 @@ def nfw_lensing(nfw_halo, pos, nfw_z_source):
         print("Warning: mu > 25 means strong lensing!  Using mu=25.")
         nfw_mu = 25
 
-    return nfw_shear, nfw_mu
+    return nfw_shear, nfw_mu, nfw_kappa
 
 def make_obj_runner(batch_indices, *args, **kwargs):
     '''
@@ -192,7 +226,7 @@ def combine_objs(make_obj_outputs, full_image, truth_catalog, exp_num):
             row = [i, truth.cosmos_index, truth.x, truth.y,
                    truth.ra, truth.dec,
                    truth.g1, truth.g2,
-                   truth.mu, truth.cosmos_g1, truth.cosmos_g2, 
+                   truth.mu, truth.kappa, truth.cosmos_g1, truth.cosmos_g2, 
                    truth.admom_g1, truth.admom_g2, truth.admom_sigma, truth.admom_flag, truth.z,
                    this_flux, truth.fwhm, truth.mom_size,
                    truth.n, truth.hlr, truth.scale_h_over_r,
@@ -244,10 +278,10 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
     if (n < 0.3):
         n = 0.3
 
-    #gal = galsim.Sersic(n = n,
-    #                    flux = gal_flux,
-    #                    half_light_radius = half_light_radius)
-    gal  = galsim.Gaussian(sigma=sigma, flux=gal_flux)
+    gal = galsim.Sersic(n = n,
+                        flux = gal_flux,
+                        half_light_radius = half_light_radius)
+    #gal  = galsim.Gaussian(sigma=sigma, flux=gal_flux)
 
     gal = gal.shear(g1 = g1_cosmos, g2 = g2_cosmos)
     logprint.debug('created galaxy')
@@ -262,7 +296,7 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
 
     ## Get the reduced shears and magnification at this point
     try:
-        nfw_shear, mu = nfw_lensing(nfw, uv_pos, gal_z)
+        nfw_shear, mu, kappa = nfw_lensing(nfw, uv_pos, gal_z)
         g1=nfw_shear.g1; g2=nfw_shear.g2
         gal = gal.lens(g1, g2, mu)
     except galsim.errors.GalSimError:
@@ -282,6 +316,7 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
     galaxy_truth.ra=ra.deg; galaxy_truth.dec=dec.deg
     galaxy_truth.x=image_pos.x; galaxy_truth.y=image_pos.y
     galaxy_truth.g1=g1; galaxy_truth.g2=g2
+    galaxy_truth.kappa = kappa
     galaxy_truth.cosmos_g1 = g1_cosmos; galaxy_truth.cosmos_g2 = g2_cosmos
     galaxy_truth.mu = mu; galaxy_truth.z = gal_z
     galaxy_truth.flux = stamp.added_flux
@@ -292,22 +327,7 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
 
     logprint.debug('created truth values')
 
-    try:
-        galaxy_truth.fwhm=final.calculateFWHM()
-    except galsim.errors.GalSimError:
-        logprint.debug('fwhm calculation failed')
-        galaxy_truth.fwhm=-9999.0
-
-    try:
-        admoms = galsim.hsm.FindAdaptiveMom(stamp)
-        galaxy_truth.admom_g1 = admoms.observed_shape.g1
-        galaxy_truth.admom_g2 = admoms.observed_shape.g2
-        galaxy_truth.admom_sigma = admoms.moments_sigma * sbparams.pixel_scale
-        #galaxy_truth.mom_size=stamp.FindAdaptiveMom().moments_sigma
-        galaxy_truth.admom_flag = 1
-    except galsim.errors.GalSimError:
-        logprint.debug('sigma calculation failed')
-        galaxy_truth.mom_size=-9999.
+    calculate_admoms_with_timeout(gal, wcs, image_pos, galaxy_truth, sbparams, timeout_seconds=10)
 
     logprint.debug('stamp made, moving to next galaxy')
     return stamp, galaxy_truth
@@ -384,17 +404,7 @@ def make_cluster_galaxy(ud, wcs, affine, centerpix, cluster_cat, psf, sbparams, 
     cluster_galaxy_truth.obj_class = 'cluster_gal'
     logprint.debug('created truth values')
 
-    try:
-        cluster_galaxy_truth.fwhm=final.calculateFWHM()
-    except galsim.errors.GalSimError:
-        logprint.debug('fwhm calculation failed')
-        cluster_galaxy_truth.fwhm=-9999.0
-
-    try:
-        cluster_galaxy_truth.mom_size=cluster_stamp.FindAdaptiveMom().moments_sigma
-    except:
-        logprint.debug('sigma calculation failed')
-        cluster_galaxy_truth.mom_size=-9999.
+    calculate_admoms_with_timeout(gal, wcs, image_pos, cluster_galaxy_truth, sbparams, timeout_seconds=10)
 
     return cluster_stamp, cluster_galaxy_truth
 
@@ -1178,12 +1188,12 @@ def main(args):
     # Initialize truth catalog during first run
     if mpi is False or M.is_mpi_root():
         names = ['gal_num', 'cosmos_index','x_image', 'y_image',
-                 'ra', 'dec', 'nfw_g1', 'nfw_g2', 'nfw_mu', 'cosmos_g1', 'cosmos_g2',
+                 'ra', 'dec', 'nfw_g1', 'nfw_g2', 'nfw_mu', 'nfw_kappa', 'cosmos_g1', 'cosmos_g2',
                  'admom_g1', 'admom_g2', 'admom_sigma', 'admom_flag', 'redshift', 'flux',
                  'truth_fwhm','truth_mom', 'n',
                  'hlr', 'scale_h_over_r', 'obj_class']
         types = [int, int, float, float, float, float, float,
-                 float, float, float, float, float, float, float, int, float, float, float, float,
+                 float, float, float, float, float, float, float, float, int, float, float, float, float,
                  float, float, float, str]
         truth_catalog = galsim.OutputCatalog(names, types)
 
@@ -1275,13 +1285,87 @@ def main(args):
 
                     if i == 1:
                         row = [ k, truth.cosmos_index, truth.x, truth.y, truth.ra, truth.dec, truth.g1,
-                                truth.g2, truth.mu, truth.cosmos_g1, truth.cosmos_g2, truth.admom_g1, truth.admom_g2, truth.admom_sigma, truth.admom_flag,  truth.z,
+                                truth.g2, truth.mu, truth.kappa, truth.cosmos_g1, truth.cosmos_g2, truth.admom_g1, truth.admom_g2, truth.admom_sigma, truth.admom_flag,  truth.z,
                                 this_flux, truth.fwhm, truth.mom_size,
                                 truth.n, truth.hlr, truth.scale_h_over_r, truth.obj_class]
                         truth_catalog.addRow(row)
                 except galsim.errors.GalSimError:
                     logprint(f'Galaxy {k} has failed, skipping...')
 
+        #####
+        ### Inject cluster galaxy objects:
+        #####
+        '''print('Starting cluster galaxy injections')
+
+        center_coords = galsim.CelestialCoord(sbparams.center_ra,sbparams.center_dec)
+        centerpix = wcs.toImage(center_coords)
+
+        if mpi is False:
+            start = time.time()
+            with Pool(ncores) as pool:
+                batch_indices = utils.setup_batches(sbparams.nclustergal, ncores)
+
+                full_image, truth_catalog = combine_objs(
+                    pool.starmap(
+                        make_obj_runner,
+                        ([
+                          batch_indices[k],
+                          'cluster_gal',
+                          galsim.UniformDeviate(sbparams.cluster_seed+k+1),
+                          wcs,
+                          affine,
+                          centerpix,
+                          cluster_cat,
+                          psf,
+                          sbparams,
+                          logprint
+                          ] for k in range(ncores))
+                        ),
+                    full_image,
+                    truth_catalog,
+                    i
+                    )
+
+            dt = time.time() - start
+            logprint(f'Total time for cluster galaxy injections: {dt:.1f}s')
+
+        else:
+            # get local range to iterate over in this process
+            local_start, local_end = M.mpi_local_range(sbparams.nclustergal)
+            for k in range(local_start, local_end):
+
+                time1 = time.time()
+
+                # The usual random number generator using a different seed for each galaxy.
+                ud = galsim.UniformDeviate(sbparams.cluster_seed+k+1)
+
+                try:
+                    # make single galaxy object
+                    cluster_stamp,truth = make_cluster_galaxy(ud=ud,wcs=wcs,affine=affine,
+                                                            centerpix=centerpix,
+                                                            cluster_cat=cluster_cat,
+                                                            psf=psf,
+                                                            sbparams=sbparams,
+                                                            logprint=logprint)
+                    # Find the overlapping bounds:
+                    bounds = cluster_stamp.bounds & full_image.bounds
+
+                    # Finally, add the stamp to the full image.
+
+                    full_image[bounds] += cluster_stamp[bounds]
+                    time2 = time.time()
+                    tot_time = time2-time1
+                    logprint(f'Cluster galaxy {k} positioned relative to center t={tot_time} s')
+                    this_flux=np.sum(cluster_stamp.array)
+
+                    if i == 1:
+                        row = [ k, truth.cosmos_index, truth.x, truth.y, truth.ra, truth.dec, truth.g1,
+                                truth.g2, truth.mu, truth.kappa, truth.cosmos_g1, truth.cosmos_g2, truth.admom_g1, truth.admom_g2, truth.admom_sigma, truth.admom_flag,  truth.z,
+                                this_flux, truth.fwhm, truth.mom_size,
+                                truth.n, truth.hlr, truth.scale_h_over_r, truth.obj_class]
+                        truth_catalog.addRow(row)
+                except galsim.errors.GalSimError:
+                    logprint(f'Cluster galaxy {k} has failed, skipping...')'''
 
         #####
         ### Now repeat process for stars!

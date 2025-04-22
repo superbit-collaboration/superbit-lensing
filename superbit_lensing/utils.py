@@ -4,6 +4,11 @@ import sys
 import yaml
 import re
 from astropy.table import Table
+from astroquery.vizier import Vizier
+from astroquery.ipac.ned import Ned
+from astropy.coordinates import SkyCoord
+from astropy import units as u
+import pandas as pd
 from numpy.random import SeedSequence, default_rng
 import time
 import numpy as np
@@ -13,6 +18,10 @@ import astropy.wcs as wcs
 from esutil import htm
 import pdb
 import ipdb
+
+# Get the path to the root of the project (2 levels up from utils.py)
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+CLUSTERS_CSV = os.path.join(PROJECT_ROOT, 'data', 'SuperBIT_target_galactic_coords.csv')
 
 class AttrDict(dict):
     '''
@@ -654,6 +663,194 @@ def analyze_mcal_fits(file_path, hdu=None, verbose=True, update_header=False):
     
     return results
 
+def get_sky_footprint_center_radius(data_table, buffer_fraction=0.05):
+    """
+    Given an astropy Table with RA/Dec in 'ALPHAWIN_J2000' and 'DELTAWIN_J2000',
+    returns the central coordinate and a radius (in degrees) that covers all objects.
+
+    Parameters
+    ----------
+    data_table : astropy.table.Table
+        A FITS binary table with 'ALPHAWIN_J2000' and 'DELTAWIN_J2000' columns.
+    buffer_fraction : float, optional
+        Fractional increase in radius to account for margin (default is 5%).
+            
+    Returns
+    -------
+    ra_center : float
+        Right Ascension of center (in degrees)
+    dec_center : float
+        Declination of center (in degrees)
+    radius_deg : float
+        Radius in degrees that encloses all objects from the center
+    """
+    ra = data_table['ALPHAWIN_J2000']
+    dec = data_table['DELTAWIN_J2000']
+    
+    # Create SkyCoord object
+    coords = SkyCoord(ra=ra, dec=dec, unit='deg')
+    
+    # Handle RA wrap-around by finding the optimal center
+    ra_wrapped = np.array(ra)
+    # If data spans the 0/360 boundary
+    ra_range = np.max(ra) - np.min(ra)
+    if ra_range > 180:
+        # Adjust RAs that are > 180 degrees away from the reference point
+        mask = ra > 180
+        ra_wrapped[mask] -= 360
+    
+    # Calculate the center as the mean of the adjusted coordinates
+    ra_center_wrapped = np.mean(ra_wrapped)
+    if ra_center_wrapped < 0:
+        ra_center_wrapped += 360
+        
+    dec_center = np.mean(dec)
+    
+    # Create center SkyCoord
+    center = SkyCoord(ra=ra_center_wrapped, dec=dec_center, unit='deg')
+    
+    # Calculate separations from center to all points
+    separations = coords.separation(center)
+    
+    # Get the maximum separation (with buffer)
+    radius_deg = separations.max().deg * (1 + buffer_fraction)
+    
+    return center.ra.deg, center.dec.deg, radius_deg
+
+def gaia_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None, catalog_id = "I/355/gaiadr3"):
+    """
+    Query Gaia DR3 data around a given cluster name or specified RA/Dec.
+
+    Parameters
+    ----------
+    cluster_name : str, optional
+        Name of the cluster to look up from CSV. Ignored if ra_center and dec_center are provided.
+    rad_deg : float
+        Search radius in degrees.
+    ra_center : float, optional
+        RA center in degrees. Overrides cluster_name if provided.
+    dec_center : float, optional
+        Dec center in degrees. Overrides cluster_name if provided.
+
+    Returns
+    -------
+    astropy.table.Table
+        Gaia catalog table with columns renamed to match internal naming.
+    """
+    Vizier.ROW_LIMIT = -1
+    Vizier.columns = ['**']
+    
+    if ra_center is not None and dec_center is not None:
+        coord = SkyCoord(ra=ra_center, dec=dec_center, unit='deg')
+    elif cluster_name is not None:
+        cluster_data = pd.read_csv(CLUSTERS_CSV)
+        idx = cluster_data['Name'] == cluster_name
+        if not idx.any():
+            raise ValueError(f"Cluster name '{cluster_name}' not found in {CLUSTERS_CSV}")
+        ra_center = cluster_data.loc[idx, 'RA'].values[0]
+        dec_center = cluster_data.loc[idx, 'Dec'].values[0]
+        coord = SkyCoord(ra=ra_center, dec=dec_center, unit='deg')
+    else:
+        raise ValueError("Either cluster_name or both ra_center and dec_center must be provided.")
+
+    radius = rad_deg * u.deg
+    result = Vizier.query_region(coord, radius=radius, catalog=catalog_id)
+
+    if not result:
+        raise RuntimeError("Gaia query returned no results.")
+
+    gaia_table = result[0]
+    final_table = gaia_table #['RAJ2000', 'DEJ2000']
+    final_table.rename_column('RAJ2000', 'ALPHAWIN_J2000')
+    final_table.rename_column('DEJ2000', 'DELTAWIN_J2000')
+
+    # Filter out rows with NaNs in RA or Dec
+    mask = ~np.isnan(final_table['ALPHAWIN_J2000']) & ~np.isnan(final_table['DELTAWIN_J2000'])
+    if not np.all(mask):
+        print(f"Warning: {np.count_nonzero(~mask)} rows with NaN coordinates removed.")
+    final_table = final_table[mask]
+
+    return final_table
+
+def ned_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None):
+    """
+    Query NED for objects around a given cluster name or RA/Dec.
+
+    Parameters
+    ----------
+    cluster_name : str, optional
+        Name of the cluster to look up from CSV. Ignored if ra_center and dec_center are provided.
+    rad_deg : float
+        Search radius in degrees.
+    ra_center : float, optional
+        RA center in degrees. Overrides cluster_name if provided.
+    dec_center : float, optional
+        Dec center in degrees. Overrides cluster_name if provided.
+
+    Returns
+    -------
+    astropy.table.Table
+        NED query results, filtered to remove rows with NaN RA or Dec.
+    """
+    if ra_center is not None and dec_center is not None:
+        coord = SkyCoord(ra=ra_center, dec=dec_center, unit='deg')
+    elif cluster_name is not None:
+        cluster_data = pd.read_csv(CLUSTERS_CSV)
+        idx = cluster_data['Name'] == cluster_name
+        if not idx.any():
+            raise ValueError(f"Cluster name '{cluster_name}' not found in {CLUSTERS_CSV}")
+        ra_center = cluster_data.loc[idx, 'RA'].values[0]
+        dec_center = cluster_data.loc[idx, 'Dec'].values[0]
+        coord = SkyCoord(ra=ra_center, dec=dec_center, unit='deg')
+    else:
+        raise ValueError("Either cluster_name or both ra_center and dec_center must be provided.")
+
+    table = Ned.query_region(coord, radius=rad_deg * u.deg, equinox='J2000.0')
+
+    # Check and drop rows with NaNs in RA or Dec
+    if 'Redshift' in table.colnames:
+        mask = ~np.isnan(table['Redshift'])
+        if not np.all(mask):
+            print(f"Warning: {np.count_nonzero(~mask)} rows with NaN coordinates removed.")
+        table = table[mask]
+
+    return table
+
+def g1g2_to_gt_gc(g1, g2, ra, dec, ra_c, dec_c, resolution = 0.3, key="ra-dec"):
+    """
+    Convert reduced shear to tangential and cross shear (Eq. 10, 11 in McCleary et al. 2023).
+    args:
+    - g1, g2: Reduced shear components.
+    - ra, dec: Right ascension and declination of the catalogue,i.e. shear_df['ra'], shear_df['dec'].
+    - ra_c, dec_c: Right ascension and declination of the cluster-centre.
+    
+    returns:
+    - gt, gc: Tangential and cross shear components.
+    - phi: Polar angle in the plane of the sky.
+    """ 
+    ra_max, ra_min, dec_max, dec_min = np.max(ra), np.min(ra), np.max(dec), np.min(dec)
+    aspect_ratio = (ra_max - ra_min) / (dec_max - dec_min)
+    pix_ra = int((np.max(ra) - np.min(ra)) / resolution)
+    pix_ra = int(np.ceil((ra_max - ra_min) * 60 / resolution))
+    pix_dec = int(np.ceil((dec_max - dec_min) * 60 / resolution))
+    ra_grid, dec_grid = np.meshgrid(np.linspace(ra_min, ra_max, pix_ra), np.linspace(dec_min, dec_max, pix_dec))
+    print(ra_grid.shape, dec_grid.shape, ra_c, dec_c)
+
+    phi = np.arctan2(dec_grid - dec_c, ra_grid - ra_c)
+    #print(phi.shape)
+    if key == "ra-dec":
+        phi = phi[:, ::-1]
+    elif key == "x-y":
+        phi = phi
+    else:
+        raise ValueError("Unknown key, must be either 'ra-dec' or 'x-y'")
+#    phi = phi[:, ::-1] # flip the phi array to match the shape of g1, g2
+    
+    # Calculate the tangential and cross components
+    gt = -g1 * np.cos(2 * phi) - g2 * np.sin(2 * phi)
+    gc = -g1 * np.sin(2 * phi) + g2 * np.cos(2 * phi)
+
+    return gt, gc, phi
 
 
 BASE_DIR = get_base_dir()

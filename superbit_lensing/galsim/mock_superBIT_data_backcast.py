@@ -19,6 +19,7 @@ import os
 import math
 import logging
 import time
+import signal
 from datetime import datetime, timezone
 import galsim
 import galsim.des
@@ -95,6 +96,101 @@ class truth():
         self.n = 0.0
         self.hlr = 0.0
         self.scale_h_over_r = 0.0
+
+def timeout_handler(signum, frame):
+    raise TimeoutError("Function execution timed out")
+
+# Set up the try block with a timeout
+def calculate_admoms_with_timeout(gal, wcs, image_pos, galaxy_truth, sbparams, timeout_seconds=10):
+    # Set up the timeout
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(timeout_seconds)
+    
+    try:
+        #print("Yay made a new change! Hiiiiiiiii")
+        admoms = galsim.hsm.FindAdaptiveMom(gal.drawImage(wcs=wcs.local(image_pos)))
+        galaxy_truth.admom_g1 = admoms.observed_shape.g1
+        galaxy_truth.admom_g2 = admoms.observed_shape.g2
+        galaxy_truth.admom_sigma = admoms.moments_sigma * sbparams.pixel_scale
+        galaxy_truth.admom_flag = 1
+        return True
+    except (galsim.errors.GalSimError, TimeoutError) as e:
+        if isinstance(e, TimeoutError):
+            print('sigma calculation timed out')
+        else:
+            print('sigma calculation failed')
+        galaxy_truth.admom_g1 = -9999.
+        galaxy_truth.admom_g2 = -9999.
+        galaxy_truth.admom_sigma = -9999.
+        galaxy_truth.admom_flag = 0
+        return False
+    finally:
+        # Cancel the alarm
+        signal.alarm(0)
+
+def matter_power_spectrum(k_abs, h=0.7, ns=1.0, A=1.7e6):
+    """
+    Calculate the matter power spectrum using the BBKS transfer function.
+    
+    Parameters:
+    -----------
+    k_abs : array_like
+        Absolute wavenumber values in h Mpc^-1
+    h : float, optional
+        Dimensionless Hubble parameter (default: 0.7)
+    ns : float, optional
+        Scalar spectral index (default: 1.0)
+    A : float, optional
+        Normalization constant (default: 1.7e6)
+        
+    Returns:
+    --------
+    P_E : ndarray
+        E-mode power spectrum with the same shape as k_abs
+    """
+    # Convert input to numpy array if it's not already
+    k_abs = np.asarray(k_abs)
+    
+    # Calculate the BBKS transfer function
+    Gamma = 0.21  # shape parameter
+    q = k_abs / (Gamma * h)
+    
+    # Handle potential divide-by-zero for k=0
+    T = np.ones_like(k_abs)
+    nonzero = q > 0
+    
+    if np.any(nonzero):
+        x = np.log(1 + 2.34 * q[nonzero]) / (2.34 * q[nonzero])
+        T[nonzero] = x * (1 + 3.89*q[nonzero] + (16.1*q[nonzero])**2 + 
+                         (5.46*q[nonzero])**3 + (6.71*q[nonzero])**4)**(-0.25)
+    
+    # Calculate the power spectrum
+    P_E = A * T**2 * k_abs**ns
+    
+    return P_E
+
+def lss_lensing(nfw_halo, pos, nfw_z_source):
+    """
+    - For some much-needed tidiness in main(), place the function that shears each galaxy here
+    - Usage is borrowed from demo9.py
+    - nfw_halo is galsim.NFW() object created in main()
+    - pos is position of galaxy in image
+    - nfw_z_source is background galaxy redshift
+    """
+
+    g1,g2 = nfw_halo.getShear( pos)
+    nfw_shear = galsim.Shear(g1=g1,g2=g2)
+    nfw_mu = nfw_halo.getMagnification( pos)
+    nfw_kappa = nfw_halo.getConvergence(pos)
+
+    if nfw_mu < 0:
+        print("Warning: mu < 0 means strong lensing!  Using mu=25.")
+        nfw_mu = 25
+    elif nfw_mu > 25:
+        print("Warning: mu > 25 means strong lensing!  Using mu=25.")
+        nfw_mu = 25
+
+    return nfw_shear, nfw_mu, nfw_kappa
 
 def nfw_lensing(nfw_halo, pos, nfw_z_source):
     """
@@ -246,10 +342,10 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
     if (n < 0.3):
         n = 0.3
 
-    #gal = galsim.Sersic(n = n,
-    #                    flux = gal_flux,
-    #                    half_light_radius = half_light_radius)
-    gal  = galsim.Gaussian(sigma=sigma, flux=gal_flux)
+    gal = galsim.Sersic(n = n,
+                        flux = gal_flux,
+                        half_light_radius = half_light_radius)
+    #gal  = galsim.Gaussian(sigma=sigma, flux=gal_flux)
 
     gal = gal.shear(g1 = g1_cosmos, g2 = g2_cosmos)
     logprint.debug('created galaxy')
@@ -302,23 +398,7 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
 
     logprint.debug('created truth values')
 
-    try:
-        galaxy_truth.fwhm=final.calculateFWHM()
-    except galsim.errors.GalSimError:
-        logprint.debug('fwhm calculation failed')
-        galaxy_truth.fwhm=-9999.0
-
-    try:
-        print("Yay made a new change! Hiiiiiiiii")
-        admoms = galsim.hsm.FindAdaptiveMom(gal.drawImage(wcs=wcs.local(image_pos)))
-        galaxy_truth.admom_g1 = admoms.observed_shape.g1
-        galaxy_truth.admom_g2 = admoms.observed_shape.g2
-        galaxy_truth.admom_sigma = admoms.moments_sigma * sbparams.pixel_scale
-        #galaxy_truth.mom_size=stamp.FindAdaptiveMom().moments_sigma
-        galaxy_truth.admom_flag = 1
-    except galsim.errors.GalSimError:
-        logprint.debug('sigma calculation failed')
-        galaxy_truth.mom_size=-9999.
+    calculate_admoms_with_timeout(gal, wcs, image_pos, galaxy_truth, sbparams, timeout_seconds=10)
 
     logprint.debug('stamp made, moving to next galaxy')
     return stamp, galaxy_truth
@@ -399,22 +479,7 @@ def make_cluster_galaxy(ud, wcs, affine, centerpix, cluster_cat, psf, sbparams, 
     cluster_galaxy_truth.obj_class = 'cluster_gal'
     logprint.debug('created truth values')
 
-    try:
-        cluster_galaxy_truth.fwhm=final.calculateFWHM()
-    except galsim.errors.GalSimError:
-        logprint.debug('fwhm calculation failed')
-        cluster_galaxy_truth.fwhm=-9999.0
-
-    try:
-        admoms = galsim.hsm.FindAdaptiveMom(gal.drawImage(wcs=wcs.local(image_pos)))
-        cluster_galaxy_truth.admom_g1 = admoms.observed_shape.g1
-        cluster_galaxy_truth.admom_g2 = admoms.observed_shape.g2
-        cluster_galaxy_truth.admom_sigma = admoms.moments_sigma * sbparams.pixel_scale
-        #galaxy_truth.mom_size=stamp.FindAdaptiveMom().moments_sigma
-        cluster_galaxy_truth.admom_flag = 1
-    except galsim.errors.GalSimError:
-        logprint.debug('sigma calculation failed')
-        cluster_galaxy_truth.mom_size=-9999.
+    calculate_admoms_with_timeout(gal, wcs, image_pos, cluster_galaxy_truth, sbparams, timeout_seconds=10)
 
     return cluster_stamp, cluster_galaxy_truth
 
@@ -1382,8 +1447,8 @@ def main(args):
                     this_flux=np.sum(cluster_stamp.array)
 
                     if i == 1:
-                        row = [ k, truth.cosmos_index, truth.x, truth.y, truth.ra, truth.dec,
-                                truth.g1, truth.g2, truth.mu, truth.z,
+                        row = [ k, truth.cosmos_index, truth.x, truth.y, truth.ra, truth.dec, truth.g1,
+                                truth.g2, truth.mu, truth.kappa, truth.cosmos_g1, truth.cosmos_g2, truth.admom_g1, truth.admom_g2, truth.admom_sigma, truth.admom_flag,  truth.z,
                                 this_flux, truth.fwhm, truth.mom_size,
                                 truth.n, truth.hlr, truth.scale_h_over_r, truth.obj_class]
                         truth_catalog.addRow(row)
