@@ -22,6 +22,7 @@ import ipdb
 # Get the path to the root of the project (2 levels up from utils.py)
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 CLUSTERS_CSV = os.path.join(PROJECT_ROOT, 'data', 'SuperBIT_target_galactic_coords.csv')
+TARGET_LIST = os.path.join(PROJECT_ROOT, 'data', 'SuperBIT_target_list.csv')
 
 class AttrDict(dict):
     '''
@@ -717,6 +718,17 @@ def get_sky_footprint_center_radius(data_table, buffer_fraction=0.05):
     
     return center.ra.deg, center.dec.deg, radius_deg
 
+def get_cluster_info(cluster_name):
+    cluster_data = pd.read_csv(TARGET_LIST)
+    idx = cluster_data['SuperBIT_name'] == cluster_name
+    if not idx.any():
+        raise ValueError(f"Cluster name '{cluster_name}' not found in {CLUSTERS_CSV}")
+    ra_center = cluster_data.loc[idx, 'RA'].values[0]
+    dec_center = cluster_data.loc[idx, 'DEC'].values[0]
+    redshift = cluster_data.loc[idx, 'redshift'].values[0]
+
+    return float(ra_center), float(dec_center), float(redshift)
+
 def gaia_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None, catalog_id = "I/355/gaiadr3"):
     """
     Query Gaia DR3 data around a given cluster name or specified RA/Dec.
@@ -749,6 +761,7 @@ def gaia_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None, 
             raise ValueError(f"Cluster name '{cluster_name}' not found in {CLUSTERS_CSV}")
         ra_center = cluster_data.loc[idx, 'RA'].values[0]
         dec_center = cluster_data.loc[idx, 'Dec'].values[0]
+        print(f"Using cluster coordinates: RA={ra_center}, Dec={dec_center}")
         coord = SkyCoord(ra=ra_center, dec=dec_center, unit='deg')
     else:
         raise ValueError("Either cluster_name or both ra_center and dec_center must be provided.")

@@ -199,8 +199,8 @@ def main(args):
     flux_g = matched_data_g['FLUX_AUTO']
     flux_u = matched_data_u['FLUX_AUTO']
 
-    #valid_flux = (flux_b > 0) & (flux_g > 0) & (flux_u > 0)
-    valid_flux = np.ones(len(matched_data_b), dtype=bool)
+    valid_flux = (flux_b > 0) & (flux_g > 0) & (flux_u > 0)
+    #valid_flux = np.ones(len(matched_data_b), dtype=bool)
     print(f"Number of objects with positive flux in all bands: {np.sum(valid_flux)}")
     print(f"Number of objects with invalid flux in all bands: {np.sum(~valid_flux)}")
     m_b = matched_data_b[valid_flux]["MAG_AUTO"] #-2.5 * np.log10(flux_b[valid_flux])
@@ -400,7 +400,7 @@ def main(args):
     matched_data_u_filtered = matched_data_u[valid_z_best_indices]
 
     #filter with snr
-    snr_threshold = -1e30
+    #snr_threshold = -1e30
     snr_mask = (matched_data_b_filtered['SNR_WIN']>snr_threshold) & (matched_data_g_filtered['SNR_WIN']>snr_threshold) & (matched_data_u_filtered['SNR_WIN']>snr_threshold)
     print(f"Number of objects with SNR > {snr_threshold} in all bands: {np.sum(snr_mask)}")
     z_best_filtered = z_best_filtered[snr_mask]
