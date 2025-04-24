@@ -18,6 +18,9 @@ desi_table = [
 ]
 ned_table = ['RA', 'DEC', 'Redshift']
 
+MAG_ZP_b = 28.66794
+MAG_ZP_g = 27.490537
+MAG_ZP_u = 26.48623
 
 def main(args):
     print("=== Arguments Passed to the Script ===")
@@ -31,6 +34,7 @@ def main(args):
     tolerance_deg = args.tolerance
     redshift = args.redshift
     snr_threshold =  args.snr_threshold
+    no_weight = args.no_weight
     delz = 0.02
 
     base_path = os.path.join(datadir, cluster_name)
@@ -104,7 +108,10 @@ def main(args):
 
     except:
         print("WARNING: source extractor has not been run for band b, so running it again")
-        sex._run_sextractor_single(file_b, dual_cat_path, config_dir, diag_dir=diag_path, band='b')
+        if no_weight:
+            sex._run_sextractor_single(file_b, dual_cat_path, config_dir, diag_dir=diag_path, mag_zp=MAG_ZP_b, use_weight=False)
+        else:
+            sex._run_sextractor_single(file_b, dual_cat_path, config_dir, diag_dir=diag_path, mag_zp=MAG_ZP_b)
         data_b = Table.read(file_b_cat, format='fits', hdu=2)
         ra_b = data_b["ALPHAWIN_J2000"]
 
@@ -118,15 +125,21 @@ def main(args):
         data_g = Table.read(file_g_cat, format='fits', hdu=2)
         ra_g = data_g["ALPHAWIN_J2000"]
     except:
-        print("WARNING: source extractor has not been run for band g, so running it again")        
-        sex._run_sextractor_dual(file_b, file_g, dual_cat_path, config_dir, diag_dir=diag_path, band='g')
+        print("WARNING: source extractor has not been run for band g, so running it again")
+        if no_weight:
+            sex._run_sextractor_dual(file_b, file_g, dual_cat_path, config_dir, diag_dir=diag_path, mag_zp=MAG_ZP_g,  use_weight=False)        
+        else:
+            sex._run_sextractor_dual(file_b, file_g, dual_cat_path, config_dir, diag_dir=diag_path,  mag_zp=MAG_ZP_g)
         data_g = Table.read(file_g_cat, format='fits', hdu=2)
     try:
         data_u = Table.read(file_u_cat, format='fits', hdu=2)
         ra_u = data_u["ALPHAWIN_J2000"]
     except:
         print("WARNING: source extractor has not been run for band u, so running it again")
-        sex._run_sextractor_dual(file_b, file_u, dual_cat_path, config_dir, diag_dir=diag_path, band='u')
+        if no_weight:
+            sex._run_sextractor_dual(file_b, file_u, dual_cat_path, config_dir, diag_dir=diag_path,  mag_zp=MAG_ZP_u, use_weight=False)
+        else:
+            sex._run_sextractor_dual(file_b, file_u, dual_cat_path, config_dir, diag_dir=diag_path,  mag_zp=MAG_ZP_u)
         data_u = Table.read(file_u_cat, format='fits', hdu=2)
     
     try:
@@ -331,58 +344,6 @@ def main(args):
         final_table['Z_source'] = z_source[valid_flux]
         # Save as a FITS file
         final_table.write(output_fits, format='fits', overwrite=True)        
-        # Modify the FITS header to store descriptions inline
-        '''with fits.open(output_fits, mode='update') as hdul:
-            hdr = hdul[1].header  # Access the table header
-
-            # Base column descriptions
-            base_desc = [
-                ('ra', 'Right Ascension (J2000) [degree]'),
-                ('dec', 'Declination (J2000) [degree]'),
-                ('m_b', 'Magnitude in b-band'),
-                ('m_g', 'Magnitude in g-band'),
-                ('m_u', 'Magnitude in u-band'),
-                ('R_b', 'Half-light radius in b-band [arcsec]'),
-                ('R_g', 'Half-light radius in g-band [arcsec]'),
-                ('R_u', 'Half-light radius in u-band [arcsec]'),
-                ('R_b_prepsf', 'pre-PSF Half-light radius in b-band [arcsec]'),
-                ('R_g_prepsf', 'pre-PSF Half-light radius in g-band [arcsec]'),
-                ('R_u_prepsf', 'pre-PSF Half-light radius in u-band [arcsec]'),
-                ('VIGNET_b', 'VIGNET in b-band'),
-                ('VIGNET_g', 'VIGNET in g-band'),
-                ('VIGNET_u', 'VIGNET in u-band'),
-                ('color_bg', 'Color index (m_b - m_g)'),
-                ('color_ub', 'Color index (m_u - m_b)'),
-                ('Z_ned', 'Redshift from NED'),
-                ('Z_lovoccs', 'Redshift from LoVoCCS'),
-                ('ZERR_lovoccs', 'Redshift uncertainty from LoVoCCS'),
-                ('Z_desi', 'Redshift from DESI'),
-                ('ZERR_desi', 'Redshift uncertainty from DESI'),
-            ]
-
-            for i, (col, comment) in enumerate(base_desc):
-                ttype_key = f'TTYPE{i+1}'
-                tcomm_key = f'TCOMM{i+1}'
-                hdr[ttype_key] = col
-                hdr[tcomm_key] = comment
-
-            # Start adding DESI metadata fields
-            offset = len(base_desc) + 1
-            for j, col in enumerate(desi_table):
-                ttype_key = f'TTYPE{offset + j}'
-                tcomm_key = f'TCOMM{offset + j}'
-                hdr[ttype_key] = col
-                hdr[tcomm_key] = 'DESI data'
-
-            # Add Z_best and Z_source
-            hdr[f'TTYPE{offset + len(desi_table)}'] = 'Z_best'
-            hdr[f'TCOMM{offset + len(desi_table)}'] = 'Best available redshift (DESI > NED > LoVoCCS)'
-
-            hdr[f'TTYPE{offset + len(desi_table) + 1}'] = 'Z_source'
-            hdr[f'TCOMM{offset + len(desi_table) + 1}'] = 'Source of Z_best (DESI/NED/LoVoCCS)'
-
-            # Save changes
-            hdul.flush()'''
 
     # Step 5: Classify NED Matches by Redshift
     cluster_redshift = redshift
@@ -631,6 +592,7 @@ if __name__ == "__main__":
                         help="Signal-to-noise ratio threshold for galaxy selection (default: 10)")
     parser.add_argument("--overwrite_coadds", action="store_true", help="Overwrite existing coadds")
     parser.add_argument("--overwrite_cats", action="store_true", help="Overwrite existing catalogs")
+    parser.add_argument('--no_weight', action='store_true', help='Do not Use the coadd weight image for SE')
     parser.add_argument("--plot_color_mag", action="store_true", help="Plot the color-magnitude diagrams")
     parser.add_argument("--plot_stars", action="store_true", help="Plot stars in the color-magnitude diagram")
     parser.add_argument("--plot_ned", action="store_true", help="Plot NED galaxies in the color-magnitude diagram")

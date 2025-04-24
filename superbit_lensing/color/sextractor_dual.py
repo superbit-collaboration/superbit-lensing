@@ -22,11 +22,14 @@ def run_command(cmd, cores):
     print(f"Running: {full_cmd}")
     subprocess.run(full_cmd, shell=True)
 
-def _run_sextractor_dual(image_file1, image_file2, cat_dir, config_dir, diag_dir=None, back_type='AUTO', band='b'):
+def _run_sextractor_dual(image_file1, image_file2, cat_dir, config_dir, diag_dir=None, back_type='AUTO', mag_zp=28.66794, use_weight=True):
     '''
     Utility method to invoke Source Extractor on supplied detection file
     Returns: file path of catalog
     '''
+    if cat_dir is None:
+        cat_dir = os.path.dirname(image_file1)    
+
     if diag_dir is None:
         diag_dir = cat_dir
     os.makedirs(cat_dir, exist_ok=True)
@@ -34,17 +37,8 @@ def _run_sextractor_dual(image_file1, image_file2, cat_dir, config_dir, diag_dir
     cat_name = os.path.basename(image_file2).replace('.fits','_cat.fits')
     cat_file = os.path.join(cat_dir, cat_name)
 
-    if band=='b':
-        mag_arg = f'-MAG_ZEROPOINT 28.66794'
-        print('Using Band b mag zero-point: 28.66794')
-    elif band=='g':
-        mag_arg = f'-MAG_ZEROPOINT 27.490537'
-        print('Using Band g mag zero-point: 27.490537')
-    elif band=='u':
-        mag_arg = f'-MAG_ZEROPOINT 26.48623'
-        print('Using Band u mag zero-point: 26.48623')
-    else:
-        raise ValueError(f"Invalid band: {band}")
+    mag_arg = f'-MAG_ZEROPINT {mag_zp}'
+    print(f'Using mag zero-point: {mag_zp}')
 
     image_arg  = f'"{image_file1}[0], {image_file2}[0]"'
     name_arg   = '-CATALOG_NAME ' + cat_file
@@ -63,9 +57,12 @@ def _run_sextractor_dual(image_file1, image_file2, cat_dir, config_dir, diag_dir
     #apt_file   = os.path.basename(image_file2).replace('.fits','.apt.fits')
     #apt_name   = os.path.join(diag_dir, apt_file)
     checkname_arg = f'-CHECKIMAGE_NAME  {bkg_name},{seg_name},{rms_name}'
-
-    weight_arg = f'-WEIGHT_IMAGE "{image_file1}[1], {image_file2}[1]" ' + \
-                    '-WEIGHT_TYPE MAP_WEIGHT'
+    
+    if use_weight:
+        weight_arg = f'-WEIGHT_IMAGE "{image_file1}[1], {image_file2}[1]" ' + \
+                        '-WEIGHT_TYPE MAP_WEIGHT'
+    else:
+        weight_arg = '-WEIGHT_TYPE NONE'
 
     cmd = ' '.join([
                 'sex', image_arg, weight_arg, name_arg,  checkname_arg,
@@ -78,26 +75,20 @@ def _run_sextractor_dual(image_file1, image_file2, cat_dir, config_dir, diag_dir
     print(f'cat_name is {cat_file} \n')
     return cat_file
 
-def _run_sextractor_single(image_file1, cat_dir, config_dir, diag_dir=None, back_type='AUTO', band='b'):
+def _run_sextractor_single(image_file1, cat_dir, config_dir, diag_dir=None, back_type='AUTO', mag_zp=28.66794, use_weight=True):
     '''
     Utility method to invoke Source Extractor on supplied detection file
     Returns: file path of catalog
     '''
+    if cat_dir is None:
+        cat_dir = os.path.dirname(image_file1)
+
     os.makedirs(cat_dir, exist_ok=True)
     if diag_dir is None:
         diag_dir = cat_dir
 
-    if band=='b':
-        mag_arg = f'-MAG_ZEROPOINT 28.66794'
-        print('Using Band b mag zero-point: 28.66794')
-    elif band=='g':
-        mag_arg = f'-MAG_ZEROPOINT 27.490537'
-        print('Using Band g mag zero-point: 27.490537')
-    elif band=='u':
-        mag_arg = f'-MAG_ZEROPOINT 26.48623'
-        print('Using Band u mag zero-point: 26.48623')
-    else:
-        raise ValueError(f"Invalid band: {band}")
+    mag_arg = f'-MAG_ZEROPINT {mag_zp}'
+    print(f'Using mag zero-point: {mag_zp}')
 
     cat_name = os.path.basename(image_file1).replace('.fits','_cat.fits')
     cat_file = os.path.join(cat_dir, cat_name)
@@ -120,9 +111,12 @@ def _run_sextractor_single(image_file1, cat_dir, config_dir, diag_dir=None, back
     #apt_name   = os.path.join(diag_dir, apt_file)
     checkname_arg = f'-CHECKIMAGE_NAME  {bkg_name},{seg_name},{rms_name}'
 
-    weight_arg = f'-WEIGHT_IMAGE "{image_file1}[1]" ' + \
-                    '-WEIGHT_TYPE MAP_WEIGHT'
-
+    if use_weight:
+        weight_arg = f'-WEIGHT_IMAGE "{image_file1}[1]" ' + \
+                        '-WEIGHT_TYPE MAP_WEIGHT'
+    else:
+        weight_arg = '-WEIGHT_TYPE NONE'
+        
     cmd = ' '.join([
                 'sex', image_arg, weight_arg, name_arg,  checkname_arg,
                 param_arg, nnw_arg, filter_arg, bg_sub_arg, config_arg, mag_arg
