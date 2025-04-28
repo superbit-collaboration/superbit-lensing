@@ -7,6 +7,7 @@ from astropy.table import Table
 from astroquery.vizier import Vizier
 from astroquery.ipac.ned import Ned
 from astropy.coordinates import SkyCoord
+from astropy.wcs import WCS
 from astropy import units as u
 import pandas as pd
 from numpy.random import SeedSequence, default_rng
@@ -828,6 +829,166 @@ def ned_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None):
         table = table[mask]
 
     return table
+
+def radec_to_xy(header, ra, dec):
+    """
+    Convert RA, Dec to pixel coordinates using WCS from image header.
+    If TPV projection is specified but no PV polynomials found, fall back to TAN-SIP.
+    
+    Parameters:
+    fits_filename (str): Path to the FITS file
+    ra (float): Right Ascension in degrees
+    dec (float): Declination in degrees
+    
+    Returns:
+    tuple: (x, y) pixel coordinates
+    """
+    
+    # Extract WCS parameters from header
+    crpix1 = header.get('CRPIX1')
+    crpix2 = header.get('CRPIX2')
+    crval1 = header.get('CRVAL1')
+    crval2 = header.get('CRVAL2')
+    cd1_1 = header.get('CD1_1')
+    cd1_2 = header.get('CD1_2', 0.0)  # Default to 0 if not present
+    cd2_1 = header.get('CD2_1', 0.0)  # Default to 0 if not present
+    cd2_2 = header.get('CD2_2')
+    
+    # Check if header specifies TPV projection
+    ctype1 = header.get('CTYPE1', '')
+    ctype2 = header.get('CTYPE2', '')
+    is_tpv = 'TPV' in ctype1 or 'TPV' in ctype2
+    
+    # Check if PV polynomials exist
+    has_pv_terms = False
+    for key in header.keys():
+        if key.startswith('PV'):
+            has_pv_terms = True
+            break
+    
+    # Create WCS object manually
+    wcs_manual = WCS(naxis=2)
+    wcs_manual.wcs.crpix = [crpix1, crpix2]
+    wcs_manual.wcs.cdelt = [cd1_1, cd2_2]  # Using CD matrix diagonals as CDELT
+    wcs_manual.wcs.crval = [crval1, crval2]
+    
+    # Set projection type based on checks
+    if is_tpv and has_pv_terms:
+        # Use TPV if it's specified and has polynomials
+        wcs_manual.wcs.ctype = [ctype1, ctype2]
+        #print("Using TPV projection with PV terms")
+    elif is_tpv and not has_pv_terms:
+        # Fall back to TAN-SIP if TPV is specified but no PV terms
+        wcs_manual.wcs.ctype = ["RA---TAN-SIP", "DEC--TAN-SIP"]
+        #print("TPV specified but no PV terms found, falling back to TAN-SIP")
+        
+        # Check for SIP coefficients (should be present for TAN-SIP)
+        has_sip = False
+        for key in header.keys():
+            if key.startswith('A_') or key.startswith('B_'):
+                has_sip = True
+                # Copy SIP coefficients if present
+                wcs_manual.sip = WCS(header).sip
+                break
+        
+        if not has_sip:
+            # If no SIP coefficients, fall back to plain TAN
+            wcs_manual.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+            #print("No SIP coefficients found, falling back to plain TAN")
+    else:
+        # Use what's in the header or default to TAN
+        if 'CTYPE1' in header and 'CTYPE2' in header:
+            wcs_manual.wcs.ctype = [ctype1, ctype2]
+            #print(f"Using projection from header: {ctype1}, {ctype2}")
+        else:
+            wcs_manual.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+            #print("No projection specified in header, using TAN")
+    
+    # Convert coordinates using the manual WCS
+    coords = SkyCoord(ra*u.deg, dec*u.deg, frame='icrs')
+    x, y = wcs_manual.world_to_pixel(coords)
+        
+    return x, y
+
+def extract_vignette(image_data, header, x_image, y_image, size=51):
+    """
+    Extract a square vignette centered on X_IMAGE, Y_IMAGE from a FITS image
+    
+    Parameters:
+    fits_file_path (str): Path to the FITS file
+    x_image (float): X pixel coordinate
+    y_image (float): Y pixel coordinate
+    size (int): Size of the vignette in pixels (default: 51)
+    
+    Returns:
+    numpy.ndarray: Vignette image data
+    dict: Metadata about the extraction
+    """
+    # Make sure size is odd to have a center pixel
+    if size % 2 == 0:
+        size += 1
+    
+    half_size = size // 2
+    
+    # Get image dimensions
+    img_height, img_width = image_data.shape
+    
+    # Convert to integer pixel coordinates
+    x_int = int(round(float(x_image)))
+    y_int = int(round(float(y_image)))
+    
+    # Calculate vignette boundaries
+    x_min = max(0, x_int - half_size)
+    x_max = min(img_width, x_int + half_size + 1)
+    y_min = max(0, y_int - half_size)
+    y_max = min(img_height, y_int + half_size + 1)
+    
+    # Check if the vignette would be at the edge of the image
+    is_at_edge = (x_int - half_size < 0 or 
+                    x_int + half_size >= img_width or 
+                    y_int - half_size < 0 or 
+                    y_int + half_size >= img_height)
+    
+    # Extract the vignette
+    vignette = image_data[y_min:y_max, x_min:x_max]
+    
+    # Create a full-sized vignette with padding if necessary
+    full_vignette = np.zeros((size, size), dtype=vignette.dtype)
+    
+    # Calculate where to place the extracted vignette in the full-sized array
+    v_y_min = max(0, half_size - (y_int - y_min))
+    v_y_max = v_y_min + (y_max - y_min)
+    v_x_min = max(0, half_size - (x_int - x_min))
+    v_x_max = v_x_min + (x_max - x_min)
+    
+    # Place the vignette in the full-sized array
+    full_vignette[v_y_min:v_y_max, v_x_min:v_x_max] = vignette
+    
+    # Get pixel scale from header if available
+    try:
+        wcs = WCS(header)
+        pixel_scale_matrix = wcs.pixel_scale_matrix * 3600  # to arcsec/pixel
+        x_scale = abs(pixel_scale_matrix[0, 0])
+        y_scale = abs(pixel_scale_matrix[1, 1])
+    except:
+        x_scale = None
+        y_scale = None
+    
+    # Return vignette and metadata
+    metadata = {
+        'center_x': float(x_image),
+        'center_y': float(y_image),
+        'vignette_size': size,
+        'image_bounds': (img_width, img_height),
+        'extraction_region': (x_min, x_max, y_min, y_max),
+        'is_at_edge': is_at_edge,
+        'pixel_scale_x': x_scale,
+        'pixel_scale_y': y_scale,
+        'angular_size_x': size * x_scale if x_scale else None,  # in arcsec
+        'angular_size_y': size * y_scale if y_scale else None   # in arcsec
+    }
+    
+    return full_vignette, metadata
 
 def g1g2_to_gt_gc(g1, g2, ra, dec, ra_c, dec_c, resolution = 0.3, key="ra-dec"):
     """

@@ -20,5 +20,5 @@ python $CODEDIR/superbit_lensing/color/color_color_v2.py ${cluster_name} \
 --config_dir=$CODEDIR/superbit_lensing/medsmaker/superbit/astro_config \
 --plot_color_mag \
 --save_fits \
---plot_ned #--plot_lovoccs
-# Optional flags: --overwrite_coadds --overwrite_cats
+--plot_redshifts 
+# Optional flags: --swarp_projection_type="TAN" --overwrite_coadds --overwrite_cats --vignet_updater --snr_threshold=-1e30

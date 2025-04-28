@@ -5,6 +5,8 @@ from astropy.io import fits
 import copy
 import subprocess
 import multiprocessing
+from tqdm import tqdm
+from superbit_lensing.utils import radec_to_xy, extract_vignette
 
 def get_slurm_resources():
     """Detect available SLURM resources, fallback to local CPU count if not in SLURM."""
@@ -137,7 +139,7 @@ def is_valid_fits(file_path):
         return False  # Either doesn't exist or is corrupted
 
 class make_coadds_for_dualmode():
-    def __init__(self, data_dir, cluster_name, config_dir=None, overwrite_coadds=False):
+    def __init__(self, data_dir, cluster_name, config_dir=None, projection="TPV", overwrite_coadds=False):
         '''
         data_path: path to the image data not including target name
         coadd: Set to true if the first image file is a coadd image (must be first)
@@ -152,6 +154,7 @@ class make_coadds_for_dualmode():
         self.base_path = os.path.join(self.data_dir, self.cluster_name)
         self.dual_mode_dir = f"{self.base_path}/sextractor_dualmode"
         self.base_coadd_dir = f"{self.dual_mode_dir}/coadd"
+        self.projection = projection
         if overwrite_coadds:
             os.system(f"rm -rf {self.base_coadd_dir}")
         if config_dir is None:
@@ -166,7 +169,7 @@ class make_coadds_for_dualmode():
         commands_to_run = []
 
         for band in self.bands:
-            command_arr, coadd_file = self.make_coadd_arguments(band, config_dir=self.config_dir)
+            command_arr, coadd_file = self.make_coadd_arguments(band,  config_dir=self.config_dir, projection=self.projection)
 
             if os.path.exists(coadd_file) and is_valid_fits(coadd_file):
                 print(f"Valid coadd FITS file exists: {coadd_file}")
@@ -253,7 +256,7 @@ class make_coadds_for_dualmode():
 
         return sex_wgt_files
         
-    def make_coadd_arguments(self, band, config_dir=None):
+    def make_coadd_arguments(self, band, config_dir=None, projection='TPV'):
         '''
         Runs SWarp on provided (reduced!) image files to make a coadd image
         for SEX and PSFEx detection.
@@ -283,6 +286,7 @@ class make_coadds_for_dualmode():
         weight_arg = f'-WEIGHT_IMAGE "{sex_weight_files}" ' + \
                         '-WEIGHT_TYPE MAP_WEIGHT'        
         config_arg = f'-c {config_dir}/swarp.config'
+        proj_arg = f'-PROJECTION_TYPE {projection}'
         resamp_arg = f'-RESAMPLE_DIR {coadd_dir}'
         cliplog_arg = f'CLIP_LOGNAME {coadd_dir}'
         outfile_arg = f'-IMAGEOUT_NAME {coadd_file} ' + \
@@ -293,7 +297,8 @@ class make_coadds_for_dualmode():
                     'weight_arg': weight_arg, 
                     'resamp_arg': resamp_arg,
                     'outfile_arg': outfile_arg, 
-                    'config_arg': config_arg
+                    'config_arg': config_arg,
+                    'proj_arg': proj_arg
                     }
         return cmd_arr, coadd_file
 
@@ -366,3 +371,44 @@ class make_coadds_for_dualmode():
         '''
         for band in ['u', 'b', 'g']:
             os.makedirs(os.path.join(self.base_coadd_dir, band), exist_ok=True)
+
+class update_vignet():
+    def __init__(self, coadd_file, bg_sub_file, cat_data):
+        '''
+        coadd_file: path to the coadd image
+        bg_sub_file: path to the background subtracted image
+        detection_cat_file: path to the SExtractor detection catalog
+        '''
+        self.coadd_file = coadd_file
+        self.bg_sub_file = bg_sub_file
+        self.cat_data = cat_data
+        with fits.open(self.bg_sub_file) as hdul:
+            self.bg_image_data = hdul[0].data
+            self.bg_header = hdul[0].header
+        with fits.open(self.coadd_file) as hdul:
+            self.weight_data = hdul[1].data
+            self.weight_header = hdul[1].header
+
+        self.update_vignet_data()
+
+    def update_vignet_data(self):
+        '''
+        Update the vignet extension of the coadd image with the background
+        subtracted image
+        '''
+        im_vignettes = []
+        weight_vignettes = []
+        is_at_edge = []        
+        for i in tqdm(range(len(self.cat_data))):
+            ra = self.cat_data["ALPHAWIN_J2000"][i]
+            dec = self.cat_data["DELTAWIN_J2000"][i]
+            x_image, y_image = radec_to_xy(self.bg_header , ra, dec)
+            im_vignett, meta_bg = extract_vignette(self.bg_image_data, self.bg_header, x_image, y_image)
+            weight_vignett, meta_wg = extract_vignette(self.weight_data, self.weight_header, x_image, y_image)
+            im_vignettes.append(im_vignett)
+            weight_vignettes.append(weight_vignett)
+            is_at_edge.append(meta_bg["is_at_edge"])
+
+        # Add the new columns to the catalog
+        self.cat_data["im_vignett"] = im_vignettes
+        self.cat_data["weight_vignett"] = weight_vignettes        

@@ -30,6 +30,7 @@ def main(args):
     # Construct file paths based on the inputs
     cluster_name = args.cluster_name
     datadir = args.datadir
+    projection = args.swarp_projection_type
     config_dir = args.config_dir
     tolerance_deg = args.tolerance
     redshift = args.redshift
@@ -86,7 +87,7 @@ def main(args):
     os.makedirs(diag_path, exist_ok=True)
     os.makedirs(dual_cat_path, exist_ok=True)
     
-    swarp = sex.make_coadds_for_dualmode(datadir, cluster_name, config_dir=config_dir, overwrite_coadds=args.overwrite_coadds)
+    swarp = sex.make_coadds_for_dualmode(datadir, cluster_name, config_dir=config_dir, overwrite_coadds=args.overwrite_coadds, projection=projection)
     coadd_files = swarp.coadd_file_names
     file_b, file_g, file_u = coadd_files['b'], coadd_files['g'], coadd_files['u']
 
@@ -100,6 +101,8 @@ def main(args):
     if args.overwrite_cats:
         print("WARNING: Overwriting catalogs, this may take a while...")
         os.system(f"rm -rf {dual_cat_path}/*")
+        os.system(f"rm -rf {diag_path}/*")
+        os.system(f"rm -rf {output_dir}/*")
 
     try:
         # Read the FITS files
@@ -142,6 +145,10 @@ def main(args):
             sex._run_sextractor_dual(file_b, file_u, dual_cat_path, config_dir, diag_dir=diag_path,  mag_zp=MAG_ZP_u)
         data_u = Table.read(file_u_cat, format='fits', hdu=2)
     
+    bg_sub_b_file = f"{diag_path}/{cluster_name}_coadd_b.sub.fits"
+    bg_sub_g_file = f"{diag_path}/{cluster_name}_coadd_g.sub.fits"
+    bg_sub_u_file = f"{diag_path}/{cluster_name}_coadd_u.sub.fits"
+
     try:
         ned_cat = Table.read(redshift_file, format='csv')
         ned_cat = ned_cat[ned_table]
@@ -154,7 +161,6 @@ def main(args):
             print(f"Failed to query NED for redshift file ({e}), creating an empty catalog.")
             ned_cat = Table(names=ned_table, dtype=['f8'] * len(ned_table))
 
-    #if args.plot_lovoccs:
     try:
         # Read the Lovoccs catalog
         lovoccs = Table.read(lovoccs_file, format='fits', hdu=1)
@@ -214,11 +220,14 @@ def main(args):
 
     valid_flux = (flux_b > 0) & (flux_g > 0) & (flux_u > 0)
     #valid_flux = np.ones(len(matched_data_b), dtype=bool)
+    matched_data_b_valid = matched_data_b[valid_flux]
+    matched_data_g_valid = matched_data_g[valid_flux]
+    matched_data_u_valid = matched_data_u[valid_flux]
     print(f"Number of objects with positive flux in all bands: {np.sum(valid_flux)}")
     print(f"Number of objects with invalid flux in all bands: {np.sum(~valid_flux)}")
-    m_b = matched_data_b[valid_flux]["MAG_AUTO"] #-2.5 * np.log10(flux_b[valid_flux])
-    m_g = matched_data_g[valid_flux]["MAG_AUTO"] #-2.5 * np.log10(flux_g[valid_flux])
-    m_u = matched_data_u[valid_flux]["MAG_AUTO"] #-2.5 * np.log10(flux_u[valid_flux])
+    m_b = matched_data_b_valid["MAG_AUTO"] #-2.5 * np.log10(flux_b[valid_flux])
+    m_g = matched_data_g_valid["MAG_AUTO"] #-2.5 * np.log10(flux_g[valid_flux])
+    m_u = matched_data_u_valid["MAG_AUTO"] #-2.5 * np.log10(flux_u[valid_flux])
     color_index_bg = m_b - m_g
     color_index_ub = m_u - m_b
 
@@ -297,6 +306,12 @@ def main(args):
             z_best_err[i] = redshift_err_lovoccs[i]
             z_source[i] = 'LoVoCCS'
 
+    if args.vignet_updater:
+        print("Vignet updater is starting...")
+        vignet_updater_b = sex.update_vignet(file_b, bg_sub_b_file, matched_data_b_valid)
+        vignet_updater_g = sex.update_vignet(file_g, bg_sub_g_file, matched_data_g_valid)
+        vignet_updater_u = sex.update_vignet(file_u, bg_sub_u_file, matched_data_u_valid)
+
     if args.save_fits:
         ra_dec_table = matched_data_b['ALPHAWIN_J2000', 'DELTAWIN_J2000']
         ra_dec_table.rename_columns(['ALPHAWIN_J2000', 'DELTAWIN_J2000'], ['ra', 'dec'])
@@ -325,9 +340,17 @@ def main(args):
         final_table['VIGNET_b'] = matched_data_b["VIGNET"][valid_flux]
         final_table['VIGNET_g'] = matched_data_g["VIGNET"][valid_flux]
         final_table['VIGNET_u'] = matched_data_u["VIGNET"][valid_flux]
+        if args.vignet_updater:
+            final_table['VIGNET_b_im'] = vignet_updater_b.cat_data["im_vignett"]
+            final_table['VIGNET_g_im'] = vignet_updater_g.cat_data["im_vignett"]
+            final_table['VIGNET_u_im'] = vignet_updater_u.cat_data["im_vignett"]
+            final_table['VIGNET_b_wt'] = vignet_updater_b.cat_data["weight_vignett"]
+            final_table['VIGNET_g_wt'] = vignet_updater_g.cat_data["weight_vignett"]
+            final_table['VIGNET_u_wt'] = vignet_updater_u.cat_data["weight_vignett"]
         final_table['SNR_b'] = matched_data_b["SNR_WIN"][valid_flux]
         final_table['SNR_g'] = matched_data_g["SNR_WIN"][valid_flux]
         final_table['SNR_u'] = matched_data_u["SNR_WIN"][valid_flux]
+        final_table['SNR_combined'] = np.sqrt(final_table['SNR_b']**2 + final_table['SNR_g']**2 + final_table['SNR_u']**2)
         final_table['color_bg'] = color_index_bg
         final_table['color_ub'] = color_index_ub
         final_table['Z_ned'] = redshifts_ned[valid_flux]
@@ -512,7 +535,7 @@ def main(args):
     if args.plot_stars:
         plt.scatter(color_bg_stars, color_ub_stars, s=5, alpha=0.10, color='red', label='Stars')
 
-    if args.plot_ned:
+    if args.plot_redshifts:
         plt.scatter(color_index_bg_high, color_index_ub_high, s=10, alpha=0.3, color='orange', label=f'High-z (z > {cluster_redshift_up:.2f}): : {len(high_z_indices)}')
         plt.scatter(color_index_bg_mid, color_index_ub_mid, s=10, alpha=0.3, color='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}): {len(mid_z_indices)}')
         plt.scatter(color_index_bg_low, color_index_ub_low, s=10, alpha=0.3, color='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
@@ -533,7 +556,7 @@ def main(args):
         if args.plot_stars:
             plt.scatter(m_stars_b, color_bg_stars, s=5, alpha=0.10, color='red', label='Stars')
 
-        if args.plot_ned:
+        if args.plot_redshifts:
             plt.scatter(m_b_high, color_index_bg_high, s=10, alpha=0.3, facecolors='orange', label=f'High-z (z > {cluster_redshift_up:.2f}): : {len(high_z_indices)}')
             plt.scatter(m_b_low, color_index_bg_low, s=10, alpha=0.3, facecolors='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
             plt.scatter(m_b_mid, color_index_bg_mid, s=10, alpha=0.3, facecolors='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}): {len(mid_z_indices)}')
@@ -554,7 +577,7 @@ def main(args):
         if args.plot_stars:
             plt.scatter(m_stars_b, color_ub_stars, s=5, alpha=0.10, color='red', label='Stars')
 
-        if args.plot_ned:
+        if args.plot_redshifts:
             plt.scatter(m_b_high, color_index_ub_high, s=10, edgecolors='black', facecolors='orange', label=f'High-z (z > {cluster_redshift_up:.2f}): : {len(high_z_indices)}')
             plt.scatter(m_b_mid, color_index_ub_mid, s=10, edgecolors='black', facecolors='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}): {len(mid_z_indices)}')
             plt.scatter(m_b_low, color_index_ub_low, s=10, edgecolors='black', facecolors='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
@@ -589,14 +612,17 @@ if __name__ == "__main__":
                         help="Redshift threshold for classification (default: value from $cluster_redshift or 0.5)")
     parser.add_argument("--snr_threshold", type=float,
                         default=-1e30,
-                        help="Signal-to-noise ratio threshold for galaxy selection (default: 10)")
+                        help="Signal-to-noise ratio threshold for galaxy selection (default: -1e30)")
+    parser.add_argument("--swarp_projection_type", type=str,
+                        default="TPV",
+                        help="Projection type for swarp (default: 'TPV')")
     parser.add_argument("--overwrite_coadds", action="store_true", help="Overwrite existing coadds")
     parser.add_argument("--overwrite_cats", action="store_true", help="Overwrite existing catalogs")
     parser.add_argument('--no_weight', action='store_true', help='Do not Use the coadd weight image for SE')
+    parser.add_argument('--vignet_updater', action='store_true', help='Update the vignette image')
     parser.add_argument("--plot_color_mag", action="store_true", help="Plot the color-magnitude diagrams")
     parser.add_argument("--plot_stars", action="store_true", help="Plot stars in the color-magnitude diagram")
-    parser.add_argument("--plot_ned", action="store_true", help="Plot NED galaxies in the color-magnitude diagram")
-    parser.add_argument("--plot_lovoccs", action="store_true", help="Plot LOVOCCS galaxies in the color-magnitude diagram")
+    parser.add_argument("--plot_redshifts", action="store_true", help="Plot NED galaxies in the color-magnitude diagram")
     parser.add_argument('--save_fits', action='store_true', help='Save the output FITS file')
     
     args = parser.parse_args()
