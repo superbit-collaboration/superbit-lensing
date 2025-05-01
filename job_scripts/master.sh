@@ -1,15 +1,20 @@
 #!/bin/bash
 
 # Source the configuration file
-#echo $SLURM_SUBMIT_DIR
-#source "$SLURM_SUBMIT_DIR/config.sh"
+
 source "./config.sh"
+
+# Submit first job and capture its ID
+JOBID1=$(sbatch ./scripts/make_meds.sh | awk '{print $4}')
 
 # Define variables
 base_arraroutdir="${DATADIR}/${cluster_name}/${band_name}/arr/run"
 base_seed=$base_ngmix_seed  # Starting seed value, can be modified as needed
 #job_script_template="$SLURM_SUBMIT_DIR/ngmix_array_runs/job1.sh"  # Path to the job script template
-job_script_template="./ngmix_array_runs/ngmix_job_template.sh"
+job_script_template="./scripts/ngmix_job_template.sh"
+
+# Create an array to store all job IDs
+job_ids=()
 
 # Loop to create and submit jobs based on the ngmix_nruns variable
 for i in $(seq 1 $ngmix_nruns)
@@ -20,8 +25,7 @@ do
   job_name="ngmix${i}"  # Job name format ngmix1, ngmix2, ...
 
   # Define the job script name
-  #job_script_name="$SLURM_SUBMIT_DIR/ngmix_array_runs/job${i}.sh"  # Adjusted path
-  job_script_name="./ngmix_array_runs/job${i}.sh" 
+  job_script_name="./scripts/job${i}.sh" 
 
   # Copy the job template to the new job script
   cp $job_script_template $job_script_name
@@ -31,9 +35,27 @@ do
   sed -i "s|-seed=.*|-seed=$new_seed \\\\|" $job_script_name
   sed -i "s|#SBATCH -J .*|#SBATCH -J $job_name|" $job_script_name
 
-  # Submit the new job script
-  sbatch $job_script_name
+  # Submit the new job script and capture the job ID
+  job_id=$(sbatch --dependency=afterok:$JOBID1 $job_script_name | awk '{print $4}')
+  
+  # Add the job ID to our array
+  job_ids+=($job_id)
 
-  echo "Job script $job_script_name created and submitted with seed $new_seed."
+  echo "Job script $job_script_name created and submitted with seed $new_seed, job ID: $job_id"
 done
+
+# Create a dependency string with all job IDs
+dependency_string="afterok"
+for job_id in "${job_ids[@]}"
+do
+  dependency_string+=":$job_id"
+done
+
+# Submit a final job that runs make_annular.sh after all ngmix jobs complete
+sbatch --dependency=$dependency_string \
+       --time=00:05:00 \
+       --job-name=make_annular \
+       --output=logs/annular_out.log \
+       --error=logs/annular_err.log \
+       --wrap="bash ./scripts/make_annular.sh"
 

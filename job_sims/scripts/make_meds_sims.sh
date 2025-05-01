@@ -6,8 +6,8 @@
 #SBATCH --partition=short
 #SBATCH -J meds
 #SBATCH -v
-#SBATCH -o logs/medout.log
-#SBATCH -e logs/mederr.log
+#SBATCH -o logs/medsout.log
+#SBATCH -e logs/medserr.log
 
 # Load configuration file
 source "$SLURM_SUBMIT_DIR/config.sh"

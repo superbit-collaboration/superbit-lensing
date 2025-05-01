@@ -60,7 +60,8 @@ def parse_args():
                         help='Turn on to overwrite existing files')
     parser.add_argument('--vb', action='store_true', default=False,
                         help='Turn on for verbose prints')
-
+    parser.add_argument('--master_seed', type=int, default=None,
+                        help='Optional master seed for RNG initialization')
     return parser.parse_args()
 
 class truth():
@@ -107,7 +108,6 @@ def calculate_admoms_with_timeout(gal, wcs, image_pos, galaxy_truth, sbparams, t
     signal.alarm(timeout_seconds)
     
     try:
-        #print("Yay made a new change! Hiiiiiiiii")
         admoms = galsim.hsm.FindAdaptiveMom(gal.drawImage(wcs=wcs.local(image_pos)))
         galaxy_truth.admom_g1 = admoms.observed_shape.g1
         galaxy_truth.admom_g2 = admoms.observed_shape.g2
@@ -351,12 +351,12 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
     logprint.debug('created galaxy')
 
     ## Apply a random rotation
-    #theta = ud()*2.0*np.pi*galsim.radians
-    #gal = gal.rotate(theta)
+    theta = ud()*2.0*np.pi*galsim.radians
+    gal = gal.rotate(theta)
 
     ## Apply a random rotation
-    #theta = ud()*2.0*np.pi*galsim.radians
-    #gal = gal.rotate(theta)
+    theta = ud()*2.0*np.pi*galsim.radians
+    gal = gal.rotate(theta)
 
     ## Get the reduced shears and magnification at this point
     try:
@@ -437,7 +437,22 @@ def make_cluster_galaxy(ud, wcs, affine, centerpix, cluster_cat, psf, sbparams, 
     g1 = 0.0; g2 = 0.0
     mu = 1.0
 
-    # Create galaxy
+    '''index = int(np.floor(ud()*len(cosmos_cat)))
+    gal_flux = cosmos_cat[index][sbparams.bandpass] * sbparams.exp_time / sbparams.gain
+    phi = cosmos_cat[index]['c10_sersic_fit_phi'] * galsim.radians
+    q = cosmos_cat[index]['c10_sersic_fit_q']    
+    half_light_radius=cosmos_cat[index]['c10_sersic_fit_hlr']*0.03*np.sqrt(q)
+    n = cosmos_cat[index]['c10_sersic_fit_n']  
+    # Sersic class requires index n >= 0.3
+    if (n < 0.3):
+        n = 0.3
+
+    gal = galsim.Sersic(n = n,
+                        flux = gal_flux,
+                        half_light_radius = half_light_radius)
+
+    gal = gal.shear(q = q, beta = phi)'''  
+    # Create galaxy    
     gal = cluster_cat.makeGalaxy(gal_type='parametric', rng=ud)
     logprint.debug('created cluster galaxy')
 
@@ -718,15 +733,14 @@ class SuperBITParameters:
             elif option == "data_dir":
                 self.data_dir = str(value)
             elif option == "master_seed":
-                self.master_seed = int(value)
+                if value is None:
+                    self.master_seed = None
+                else:
+                    self.master_seed = int(value)
             elif option == "noise_seed":
                 self.noise_seed = int(value)
             elif option == "dithering_seed":
                 self.dithering_seed = int(value)
-            elif option == "cluster_seed":
-                self.cluster_seed = int(value)
-            elif option == "stars_seed":
-                self.stars_seed = int(value)
             elif option == "nstruts":
                 self.nstruts = int(value)
             elif option == "nstruts":
@@ -856,7 +870,7 @@ class SuperBITParameters:
                     seeds[seed_name] = getattr(self, seed_name)
                     needed_seeds -= 1
 
-        assert needed_seeds >= 0
+        assert needed_seeds >= 0, "needed_seeds should never be negative"
         if needed_seeds > 0:
             # Create safe, independent obj seeds given a master seed
             new_seeds = utils.generate_seeds(
@@ -1137,10 +1151,14 @@ def main(args):
     cosmos_cat = cosmos_cat[size_wg]
 
     try:
-        cluster_cat = galsim.COSMOSCatalog(sbparams.cluster_cat_name,
-                                           dir=sbparams.cosmosdir)
+        cluster_cat = galsim.COSMOSCatalog()
+        print("Default galsim cosmos catalog worked")
     except:
-        cluster_cat = galsim.COSMOSCatalog(sbparams.cluster_cat_name)
+        try:
+            cluster_cat = galsim.COSMOSCatalog(sbparams.cluster_cat_name,
+                                               dir=sbparams.cosmosdir)
+        except:
+            cluster_cat = galsim.COSMOSCatalog(sbparams.cluster_cat_name)
 
     ### Now create PSF. First, define Zernicke polynomial component
     ### note: aberrations were definined for lam = 550, and close to the
@@ -1500,7 +1518,7 @@ def main(args):
                 ud = galsim.UniformDeviate(sbparams.stars_seed+k+1)
                 pud = np.random.default_rng(sbparams.stars_seed)
                 star_stamp,truth = make_a_star(ud=ud,pud=pud,
-                                            index=k,
+                                            k=k,
                                             wcs=wcs,
                                             affine=affine,
                                             psf=psf,

@@ -6,11 +6,26 @@
 #SBATCH --partition=short
 #SBATCH -J meds
 #SBATCH -v
-#SBATCH -o out.log
-#SBATCH -e err.log
+#SBATCH -o logs/medout.log
+#SBATCH -e logs/mederr.log
 
 # Load configuration file
 source "$SLURM_SUBMIT_DIR/config.sh"
+
+# Print defined variables
+echo "Cluster Name: $cluster_name"
+echo "Band Name: $band_name"
+echo "Cluster Redshift: $cluster_redshift"
+echo "Detection Band: $detection_band"
+echo "Data Directory: $DATADIR"
+echo "Code Directory: $CODEDIR"
+echo "Output Directory: $OUTDIR"
+echo "ngmix Runs: $ngmix_nruns"
+echo "PSF Model: $PSF_MODEL"
+echo "Galaxy Model: $GAL_MODEL"
+echo "PSF Seed: $psf_seed"
+echo "Base ngmix Seed: $base_ngmix_seed"
+echo "Conda Environment: $CONDA_ENV"
 
 date
 
@@ -20,15 +35,6 @@ which python
 export PATH=$PATH:'/work/mccleary_group/Software/texlive-bin/x86_64-linux'
 echo $PATH
 echo $PYTHONPATH
-
-dirname="slurm_outfiles"
-if [ ! -d "$dirname" ]; then
-     echo " Directory $dirname does not exist. Creating now"
-     mkdir -p -- "$dirname"
-     echo " $dirname created"
-else
-     echo " Directory $dirname exists"
-fi
 
 echo "Proceeding with code..."
 
@@ -40,11 +46,13 @@ python $CODEDIR/superbit_lensing/medsmaker/scripts/process_2023.py \
 -star_config_dir $CODEDIR/superbit_lensing/medsmaker/configs \
 --meds_coadd ${cluster_name} ${band_name} $DATADIR
 
+
+
 # Check if the Python script ran successfully
 : '
 if [ $? -eq 0 ]; then
     echo "Python script executed successfully. Running multiple_ngmixrun.sh..."
-    bash multiple_ngmixrun.sh
+    bash "$SLURM_SUBMIT_DIR/multiple_ngmixrun.sh"
 else
     echo "Python script failed. Exiting without running multiple_ngmixrun.sh."
     exit 1

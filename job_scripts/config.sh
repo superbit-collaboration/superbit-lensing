@@ -1,18 +1,18 @@
 # config.sh - Configuration file for submission.sh
 
 # Define cluster-related variables
-export cluster_name="PLCKG287d0p32d9"
+export cluster_name="1E0657_Bullet"
 export band_name="b"
-export cluster_redshift="0.39"
+export cluster_redshift="0.296"
 export detection_band="b"
 
 # Define directories
-export DATADIR="/work/mccleary_group/saha/codes/superbit-lensing/data"
+export DATADIR="/work/mccleary_group/saha/data"
 export CODEDIR="/work/mccleary_group/saha/codes/superbit-lensing"
 export OUTDIR="${DATADIR}/${cluster_name}/${band_name}/out"
 
 # Define ngmix parameters
-export ngmix_nruns=50 
+export ngmix_nruns=1 
 export PSF_MODEL="coellip5"
 export GAL_MODEL="gauss"
 

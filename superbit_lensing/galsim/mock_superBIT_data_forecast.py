@@ -60,7 +60,8 @@ def parse_args():
                         help='Turn on to overwrite existing files')
     parser.add_argument('--vb', action='store_true', default=False,
                         help='Turn on for verbose prints')
-
+    parser.add_argument('--master_seed', type=int, default=None,
+                        help='Optional master seed for RNG initialization')
     return parser.parse_args()
 
 def timeout_handler(signum, frame):
@@ -287,12 +288,12 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
     logprint.debug('created galaxy')
 
     ## Apply a random rotation
-    #theta = ud()*2.0*np.pi*galsim.radians
-    #gal = gal.rotate(theta)
+    theta = ud()*2.0*np.pi*galsim.radians
+    gal = gal.rotate(theta)
 
     ## Apply a random rotation
-    #theta = ud()*2.0*np.pi*galsim.radians
-    #gal = gal.rotate(theta)
+    theta = ud()*2.0*np.pi*galsim.radians
+    gal = gal.rotate(theta)
 
     ## Get the reduced shears and magnification at this point
     try:
@@ -303,6 +304,7 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
         logprint(f'could not lens galaxy at z = {gal_z}, setting default values...')
         g1 = 0.0; g2 = 0.0
         mu = 1.0
+        kappa = 0.0
 
     final = galsim.Convolve([psf, gal])
 
@@ -637,15 +639,14 @@ class SuperBITParameters:
             elif option == "data_dir":
                 self.data_dir = str(value)
             elif option == "master_seed":
-                self.master_seed = int(value)
+                if value is None:
+                    self.master_seed = None
+                else:
+                    self.master_seed = int(value)
             elif option == "noise_seed":
                 self.noise_seed = int(value)
             elif option == "dithering_seed":
                 self.dithering_seed = int(value)
-            elif option == "cluster_seed":
-                self.cluster_seed = int(value)
-            elif option == "stars_seed":
-                self.stars_seed = int(value)
             elif option == "nstruts":
                 self.nstruts = int(value)
             elif option == "nstruts":

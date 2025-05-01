@@ -6,8 +6,8 @@
 #SBATCH --partition=short
 #SBATCH -J ngmix1
 #SBATCH -v
-#SBATCH -o out.log
-#SBATCH -e err.log
+#SBATCH -o logs/ngmixout.log
+#SBATCH -e logs/ngmixerr.log
 
 # Load configuration file
 source "$SLURM_SUBMIT_DIR/config.sh"
@@ -16,7 +16,7 @@ date
 
 which python
 
-export ARRAROUTDIR= #should be automatically edited
+export ARRAROUTDIR="/work/mccleary_group/saha/data/Abell3411/b/arr/run1"
 
 # Ensure ARRAROUTDIR exists
 mkdir -p $ARRAROUTDIR
