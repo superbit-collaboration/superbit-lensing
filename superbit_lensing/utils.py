@@ -1026,6 +1026,69 @@ def g1g2_to_gt_gc(g1, g2, ra, dec, ra_c, dec_c, resolution = 0.3, key="ra-dec"):
 
     return gt, gc, phi
 
+def read_ds9_ctr(filename):
+    contours = []
+    current = []
+    coord_system = None
+
+    with open(filename, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if line.lower() in ('fk5', 'image', 'physical', 'wcs'):
+                coord_system = line.lower()
+            elif line.lower() == "line":
+                if current:
+                    contours.append(current)
+                    current = []
+            else:
+                try:
+                    parts = list(map(float, line.split()))
+                    current.append(parts)
+                except ValueError:
+                    continue
+        if current:
+            contours.append(current)
+
+    # Fallback to FK5 if unknown
+    if coord_system is None:
+        coord_system = 'fk5'
+    return contours, coord_system
+
+def build_clean_tan_wcs(header):
+    # Extract key WCS parameters
+    crpix1 = header.get('CRPIX1')
+    crpix2 = header.get('CRPIX2')
+    naxis1 = header.get('NAXIS1')
+    naxis2 = header.get('NAXIS2')
+    crval1 = header.get('CRVAL1')
+    crval2 = header.get('CRVAL2')
+
+    cd1_1 = header.get('CD1_1')
+    cd1_2 = header.get('CD1_2', 0.0)
+    cd2_1 = header.get('CD2_1', 0.0)
+    cd2_2 = header.get('CD2_2')
+
+    # Check if it's a TPV header
+    ctype1 = header.get('CTYPE1', '')
+    ctype2 = header.get('CTYPE2', '')
+    is_tpv = 'TPV' in ctype1 or 'TPV' in ctype2
+
+    # Check for any PV distortion terms
+    has_pv_terms = any(key.startswith('PV') for key in header.keys())
+
+    # Build WCS manually
+    wcs_manual = WCS(naxis=2)
+    wcs_manual.wcs.crpix = [crpix1, crpix2]
+    wcs_manual.wcs.crval = [crval1, crval2]
+    wcs_manual.naxis1 = naxis1
+    wcs_manual.naxis2 = naxis2
+    wcs_manual.wcs.cd = [[cd1_1, cd1_2], [cd2_1, cd2_2]]
+    wcs_manual.wcs.ctype = ['RA---TAN', 'DEC--TAN']  # Force TAN
+    wcs_manual.wcs.cunit = ['deg', 'deg']
+
+    return wcs_manual
 
 BASE_DIR = get_base_dir()
 MODULE_DIR = get_module_dir()

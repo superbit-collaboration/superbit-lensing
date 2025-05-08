@@ -373,7 +373,7 @@ class make_coadds_for_dualmode():
             os.makedirs(os.path.join(self.base_coadd_dir, band), exist_ok=True)
 
 class update_vignet():
-    def __init__(self, coadd_file, bg_sub_file, cat_data):
+    def __init__(self, coadd_file, bg_sub_file, bkg_rms_file, cat_data):
         '''
         coadd_file: path to the coadd image
         bg_sub_file: path to the background subtracted image
@@ -381,34 +381,107 @@ class update_vignet():
         '''
         self.coadd_file = coadd_file
         self.bg_sub_file = bg_sub_file
+        self.bkg_rms_file = bkg_rms_file
         self.cat_data = cat_data
+        
+        # Load the image data
+        print("Loading background subtracted image...")
         with fits.open(self.bg_sub_file) as hdul:
             self.bg_image_data = hdul[0].data
             self.bg_header = hdul[0].header
+        
+        print("Loading weight data...")
         with fits.open(self.coadd_file) as hdul:
             self.weight_data = hdul[1].data
             self.weight_header = hdul[1].header
-
+        
+        print("Loading background RMS data...")
+        with fits.open(self.bkg_rms_file) as hdul:
+            self.bkg_rms_data = hdul[0].data
+            self.bkg_rms_header = hdul[0].header
+        
+        # Calculate RMS weight map
+        print("Calculating RMS weight map...")
+        self.rms_weight_map = 1 / (self.bkg_rms_data**2)
+        
+        # Initialize arrays in cat_data
+        print("Initializing arrays...")
+        self.initialize_arrays()
+        
+        # Process vignets in batches
+        print("Processing vignets...")
         self.update_vignet_data()
+        
+        # Clean up large arrays we no longer need
+        print("Cleaning up...")
+        self.cleanup()
+
+    def initialize_arrays(self):
+        """Initialize empty arrays for our vignette data"""
+        n_objects = len(self.cat_data)
+        
+        # Get sample vignette to determine shape
+        ra = self.cat_data["ALPHAWIN_J2000"][0]
+        dec = self.cat_data["DELTAWIN_J2000"][0]
+        x_image, y_image = radec_to_xy(self.bg_header, ra, dec)
+        sample_vignet, _ = extract_vignette(self.bg_image_data, self.bg_header, x_image, y_image)
+        vignet_shape = sample_vignet.shape
+        
+        # Initialize arrays with proper shape
+        self.cat_data["im_vignett"] = np.zeros((n_objects, *vignet_shape), dtype=np.float32)
+        self.cat_data["weight_vignett"] = np.zeros((n_objects, *vignet_shape), dtype=np.float32)
+        self.cat_data["rms_weight_vignett"] = np.zeros((n_objects, *vignet_shape), dtype=np.float32)
+        self.cat_data["mask"] = np.zeros((n_objects, *vignet_shape), dtype=np.int8)  # Use smaller dtype
+        self.cat_data["is_at_edge"] = np.zeros(n_objects, dtype=bool)  # Use boolean type
 
     def update_vignet_data(self):
-        '''
-        Update the vignet extension of the coadd image with the background
-        subtracted image
-        '''
-        im_vignettes = []
-        weight_vignettes = []
-        is_at_edge = []        
-        for i in tqdm(range(len(self.cat_data))):
-            ra = self.cat_data["ALPHAWIN_J2000"][i]
-            dec = self.cat_data["DELTAWIN_J2000"][i]
-            x_image, y_image = radec_to_xy(self.bg_header , ra, dec)
-            im_vignett, meta_bg = extract_vignette(self.bg_image_data, self.bg_header, x_image, y_image)
-            weight_vignett, meta_wg = extract_vignette(self.weight_data, self.weight_header, x_image, y_image)
-            im_vignettes.append(im_vignett)
-            weight_vignettes.append(weight_vignett)
-            is_at_edge.append(meta_bg["is_at_edge"])
-
-        # Add the new columns to the catalog
-        self.cat_data["im_vignett"] = im_vignettes
-        self.cat_data["weight_vignett"] = weight_vignettes        
+        '''Update the vignet data directly, without accumulating lists'''
+        batch_size = 500  # Process 500 objects at a time
+        total_objects = len(self.cat_data)
+        
+        for batch_start in range(0, total_objects, batch_size):
+            batch_end = min(batch_start + batch_size, total_objects)
+            print(f"Processing batch {batch_start//batch_size + 1}/{(total_objects + batch_size - 1)//batch_size}...")
+            
+            for i in tqdm(range(batch_start, batch_end)):
+                ra = self.cat_data["ALPHAWIN_J2000"][i]
+                dec = self.cat_data["DELTAWIN_J2000"][i]
+                x_image, y_image = radec_to_xy(self.bg_header, ra, dec)
+                
+                # Extract vignettes
+                im_vignett, meta_bg = extract_vignette(self.bg_image_data, self.bg_header, x_image, y_image)
+                weight_vignett, meta_wg = extract_vignette(self.weight_data, self.weight_header, x_image, y_image)
+                rms_wt_vignett, meta_rms_wt = extract_vignette(self.rms_weight_map, self.bkg_rms_header, x_image, y_image)
+                
+                # Create mask directly
+                raw_vignet = self.cat_data["VIGNET"][i]
+                mask = np.ones_like(raw_vignet, dtype=np.int8)  # Use smaller dtype
+                mask[raw_vignet < -1e29] = 0
+                
+                # Store directly in the arrays
+                self.cat_data["im_vignett"][i] = im_vignett
+                self.cat_data["weight_vignett"][i] = weight_vignett
+                self.cat_data["rms_weight_vignett"][i] = rms_wt_vignett
+                self.cat_data["mask"][i] = mask
+                self.cat_data["is_at_edge"][i] = meta_bg["is_at_edge"]
+            
+            # Force garbage collection after each batch
+            import gc
+            gc.collect()
+            print(f"Memory usage after batch: {self.get_memory_usage()} MB")
+    
+    def get_memory_usage(self):
+        """Return current memory usage in MB"""
+        import psutil
+        import os
+        process = psutil.Process(os.getpid())
+        return process.memory_info().rss / 1024 / 1024
+    
+    def cleanup(self):
+        """Clean up large arrays we don't need anymore"""
+        self.bg_image_data = None
+        self.weight_data = None
+        self.bkg_rms_data = None
+        self.rms_weight_map = None
+        import gc
+        gc.collect()    

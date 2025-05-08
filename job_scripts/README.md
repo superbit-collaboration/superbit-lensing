@@ -12,8 +12,13 @@ This pipeline uses `ngmix_fit.py` and `make_annular_catalog_v2.py`. From the sam
    - `CODEDIR`: Path to your code directory
 
 
-2. **Give Master Run**
+2. **Give Master Shape Measurement Run**
 
    Submit the main job script:
    ```sh
    bash master.sh
+3. **Give Color-Color runs**
+
+   Submit jobs from current directory (where your config.sh is)
+   ```sh
+   sbatch ./scripts/color_color_run.sh

@@ -109,7 +109,7 @@ class MatchedTruthCatalog(MatchedCatalog):
     def meas(self):
         return self.cat2
 
-class SkyCoordMatcher:
+class SkyCoordMatcherv2:
     def __init__(self, cat1, cat2,
                  cat1_ratag='ALPHAWIN_J2000', cat1_dectag='DELTAWIN_J2000',
                  cat2_ratag=None, cat2_dectag=None, return_idx=False,
@@ -213,7 +213,7 @@ class SkyCoordMatcher:
             return self.matched_cat1, self.matched_cat2
         return self.matched_cat1, self.matched_cat2, self.match_idx1, self.match_idx2
 
-class SkyCoordMatcherv2:
+class SkyCoordMatcher:
     def __init__(self, cat1, cat2,
                  cat1_ratag='ALPHAWIN_J2000', cat1_dectag='DELTAWIN_J2000',
                  cat2_ratag=None, cat2_dectag=None, return_idx=False,
@@ -270,10 +270,10 @@ class SkyCoordMatcherv2:
         tolerance_rad = np.radians(self.match_radius)
         chord_tol = 2 * np.sin(tolerance_rad / 2)
 
-        print("Building KD-tree...")
+        #print("Building KD-tree...")
         tree = cKDTree(vec2)
 
-        print("Querying nearest neighbors...")
+        #print("Querying nearest neighbors...")
         dists, idx = tree.query(vec1, k=1, distance_upper_bound=chord_tol)
 
         # Handle unmatched points

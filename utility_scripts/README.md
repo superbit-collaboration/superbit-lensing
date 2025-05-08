@@ -15,9 +15,9 @@ Submit the main job script:
     bash SimBlaster.sh {run_name} {num_sims} {exp}
     ```
 **Parameters:**
-    - `run_name`: Name of the simulation run
-    - `num_sims`: Number of simulations to generate
-    - `exp`: Exposure time
+- `run_name`: Name of the simulation run
+- `num_sims`: Number of simulations to generate
+- `exp`: Experiment type, i.e. forecast/backcast
 
 ## data_downloader.py
 

@@ -737,8 +737,6 @@ class SuperBITParameters:
                     self.master_seed = None
                 else:
                     self.master_seed = int(value)
-            elif option == "noise_seed":
-                self.noise_seed = int(value)
             elif option == "dithering_seed":
                 self.dithering_seed = int(value)
             elif option == "nstruts":

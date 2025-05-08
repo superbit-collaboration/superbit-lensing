@@ -7,6 +7,8 @@ from astropy import units as u
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import ipdb
+import time
 from superbit_lensing.match import SkyCoordMatcher
 from superbit_lensing.color import sextractor_dual as sex
 from superbit_lensing.utils import gaia_query, ned_query, get_sky_footprint_center_radius
@@ -16,7 +18,9 @@ desi_table = [
     'TARGETID', 'SURVEY', 'PROGRAM', 'OBJTYPE', 'SPECTYPE', 
     'TARGET_RA', 'TARGET_DEC', 'Z', 'ZERR', 'ZWARN', 'ZCAT_NSPEC', 'ZCAT_PRIMARY'
 ]
+desi_table_primary = ['TARGET_RA', 'TARGET_DEC', 'ZCAT_PRIMARY', 'OBJTYPE', 'ZWARN']
 ned_table = ['RA', 'DEC', 'Redshift']
+DESI_MASTER_FILE = "/work/mccleary_group/superbit/desi_data/zall-pix-iron.fits"
 
 MAG_ZP_b = 28.66794
 MAG_ZP_g = 27.490537
@@ -41,7 +45,12 @@ def main(args):
     base_path = os.path.join(datadir, cluster_name)
     redshift_file = os.path.join(datadir, f'catalogs/redshifts/{cluster_name}_NED_redshifts.csv')
     lovoccs_file = os.path.join(datadir, f'catalogs/lovoccs/{cluster_name}_lovoccs_redshifts.fits')
-    desi_file = os.path.join(datadir, f'catalogs/desi/{cluster_name}_desi_spectra.fits')
+    if os.path.exists(DESI_MASTER_FILE):
+        desi_file = DESI_MASTER_FILE
+        print(f"Using DESI_MASTER_FILE: {DESI_MASTER_FILE}")
+    else:
+        desi_file = os.path.join(datadir, f'catalogs/desi/{cluster_name}_desi_spectra.fits')
+        print(f"Using fall_back file: {desi_file}")
 
     # Construct file paths
     file_b_stars_union = f"{base_path}/b/coadd/{cluster_name}_coadd_b_starcat_union.fits"
@@ -148,6 +157,9 @@ def main(args):
     bg_sub_b_file = f"{diag_path}/{cluster_name}_coadd_b.sub.fits"
     bg_sub_g_file = f"{diag_path}/{cluster_name}_coadd_g.sub.fits"
     bg_sub_u_file = f"{diag_path}/{cluster_name}_coadd_u.sub.fits"
+    bkg_rms_b_file = f"{diag_path}/{cluster_name}_coadd_b.bkg_rms.fits"
+    bkg_rms_g_file = f"{diag_path}/{cluster_name}_coadd_g.bkg_rms.fits"
+    bkg_rms_u_file = f"{diag_path}/{cluster_name}_coadd_u.bkg_rms.fits"
 
     try:
         ned_cat = Table.read(redshift_file, format='csv')
@@ -158,8 +170,13 @@ def main(args):
             ned_cat = ned_query(rad_deg=radius_b, ra_center=center_ra_b, dec_center=center_dec_b)
             print(f"NED query was sucessfull, found {len(ned_cat)} objects")
         except Exception as e:
-            print(f"Failed to query NED for redshift file ({e}), creating an empty catalog.")
-            ned_cat = Table(names=ned_table, dtype=['f8'] * len(ned_table))
+            try:
+                print(f"Failed to query NED for redshift file ({e}), trying again....")
+                ned_cat = ned_query(rad_deg=radius_b, ra_center=center_ra_b, dec_center=center_dec_b)
+                print(f"2nd NED query was sucessfull, found {len(ned_cat)} objects")
+            except Exception as e:
+                print(f"Ned query failed for 2nd time ({e}), creating an empty catalog.")
+                ned_cat = Table(names=ned_table, dtype=['f8'] * len(ned_table))
 
     try:
         # Read the Lovoccs catalog
@@ -168,18 +185,21 @@ def main(args):
     except Exception as e:
         print(f"Failed to read lovoccs file ({e}), creating an empty catalog.")
         lovoccs = Table(names=lovoccs_table, dtype=['f8'] * len(lovoccs_table))
-    #if args.plot_desi:
-    try:
-        # Read the DESI catalog
-        desi = Table.read(desi_file, format='fits', hdu=1)
-        desi = desi[desi_table]
 
-        # Apply filtering conditions
+    try:
+        col_data = {}
+        with fits.open(desi_file, memmap=True) as hdul:
+            for col in desi_table:
+                col_data[col] = hdul[1].data[col]
+
+        desi = Table(col_data)
+        end = time.time()      
         desi = desi[
             (desi['ZCAT_PRIMARY'] == True) &
             (desi['OBJTYPE'] == 'TGT') &
             (desi['ZWARN'] == 0)
         ]
+
     except Exception as e:
         print(f"Failed to read desi file ({e}), creating an empty catalog.")
         desi = Table(names=desi_table, dtype=['f8'] * len(desi_table))
@@ -187,7 +207,6 @@ def main(args):
     print("Star matching and object discarding is starting...")
     try:
         matcher_b_stars = SkyCoordMatcher(data_b, star_data_b, match_radius=tolerance_deg)
-        # Use SkyCoordMatcher for star matching in band b
         matched_data_b_stars, matched_star_data_b = matcher_b_stars.get_matched_pairs()
 
         # Filter out stars from the main catalogs using both RA and DEC
@@ -249,6 +268,7 @@ def main(args):
     print(f"Number of matched galaxies with known desi redshifts: {len(matched_desi)}")
     
     # --- Initialize redshift arrays for all matched_data_b entries ---
+    del desi
     n = len(matched_data_b)
     redshifts_ned = np.full(n, np.nan)
     redshifts_lovoccs = np.full(n, np.nan)
@@ -308,9 +328,9 @@ def main(args):
 
     if args.vignet_updater:
         print("Vignet updater is starting...")
-        vignet_updater_b = sex.update_vignet(file_b, bg_sub_b_file, matched_data_b_valid)
-        vignet_updater_g = sex.update_vignet(file_g, bg_sub_g_file, matched_data_g_valid)
-        vignet_updater_u = sex.update_vignet(file_u, bg_sub_u_file, matched_data_u_valid)
+        vignet_updater_b = sex.update_vignet(file_b, bg_sub_b_file, bkg_rms_b_file, matched_data_b_valid)
+        vignet_updater_g = sex.update_vignet(file_g, bg_sub_g_file, bkg_rms_g_file, matched_data_g_valid)
+        vignet_updater_u = sex.update_vignet(file_u, bg_sub_u_file, bkg_rms_u_file, matched_data_u_valid)
 
     if args.save_fits:
         ra_dec_table = matched_data_b['ALPHAWIN_J2000', 'DELTAWIN_J2000']
@@ -347,6 +367,13 @@ def main(args):
             final_table['VIGNET_b_wt'] = vignet_updater_b.cat_data["weight_vignett"]
             final_table['VIGNET_g_wt'] = vignet_updater_g.cat_data["weight_vignett"]
             final_table['VIGNET_u_wt'] = vignet_updater_u.cat_data["weight_vignett"]
+            final_table['VIGNET_b_bkg_wt'] = vignet_updater_b.cat_data["rms_weight_vignett"]
+            final_table['VIGNET_g_bkg_wt'] = vignet_updater_g.cat_data["rms_weight_vignett"]
+            final_table['VIGNET_u_bkg_wt'] = vignet_updater_u.cat_data["rms_weight_vignett"]
+            final_table['MASK_b'] = vignet_updater_b.cat_data["mask"]
+            final_table['MASK_g'] = vignet_updater_g.cat_data["mask"]
+            final_table['MASK_u'] = vignet_updater_u.cat_data["mask"]
+            final_table['at_edge'] = vignet_updater_b.cat_data["is_at_edge"]
         final_table['SNR_b'] = matched_data_b["SNR_WIN"][valid_flux]
         final_table['SNR_g'] = matched_data_g["SNR_WIN"][valid_flux]
         final_table['SNR_u'] = matched_data_u["SNR_WIN"][valid_flux]
