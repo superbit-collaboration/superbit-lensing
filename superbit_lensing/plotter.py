@@ -10,6 +10,10 @@ from astropy.visualization.wcsaxes import SphericalCircle
 from astropy.coordinates import SkyCoord
 from astropy.visualization import ZScaleInterval
 import matplotlib.patches as patches
+from astropy.visualization import (MinMaxInterval, SqrtStretch, 
+                                  AsinhStretch, LogStretch,
+                                  ImageNormalize)
+from matplotlib.colors import LogNorm
 
 import astropy.units as u
 from astropy.table import Table
@@ -444,6 +448,113 @@ def plot_kappa_with_coadd(kappa_file, coadd_file, figsize=(10, 10), kappa_vmin=N
     if ctr_file is not None:
         ax.legend(loc='upper right', fontsize='medium')
     plt.show()
+
+def make_rgb_image(u_fits, b_fits, g_fits, stretch='asinh', output_file=None, 
+                   percentile_limits=(0.5, 99.5), scale_factors=None, 
+                   red_boost_factor=1., blue_suppression=0.7):
+    """
+    Create an RGB image from three FITS files with enhanced red coloration for galaxies.
+    
+    Parameters
+    ----------
+    u_fits, b_fits, g_fits : str or HDUList or HDU
+        FITS files for the u, b, and g bands
+    stretch : str, optional
+        Stretching function to apply ('linear', 'sqrt', 'log', 'asinh')
+    output_file : str, optional
+        If provided, save the image to this file
+    percentile_limits : tuple, optional
+        Lower and upper percentiles for scaling (default: 0.5, 99.5)
+    scale_factors : tuple of 3 floats, optional
+        Base scaling factors for r, g, b channels
+    red_boost_factor : float, optional
+        Extra boost to the red channel (default: 1.5)
+    blue_suppression : float, optional
+        Factor to reduce blue channel (default: 0.8)
+    """
+    # Load the data
+    if isinstance(u_fits, str):
+        u_data = fits.getdata(u_fits)
+    else:
+        u_data = u_fits
+        
+    if isinstance(b_fits, str):
+        b_data = fits.getdata(b_fits)
+    else:
+        b_data = b_fits
+        
+    if isinstance(g_fits, str):
+        g_data = fits.getdata(g_fits)
+    else:
+        g_data = g_fits
+    
+    # Create an empty RGB image array
+    rgb_image = np.zeros((u_data.shape[0], u_data.shape[1], 3), dtype=np.float32)
+    
+    # Map data to RGB channels: g→Red, b→Green, u→Blue
+    data_bands = [g_data, b_data, u_data]
+    
+    # Calculate lower/upper limits for scaling based on each band's data
+    limits = []
+    for data in data_bands:
+        data_clean = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+        data_positive = data_clean[data_clean > 0]
+        if len(data_positive) > 0:
+            limits.append(np.percentile(data_positive, percentile_limits))
+        else:
+            limits.append((0, 1))
+    
+    # Apply stretching/normalization for each channel
+    for i, (data, (vmin, vmax)) in enumerate(zip(data_bands, limits)):
+        # Handle NaNs and replace with zeros
+        data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+        
+        # Apply the selected stretch
+        if stretch == 'sqrt':
+            norm = ImageNormalize(data, vmin=vmin, vmax=vmax, 
+                                 interval=MinMaxInterval(), stretch=SqrtStretch())
+        elif stretch == 'log':
+            # Ensure vmin is positive for log stretch
+            vmin = max(vmin, 1e-10)
+            norm = ImageNormalize(data, vmin=vmin, vmax=vmax, 
+                                 interval=MinMaxInterval(), stretch=LogStretch())
+        elif stretch == 'asinh':
+            norm = ImageNormalize(data, vmin=vmin, vmax=vmax, 
+                                 interval=MinMaxInterval(), stretch=AsinhStretch())
+        else:  # linear
+            norm = ImageNormalize(data, vmin=vmin, vmax=vmax, 
+                                 interval=MinMaxInterval())
+        
+        # Normalize the data
+        rgb_image[:, :, i] = norm(data)
+    
+    # Apply default scale factors if none provided
+    if scale_factors is None:
+        scale_factors = (1.0, 1.0, 1.0)
+    
+    # Apply red boost and blue suppression
+    rgb_image[:, :, 0] *= scale_factors[0] * red_boost_factor  # Boost red channel
+    rgb_image[:, :, 1] *= scale_factors[1]  # Keep green as is
+    rgb_image[:, :, 2] *= scale_factors[2] * blue_suppression  # Reduce blue channel
+    
+    # Clip values to the range [0, 1]
+    rgb_image = np.clip(rgb_image, 0, 1)
+    
+    # Display or save the image
+    plt.figure(figsize=(10, 10))
+    plt.imshow(rgb_image, origin='lower')
+    plt.axis('off')
+    
+    if output_file:
+        plt.savefig(output_file, dpi=300, bbox_inches='tight', pad_inches=0)
+        plt.close()
+        print(f"RGB image saved to {output_file}")
+    else:
+        plt.tight_layout()
+        plt.show()
+    
+    return rgb_image
+
 
 class gtan_cross_1D:
     """

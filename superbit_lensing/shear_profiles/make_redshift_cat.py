@@ -4,8 +4,13 @@ from astropy.table import Table
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 import numpy as np
+import superbit_lensing.utils as utils
+from superbit_lensing.match import SkyCoordMatcher
+import time
 
-def make_redshift_catalog(datadir, target, band, detect_cat_path):
+DESI_MASTER_FILE = "/work/mccleary_group/superbit/desi_data/zall-pix-iron.fits"
+
+def make_redshift_catalog(datadir, target, band, detect_cat_path, tolerance_deg=1/3600):
     """
     Utility script to create a "redshift catalog" with spec-z's where they
     exist, a dummy value of 1 otherwise.
@@ -16,39 +21,68 @@ def make_redshift_catalog(datadir, target, band, detect_cat_path):
         band: which bandpass are we measuring shear in?
         detect_cat_path: path to detection catalog
     """
+    # Path for detect_cat FITS file remains the same
+    # detect_cat_path = f"{datadir}/{target}_{band}_coadd_cat.fits"
+    detect_cat = Table.read(detect_cat_path, format='fits', hdu=2)
+    # Get footprint of the cluster
+    center_ra, center_dec, radius = utils.get_sky_footprint_center_radius(detect_cat, buffer_fraction=0.2)    
 
     # Adjusted path for NED_redshifts
     ned_redshifts_path = \
         f"{datadir}/catalogs/redshifts/{target}_NED_redshifts.csv"
-    ned_redshifts = pd.read_csv(ned_redshifts_path)
+    lovoccs_path = f"{datadir}/catalogs/lovoccs/{target}_lovoccs_redshifts.fits"
+    desi_path = f"{datadir}/catalogs/desi/{target}_desi_spectra.fits"
+    # First try to load from file
+    try:
+        print(f"Attempting to load redshifts from {ned_redshifts_path}")
+        ned_redshifts = pd.read_csv(ned_redshifts_path)
+        print(f"Successfully loaded {len(ned_redshifts)} redshifts from file")
+    except Exception as e:
+        print(f"Could not load {ned_redshifts_path} because: {e}")
+        
+        # Fall back to NED query with three attempts
+        print("Falling back to NED query...")
+        max_attempts = 3
+        ned_query_success = False
+        
+        for attempt in range(max_attempts):
+            try:
+                print(f"Attempting NED query (attempt {attempt+1}/{max_attempts})...")
+                ned_redshifts = utils.ned_query(rad_deg=radius, ra_center=center_ra, dec_center=center_dec)
+                print(f"Successfully queried NED with {len(ned_redshifts)} results")
+                ned_query_success = True
+                
+                # Optionally save the results for future use
+                try:
+                    print(f"Saving results to {ned_redshifts_path}")
+                    ned_redshifts.write(ned_redshifts_path, format='ascii.csv', overwrite=True)
+                    print("Results saved successfully")
+                except Exception as save_error:
+                    print(f"Warning: Could not save NED results to file: {save_error}")
+                
+                break  # Exit retry loop if successful
+                
+            except Exception as e:
+                print(f"NED query attempt {attempt+1} failed: {e}")
+                if attempt < max_attempts - 1:
+                    wait_time = 5  # Longer wait for external API
+                    print(f"Waiting {wait_time} seconds before retrying...")
+                    time.sleep(wait_time)
+        
+        # If all NED query attempts failed, raise an error
+        if not ned_query_success:
+            error_msg = "All NED query attempts failed. Cannot proceed without redshift data."
+            print(error_msg)
+            raise RuntimeError(error_msg)
 
-    # Path for detect_cat FITS file remains the same
-    # detect_cat_path = f"{datadir}/{target}_{band}_coadd_cat.fits"
-    with fits.open(detect_cat_path) as hdul:
-        detect_cat = Table(hdul[2].data)
+    print(f"Loaded {len(ned_redshifts)} redshifts from NED")
+    matcher_ned = SkyCoordMatcher(ned_redshifts, detect_cat, cat1_ratag='RA', cat1_dectag='DEC',
+                 cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', return_idx=True, match_radius=1 * tolerance_deg)
+    matched_ned, matched_data_b_ned, idx1_ned, idx2_ned = matcher_ned.get_matched_pairs()    
 
     # Create a dummy redshift column filled with ones
     redshift_col = np.ones(len(detect_cat))
-
-    # Match detect_cat to NED_redshifts in RA and Dec
-    ned_coords = SkyCoord(
-        ra=ned_redshifts['RA']*u.degree, dec=ned_redshifts['DEC']*u.degree,
-        unit='deg'
-    )
-
-    detect_cat_coords = SkyCoord(
-        ra=detect_cat['ALPHAWIN_J2000']*u.degree,
-        dec=detect_cat['DELTAWIN_J2000']*u.degree
-    )
-
-    idx, d2d, _ = detect_cat_coords.match_to_catalog_sky(ned_coords)
-    max_sep = 1.0 * u.arcsec
-    sep_constraint = d2d < max_sep
-    matched_idx = idx[sep_constraint]
-
-    # Update the redshift column in detect_cat for matched galaxies
-    redshift_col[sep_constraint] = \
-        ned_redshifts.iloc[matched_idx]['Redshift'].values
+    redshift_col[idx2_ned] = matched_ned["Redshift"]
 
     # Create a new table with RA/Dec and new redshifts
     new_table = Table([

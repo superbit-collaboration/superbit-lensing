@@ -172,6 +172,7 @@ def main(args):
         except Exception as e:
             try:
                 print(f"Failed to query NED for redshift file ({e}), trying again....")
+                time.sleep(3)
                 ned_cat = ned_query(rad_deg=radius_b, ra_center=center_ra_b, dec_center=center_dec_b)
                 print(f"2nd NED query was sucessfull, found {len(ned_cat)} objects")
             except Exception as e:
@@ -193,7 +194,6 @@ def main(args):
                 col_data[col] = hdul[1].data[col]
 
         desi = Table(col_data)
-        end = time.time()      
         desi = desi[
             (desi['ZCAT_PRIMARY'] == True) &
             (desi['OBJTYPE'] == 'TGT') &
