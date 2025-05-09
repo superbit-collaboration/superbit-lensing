@@ -668,7 +668,8 @@ def analyze_mcal_fits(file_path, hdu=None, verbose=True, update_header=False):
 def get_sky_footprint_center_radius(data_table, buffer_fraction=0.05):
     """
     Given an astropy Table with RA/Dec in 'ALPHAWIN_J2000' and 'DELTAWIN_J2000',
-    returns the central coordinate and a radius (in degrees) that covers all objects.
+    returns the center coordinate as the midpoint of the range and a radius 
+    (in degrees) that covers all objects.
 
     Parameters
     ----------
@@ -680,36 +681,46 @@ def get_sky_footprint_center_radius(data_table, buffer_fraction=0.05):
     Returns
     -------
     ra_center : float
-        Right Ascension of center (in degrees)
+        Right Ascension of center (in degrees), calculated as (max + min)/2
     dec_center : float
-        Declination of center (in degrees)
+        Declination of center (in degrees), calculated as (max + min)/2
     radius_deg : float
         Radius in degrees that encloses all objects from the center
     """
     ra = data_table['ALPHAWIN_J2000']
     dec = data_table['DELTAWIN_J2000']
     
-    # Create SkyCoord object
-    coords = SkyCoord(ra=ra, dec=dec, unit='deg')
-    
-    # Handle RA wrap-around by finding the optimal center
+    # Handle RA wrap-around for midpoint calculation
     ra_wrapped = np.array(ra)
-    # If data spans the 0/360 boundary
     ra_range = np.max(ra) - np.min(ra)
+    
+    # If data spans the 0/360 boundary
     if ra_range > 180:
         # Adjust RAs that are > 180 degrees away from the reference point
         mask = ra > 180
         ra_wrapped[mask] -= 360
     
-    # Calculate the center as the mean of the adjusted coordinates
-    ra_center_wrapped = np.mean(ra_wrapped)
+    # Calculate min and max for wrapped RA
+    ra_min = np.min(ra_wrapped)
+    ra_max = np.max(ra_wrapped)
+    
+    # Calculate the center as the midpoint of the range
+    ra_center_wrapped = (ra_min + ra_max) / 2
+    
+    # Adjust back to 0-360 range if needed
     if ra_center_wrapped < 0:
         ra_center_wrapped += 360
-        
-    dec_center = np.mean(dec)
+    
+    # Calculate midpoint for declination (no wrap-around needed)
+    dec_min = np.min(dec)
+    dec_max = np.max(dec)
+    dec_center = (dec_min + dec_max) / 2
     
     # Create center SkyCoord
     center = SkyCoord(ra=ra_center_wrapped, dec=dec_center, unit='deg')
+    
+    # Create SkyCoord for all points
+    coords = SkyCoord(ra=ra, dec=dec, unit='deg')
     
     # Calculate separations from center to all points
     separations = coords.separation(center)

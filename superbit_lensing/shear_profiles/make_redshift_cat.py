@@ -41,21 +41,22 @@ def make_redshift_catalog(datadir, target, band, detect_cat_path, tolerance_deg=
         print(f"Could not load {ned_redshifts_path} because: {e}")
         
         # Fall back to NED query with three attempts
-        print("Falling back to NED query...")
+        print("Falling back to NED query with decreasing radius...")
         max_attempts = 3
         ned_query_success = False
+        current_radius = radius  # Start with the original radius
         
         for attempt in range(max_attempts):
             try:
-                print(f"Attempting NED query (attempt {attempt+1}/{max_attempts})...")
-                ned_redshifts = utils.ned_query(rad_deg=radius, ra_center=center_ra, dec_center=center_dec)
-                print(f"Successfully queried NED with {len(ned_redshifts)} results")
+                print(f"Attempting NED query (attempt {attempt+1}/{max_attempts}) with radius={current_radius:.4f} deg...")
+                ned_redshifts = utils.ned_query(rad_deg=current_radius, ra_center=center_ra, dec_center=center_dec)
+                print(f"Successfully queried NED with {len(ned_redshifts)} results at radius {current_radius:.4f} deg")
                 ned_query_success = True
                 
                 # Optionally save the results for future use
                 try:
                     print(f"Saving results to {ned_redshifts_path}")
-                    ned_redshifts.write(ned_redshifts_path, format='ascii.csv', overwrite=True)
+                    ned_redshifts.write(ned_redshifts_path, format='csv', overwrite=True)
                     print("Results saved successfully")
                 except Exception as save_error:
                     print(f"Warning: Could not save NED results to file: {save_error}")
@@ -63,10 +64,12 @@ def make_redshift_catalog(datadir, target, band, detect_cat_path, tolerance_deg=
                 break  # Exit retry loop if successful
                 
             except Exception as e:
-                print(f"NED query attempt {attempt+1} failed: {e}")
+                print(f"NED query attempt {attempt+1} failed with radius {current_radius:.4f} deg: {e}")
                 if attempt < max_attempts - 1:
                     wait_time = 5  # Longer wait for external API
-                    print(f"Waiting {wait_time} seconds before retrying...")
+                    # Reduce radius for next attempt
+                    current_radius = current_radius / 1.06
+                    print(f"Waiting {wait_time} seconds before retrying with smaller radius ({current_radius:.4f} deg)...")
                     time.sleep(wait_time)
         
         # If all NED query attempts failed, raise an error

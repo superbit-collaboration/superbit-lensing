@@ -74,6 +74,7 @@ def main(args):
         try:
             star_data_b = gaia_query(cluster_name)
             print(f"Gaia query was sucessfull, found {len(star_data_b)} objects")
+            star_data_b.write(file_b_stars_fallback_2nd, format='fits', overwrite=True)
         except Exception as e:
             print(f"Failed to query Gaia for star catalog for band b ({e}), creating an empty catalog.")   
             star_data_b = Table(names=['ALPHAWIN_J2000', 'DELTAWIN_J2000'], dtype=['f8', 'f8'])
@@ -169,12 +170,14 @@ def main(args):
         try:
             ned_cat = ned_query(rad_deg=radius_b, ra_center=center_ra_b, dec_center=center_dec_b)
             print(f"NED query was sucessfull, found {len(ned_cat)} objects")
+            ned_cat.write(redshift_file, format='csv', overwrite=True)
         except Exception as e:
             try:
                 print(f"Failed to query NED for redshift file ({e}), trying again....")
                 time.sleep(3)
-                ned_cat = ned_query(rad_deg=radius_b, ra_center=center_ra_b, dec_center=center_dec_b)
+                ned_cat = ned_query(rad_deg=radius_b/1.1, ra_center=center_ra_b, dec_center=center_dec_b)
                 print(f"2nd NED query was sucessfull, found {len(ned_cat)} objects")
+                ned_cat.write(redshift_file, format='csv', overwrite=True)
             except Exception as e:
                 print(f"Ned query failed for 2nd time ({e}), creating an empty catalog.")
                 ned_cat = Table(names=ned_table, dtype=['f8'] * len(ned_table))

@@ -3,6 +3,7 @@
 GalSim/data/*.csv
 notebooks/*
 notebooks/simulations/*
+notebooks/red_sequence/*
 superbit_lensing.egg-info/
 superbit_lensing/medsmaker/configs
 .DS_Store
