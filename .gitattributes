@@ -1,0 +1,2 @@
+# Exclude all .ipynb files from language stats
+*.ipynb -linguist-detectable
