@@ -1,11 +1,14 @@
 import os
 import sys
 from glob import glob
-from astropy.table import Table
+from astropy.table import Table, vstack
 import matplotlib.pyplot as plt
+import numpy as np
+from astropy.io import fits
+import time
 
-from match import MatchedTruthCatalog
-import utils
+from .match import MatchedTruthCatalog
+import superbit_lensing.utils as utils
 
 import ipdb
 
@@ -336,3 +339,78 @@ def build_diagnostics(name, config):
         diagnostics = Diagnostics(name, config)
 
     return diagnostics
+
+def combine_simulation_catalogs(base_path, output_file=None, start_sim=0, num_sims=40, verbose=True):
+    """
+    Combines simulation catalogs by vstacking all files.
+    
+    Parameters:
+    -----------
+    base_path : str
+        Base path where simulation files are stored, not including sim number
+    output_file : str, optional
+        Path where the combined mega catalog will be saved
+    num_sims : int, optional
+        Number of simulation files to combine (default: 40)
+    verbose : bool, optional
+        Whether to print progress information (default: True)
+    
+    Returns:
+    --------
+    mega_catalog : astropy.table.Table
+        The combined mega catalog
+    """
+    start_time = time.time()
+    
+    if verbose:
+        print(f"Starting to combine {num_sims} simulation catalogs...")
+    
+    all_tables = []
+    
+    success_count = 0
+    # Loop through all simulation files
+    for sim_num in range(start_sim, start_sim+num_sims):
+        sim_file = f"{base_path}/sim{sim_num}/b/out/sim{sim_num}_b_annular_combined_with_truth.fits"
+        
+        if verbose:
+            print(f"Reading sim {sim_num}: {sim_file}")
+        
+        try:
+            # Read the FITS file
+            table = Table.read(sim_file)
+            
+            # Add a column to identify which simulation this data came from
+            table['sim_id'] = sim_num
+            
+            # Append to our list of tables
+            all_tables.append(table)
+            
+            if verbose:
+                print(f"  Added {len(table)} rows from sim{sim_num}")
+            success_count += 1
+
+        except Exception as e:
+            print(f"ERROR: Failed to read {sim_file}: {e}")
+    
+    if not all_tables:
+        raise ValueError("No tables were successfully read. Cannot create mega catalog.")
+    elif success_count < num_sims:
+        print(f"WARNING: Only {success_count} out of {num_sims} simulations were successfully read.")
+
+    # Vertical stack all tables
+    if verbose:
+        print("Stacking all tables...")
+    
+    mega_catalog = vstack(all_tables, metadata_conflicts='silent')
+    
+    # Save the combined catalog
+
+    if output_file is not None:
+        mega_catalog.write(output_file, format='fits', overwrite=True)
+        if verbose:
+            print(f"Saving mega catalog with {len(mega_catalog)} total rows to {output_file}")    
+    end_time = time.time()
+    if verbose:
+        print(f"Finished in {end_time - start_time:.2f} seconds")
+    
+    return mega_catalog

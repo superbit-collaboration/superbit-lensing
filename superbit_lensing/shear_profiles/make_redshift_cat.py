@@ -35,7 +35,7 @@ def make_redshift_catalog(datadir, target, band, detect_cat_path, tolerance_deg=
     # First try to load from file
     try:
         print(f"Attempting to load redshifts from {ned_redshifts_path}")
-        ned_redshifts = pd.read_csv(ned_redshifts_path)
+        ned_redshifts = Table.read(ned_redshifts_path, format='csv')
         print(f"Successfully loaded {len(ned_redshifts)} redshifts from file")
     except Exception as e:
         print(f"Could not load {ned_redshifts_path} because: {e}")

@@ -19,6 +19,8 @@ import astropy.wcs as wcs
 from esutil import htm
 import pdb
 import ipdb
+import pyregion
+from shapely.geometry import Point, Polygon
 
 # Get the path to the root of the project (2 levels up from utils.py)
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -741,7 +743,7 @@ def get_cluster_info(cluster_name):
 
     return float(ra_center), float(dec_center), float(redshift)
 
-def gaia_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None, catalog_id = "I/355/gaiadr3"):
+def gaia_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None, catalog_id = "I/355/gaiadr3", pure=True):
     """
     Query Gaia DR3 data around a given cluster name or specified RA/Dec.
 
@@ -794,6 +796,12 @@ def gaia_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None, 
     if not np.all(mask):
         print(f"Warning: {np.count_nonzero(~mask)} rows with NaN coordinates removed.")
     final_table = final_table[mask]
+
+    # Add object class column
+    final_table = add_object_class(final_table)
+
+    if pure:
+        return final_table[final_table["class"]=='star']
 
     return final_table
 
@@ -1100,6 +1108,232 @@ def build_clean_tan_wcs(header):
     wcs_manual.wcs.cunit = ['deg', 'deg']
 
     return wcs_manual
+
+def separate_catalog_by_regions(reg_file, catalog):
+    # Read the region file with pyregion
+    print(f"Reading regions from {reg_file}")
+    regions = pyregion.open(reg_file)
+    print(f"Found {len(regions)} regions")
+    
+    # Convert regions to shapely polygons
+    print("Converting regions to polygons...")
+    polygons = []
+    for reg in regions:
+        if reg.name == "polygon":
+            # Extract the polygon vertices
+            vertices = reg.coord_list
+            points = [(vertices[i], vertices[i+1]) for i in range(0, len(vertices), 2)]
+            polygons.append(Polygon(points))
+    
+    print(f"Converted {len(polygons)} polygons")
+    
+    
+    # Using X_IMAGE and Y_IMAGE columns
+    x_col = 'XWIN_IMAGE'
+    y_col = 'YWIN_IMAGE'
+    print(f"Using {x_col} and {y_col} as pixel coordinate columns")
+    
+    # Check each object against all polygons
+    in_region_mask = np.zeros(len(catalog), dtype=bool)
+    
+    for i, (x, y) in enumerate(zip(catalog[x_col], catalog[y_col])):
+        if i % 1000 == 0:  # Progress indicator
+            print(f"Checking object {i}/{len(catalog)}")
+        
+        # Create a Point for the current object
+        point = Point(x, y)
+        
+        # Check if the point is inside any polygon
+        for polygon in polygons:
+            if polygon.contains(point):
+                in_region_mask[i] = True
+                break
+    
+    # Create the two catalogs
+    inside_catalog = catalog[in_region_mask]
+    outside_catalog = catalog[~in_region_mask]
+    
+    return inside_catalog, outside_catalog, in_region_mask
+
+def add_object_class(gaia_table, verbose=False):
+    """
+    Add a 'class' column to Gaia DR3 Astropy Table.
+    Only classifies as 'star' if BOTH conditions are met:
+    1. PSS > 0.9995 (high confidence from Gaia classifier)
+    2. Passes all extended source tests (no galaxy indicators)
+    
+    Also counts and prints statistics on objects with PSS > 0.9995 
+    that still show extended source characteristics.
+    """
+    # Create default classification as 'galaxy'
+    class_column = ['galaxy'] * len(gaia_table)
+    
+    # Create counters for statistics
+    total_objects = len(gaia_table)
+    high_pss_count = 0
+    extended_with_high_pss = 0
+    extended_reasons = {}
+    
+    # Process each object
+    for i, row in enumerate(gaia_table):
+        # First identify quasars
+        if row['QSO'] == 1 or (row['PQSO'] is not None and row['PQSO'] > 0.5):
+            class_column[i] = 'quasar'
+            continue
+        
+        # Check for high confidence PSS
+        high_conf_star = row['PSS'] is not None and row['PSS'] > 0.9995
+        if high_conf_star:
+            high_pss_count += 1
+        
+        # Check if any extended source criteria are met
+        extended_source = False
+        reason = None
+        
+        # Gaia's own galaxy classification
+        if row['Gal'] == 1 or (row['PGal'] is not None and row['PGal'] > 0.5):
+            extended_source = True
+            reason = "Gal flag or PGal > 0.5"
+        
+        # amax = Longest semi-major axis of the error ellipsoid 
+        elif row['amax'] is not None and row['amax'] > 8.0:
+            extended_source = True
+            reason = "amax > 8.0"
+            
+        # E(BP/RP) = BP/RP excess factor
+        elif row['E(BP/RP)'] is not None and row['E(BP/RP)'] > 2.0:
+            extended_source = True
+            reason = "E(BP/RP) > 2.0"
+            
+        # RUWE = Renormalised Unit Weight Error
+        elif row['RUWE'] is not None and row['RUWE'] > 2.0:
+            extended_source = True
+            reason = "RUWE > 2.0"
+            
+        # Color + astrometric criteria
+        elif (row['BP-RP'] is not None and row['BP-RP'] > 1.5 and 
+              row['amax'] is not None and row['amax'] > 4.0):
+            extended_source = True
+            reason = "BP-RP > 1.5 & amax > 4.0"
+        
+        # Count high PSS objects that show extended source characteristics
+        if high_conf_star and extended_source:
+            extended_with_high_pss += 1
+            if reason in extended_reasons:
+                extended_reasons[reason] += 1
+            else:
+                extended_reasons[reason] = 1
+        
+        # Only classify as star if BOTH conditions are met
+        if high_conf_star and not extended_source:
+            # Check for star system
+            if row['NSS'] is not None and row['NSS'] > 0:
+                class_column[i] = 'star-system'
+            else:
+                class_column[i] = 'star'
+    
+    # Add the column to the table
+    gaia_table['class'] = class_column
+    
+    if verbose:
+        # Print statistics
+        print(f"Total objects in catalog: {total_objects}")
+        print(f"Objects with PSS > 0.9995: {high_pss_count} ({high_pss_count/total_objects*100:.2f}%)")
+        print(f"High PSS objects showing extended source characteristics: {extended_with_high_pss} ({extended_with_high_pss/high_pss_count*100:.2f}% of high PSS objects)")
+        
+        if extended_with_high_pss > 0:
+            print("\nReasons for extended source classification in high PSS objects:")
+            for reason, count in sorted(extended_reasons.items(), key=lambda x: x[1], reverse=True):
+                print(f"  {reason}: {count} objects ({count/extended_with_high_pss*100:.2f}%)")
+    
+    return gaia_table
+
+def add_object_class_v1(gaia_table):
+    """
+    Add a simple 'class' column to Gaia DR3 Astropy Table with four categories:
+    'star', 'star-system', 'galaxy', or 'quasar'
+    Default classification is 'star' if no other specific criteria are met.
+    """
+    # Create a new column with default 'star' classification
+    class_column = ['star'] * len(gaia_table)
+    
+    # Update classification for each object
+    for i, row in enumerate(gaia_table):
+        # Check for quasar
+        if row['QSO'] == 1 or (row['PQSO'] is not None and row['PQSO'] > 0.5):
+            class_column[i] = 'quasar'
+        # Check for galaxy
+        elif row['Gal'] == 1 or (row['PGal'] is not None and row['PGal'] > 0.5):
+            class_column[i] = 'galaxy'
+        # Check for star system
+        elif row['NSS'] is not None and row['NSS'] > 0:
+            class_column[i] = 'star-system'
+        # Everything else remains as 'star'
+    
+    # Add the new column to the table
+    gaia_table['class'] = class_column
+    
+    return gaia_table
+
+# If the file doesn't exist yet and you want to create it with your data in HDU=2
+def write_to_hdu2(mega_catalog, output_file, overwrite=True):
+    # Create a primary HDU (HDU=0) that's empty
+    primary_hdu = fits.PrimaryHDU()
+    
+    # Create an empty HDU=1 (since we want our data in HDU=2)
+    empty_hdu = fits.ImageHDU()
+    
+    # Convert your catalog to an HDU
+    if hasattr(mega_catalog, 'to_table'):
+        # If it's an Astropy Table object
+        table = mega_catalog.to_table()
+    else:
+        # If it's already a Table
+        table = mega_catalog
+    
+    data_hdu = fits.table_to_hdu(table)
+    
+    # Create a HDUList with our HDUs
+    hdul = fits.HDUList([primary_hdu, empty_hdu, data_hdu])
+    
+    # Write to file
+    hdul.writeto(output_file, overwrite=overwrite)
+    print(f"Data successfully written to HDU=2 in {output_file}")
+
+def update_hdu2(mega_catalog, output_file):
+    mega_catalog = Table.read(mega_catalog)
+    try:
+        # Try to open the existing file
+        with fits.open(output_file, mode='update') as hdul:
+            # Convert mega_catalog to a Table if needed
+            if hasattr(mega_catalog, 'to_table'):
+                table = mega_catalog.to_table()
+            else:
+                table = mega_catalog
+            
+            # Create a new HDU from the table
+            new_hdu = fits.table_to_hdu(table)
+            
+            # Check if HDU=2 already exists
+            if len(hdul) > 2:
+                # Replace existing HDU=2
+                hdul[2] = new_hdu
+                print(f"Replaced existing HDU=2 in {output_file}")
+            else:
+                # If HDU=2 doesn't exist, make sure HDU=1 exists first
+                if len(hdul) == 1:
+                    hdul.append(fits.ImageHDU())
+                
+                # Then append the new HDU to make it HDU=2
+                hdul.append(new_hdu)
+                print(f"Added data as HDU=2 in {output_file}")
+            
+            # Save changes
+            hdul.flush()
+    
+    except FileNotFoundError:
+        # If file doesn't exist, create it with HDU=2
+        write_to_hdu2(mega_catalog, output_file)
 
 BASE_DIR = get_base_dir()
 MODULE_DIR = get_module_dir()

@@ -2,6 +2,7 @@ import numpy as np
 from astropy.table import Table
 from argparse import ArgumentParser
 from superbit_lensing.match import SkyCoordMatcher
+from superbit_lensing.utils import separate_catalog_by_regions
 import os
 import ipdb
 
@@ -113,7 +114,7 @@ def main(args):
         else:
             raise FileNotFoundError("Star catalog not found. Cannot proceed.")
 
-        tolerance_deg = 1e-6
+        tolerance_deg = 2*1e-5
 
         matcher = SkyCoordMatcher(mcal_combined_table, starcat, cat1_ratag='ra', cat1_dectag='dec',
                 cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', match_radius=5 * tolerance_deg)
@@ -165,6 +166,14 @@ def main(args):
         else:
             print(f"WARNING: Red Seq Galaxy catalog '{red_seq_file}' not found, skipping the discarding process.")
 
+    mask_file_path = os.path.join(data_dir, "star_masks")
+    mask_file = f"{mask_file_path}/{run_name}_{band}_starmask_physical.reg"
+    if os.path.exists(mask_file):
+        print(f"Using star mask file: {mask_file}")
+        junks_mcal, mcal_combined_table, reg_mask = separate_catalog_by_regions(mask_file, mcal_combined_table)
+        junks_mcal.write(f"{outdir}/{run_name}_{band}_mcal_junks.fits", format="fits", overwrite=True)
+    else:
+        print(f"WARNING: Star mask file '{mask_file}' not found, skipping the discarding process.")
 
     mcal_combined_table.write(f"{outdir}/{run_name}_{band}_mcal_combined.fits", format="fits", overwrite=True)
 

@@ -276,6 +276,7 @@ dependencies:
     - sep==1.2.1
     - setuptools==71.1.0
     - shapely==2.0.6
+    - pyregion==2.3.0
     - simplejson==3.19.3
     - statsmodels==0.14.4
     - tensorboard-data-server==0.7.0

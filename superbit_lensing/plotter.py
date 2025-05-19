@@ -14,7 +14,8 @@ from astropy.visualization import (MinMaxInterval, SqrtStretch,
                                   AsinhStretch, LogStretch,
                                   ImageNormalize)
 from matplotlib.colors import LogNorm
-
+from scipy.interpolate import splprep, splev
+from reproject import reproject_interp
 import astropy.units as u
 from astropy.table import Table
 import random
@@ -364,6 +365,107 @@ def plot_kappa_with_counts(kappa_file, count_file, figsize=(20, 16), vmin=-0.1, 
     plt.tight_layout()
     plt.show()
 
+def plot_kappa_with_coadd_v2(kappa_file, coadd_file, figsize=(10, 10), kappa_vmin=None, kappa_vmax=None, sample_order=1, alpha=0.5, title='Abell3411', ctr_file=None):
+    # Load FITS files
+    with fits.open(kappa_file) as hdul:
+        kappa_data = hdul[0].data
+        kappa_hdr = hdul[0].header
+
+    # Extract data and WCS
+    with fits.open(coadd_file) as hdul:
+        coadd_hdr = hdul[0].header
+        coadd_data = hdul[0].data
+        
+    coadd_wcs = build_clean_tan_wcs(coadd_hdr)
+    kappa_wcs = WCS(kappa_hdr)
+
+    center = SkyCoord(ra = kappa_wcs.wcs.crval[0], dec = kappa_wcs.wcs.crval[1], unit = (u.deg, u.deg), frame = 'icrs')
+    ny, nx = kappa_data.shape
+    corners = [[0, 0], [0, nx], [ny, 0], [ny, nx]]
+    sky_corners = pixel_to_skycoord([y for y, x in corners], [x for y, x in corners], kappa_wcs)
+
+    # Estimate size in pixels using WCS
+    # Note: this assumes approximate scale is constant
+    pixel_scale = np.abs(coadd_wcs.pixel_scale_matrix[1,1])  # deg/pix
+    size_deg_x = np.max([corner.ra.degree for corner in sky_corners]) - np.min([corner.ra.degree for corner in sky_corners])
+    size_deg_y = np.max([corner.dec.degree for corner in sky_corners]) - np.min([corner.dec.degree for corner in sky_corners])
+    size_pix = (int(size_deg_x / pixel_scale), int(size_deg_y / pixel_scale))
+    cutout = Cutout2D(data=coadd_data, position=center, size=size_pix, wcs=coadd_wcs)
+
+    # zscale for both
+    z1 = ZScaleInterval()
+    vmin1, vmax1 = z1.get_limits(cutout.data)
+    if kappa_vmin is None or kappa_vmax is None:
+        kappa_vmin, kappa_vmax = z1.get_limits(kappa_data)
+    vmin2, vmax2 = kappa_vmin, kappa_vmax
+
+    # Normalize coadd
+    coadd_norm = np.clip((cutout.data - vmin1) / (vmax1 - vmin1), 0, 1)
+    
+    # Use reproject to properly align kappa with coadd WCS
+    kappa_reprojected, footprint = reproject_interp(
+        (kappa_data, kappa_wcs),
+        cutout.wcs,
+        shape_out=cutout.shape,
+        order=sample_order
+    )
+
+    # Fill areas where reprojection failed with extrapolated values
+    # This ensures full coverage while maintaining proper alignment
+    valid_mask = footprint > 0
+    if not np.all(valid_mask):
+        # Get the median value of valid pixels for filling
+        valid_values = kappa_reprojected[valid_mask]
+        fill_value = np.median(valid_values) if len(valid_values) > 0 else kappa_vmin
+        
+        # Fill invalid areas with this value
+        kappa_reprojected[~valid_mask] = fill_value
+
+    # Normalize kappa after reprojection
+    kappa_norm = np.clip((kappa_reprojected - vmin2) / (vmax2 - vmin2), 0, 1)
+
+    from astropy.visualization.wcsaxes import WCSAxes
+    # Plot with WCSAxes
+    wcs = cutout.wcs
+    fig = plt.figure(figsize=(figsize))
+    ax = plt.subplot(projection=wcs)
+    ax.coords[0].set_format_unit('deg')
+
+    # Coadd background
+    ax.imshow(coadd_norm, origin='lower', cmap='gray')
+    ax.imshow(kappa_norm, origin='lower', cmap='magma', alpha=alpha)
+
+    if ctr_file is not None:
+        contours, coord_type = read_ds9_ctr(ctr_file)
+        label_added = False  # To avoid duplicate legend entries
+        for contour in contours:
+            contour = np.array(contour)
+            if coord_type == 'fk5':
+                sky = SkyCoord(ra=contour[:,0]*u.deg, dec=contour[:,1]*u.deg)
+                pix = wcs.world_to_pixel(sky)
+                if not label_added:
+                    ax.scatter(pix[0], pix[1], color='cyan', s=1, alpha=0.5, label='X-ray contours')
+                    label_added = True
+                else:
+                    ax.scatter(pix[0], pix[1], color='cyan', s=1, alpha=0.5, linewidth=1)
+            else:
+                # Pixel space contours
+                if not label_added:
+                    ax.scatter(contour[:,0], contour[:,1], color='cyan', linewidth=1, label='X-ray contours')
+                    label_added = True
+                else:
+                    ax.scatter(contour[:,0], contour[:,1], color='cyan', linewidth=1)
+
+    # Labels and ticks
+    ax.set_xlabel("Right Ascension (J2000)")
+    ax.set_ylabel("Declination (J2000)")
+    ax.grid(color='white', ls='dotted')
+    ax.coords.grid(True, color='white', ls='dotted')
+    ax.set_title(title)
+    if ctr_file is not None:
+        ax.legend(loc='upper right', fontsize='medium')
+    plt.show()
+
 def plot_kappa_with_coadd(kappa_file, coadd_file, figsize=(10, 10), kappa_vmin=None, kappa_vmax=None, sample_order=1, alpha=0.5, title='Abell3411', ctr_file=None):
     # Load FITS files
     with fits.open(kappa_file) as hdul:
@@ -450,8 +552,9 @@ def plot_kappa_with_coadd(kappa_file, coadd_file, figsize=(10, 10), kappa_vmin=N
     plt.show()
 
 def make_rgb_image(u_fits, b_fits, g_fits, stretch='asinh', output_file=None, 
-                   percentile_limits=(0.5, 99.5), scale_factors=None, 
-                   red_boost_factor=1., blue_suppression=0.7):
+                   percentile_limits=(0.5, 99.5),
+                   red_boost_factor=1.1, green_supression=0.9, blue_suppression=0.9,
+                   dpi=600, format='png', figsize=(12, 12)):
     """
     Create an RGB image from three FITS files with enhanced red coloration for galaxies.
     
@@ -465,12 +568,18 @@ def make_rgb_image(u_fits, b_fits, g_fits, stretch='asinh', output_file=None,
         If provided, save the image to this file
     percentile_limits : tuple, optional
         Lower and upper percentiles for scaling (default: 0.5, 99.5)
-    scale_factors : tuple of 3 floats, optional
-        Base scaling factors for r, g, b channels
     red_boost_factor : float, optional
-        Extra boost to the red channel (default: 1.5)
+        Extra boost to the red channel (default: 1.1)
+    green_suppression: float, optional
+        Factor to reduce green channel (default: 0.9)
     blue_suppression : float, optional
-        Factor to reduce blue channel (default: 0.8)
+        Factor to reduce blue channel (default: 0.9)
+    dpi : int, optional
+        Resolution in dots per inch for saved file (default: 600)
+    format : str, optional
+        File format for saved image ('png', 'tiff', 'jpg', etc.) (default: 'png')
+    figsize : tuple, optional
+        Figure size in inches (default: (12, 12))
     """
     # Load the data
     if isinstance(u_fits, str):
@@ -528,27 +637,46 @@ def make_rgb_image(u_fits, b_fits, g_fits, stretch='asinh', output_file=None,
         # Normalize the data
         rgb_image[:, :, i] = norm(data)
     
-    # Apply default scale factors if none provided
-    if scale_factors is None:
-        scale_factors = (1.0, 1.0, 1.0)
-    
     # Apply red boost and blue suppression
-    rgb_image[:, :, 0] *= scale_factors[0] * red_boost_factor  # Boost red channel
-    rgb_image[:, :, 1] *= scale_factors[1]  # Keep green as is
-    rgb_image[:, :, 2] *= scale_factors[2] * blue_suppression  # Reduce blue channel
+    rgb_image[:, :, 0] *=  red_boost_factor  # Boost red channel
+    rgb_image[:, :, 1] *=  green_supression # Keep green as is
+    rgb_image[:, :, 2] *=  blue_suppression  # Reduce blue channel
     
     # Clip values to the range [0, 1]
     rgb_image = np.clip(rgb_image, 0, 1)
     
-    # Display or save the image
-    plt.figure(figsize=(10, 10))
-    plt.imshow(rgb_image, origin='lower')
+    # Create figure with high resolution
+    plt.figure(figsize=figsize, dpi=dpi)
+    
+    # Use interpolation='nearest' for astronomical images to preserve details
+    plt.imshow(rgb_image, origin='lower', interpolation='nearest')
     plt.axis('off')
     
     if output_file:
-        plt.savefig(output_file, dpi=300, bbox_inches='tight', pad_inches=0)
+        # Determine format from filename if not explicitly provided
+        if '.' in output_file and not format:
+            format = output_file.split('.')[-1]
+            
+        # Ensure the output_file has the correct extension
+        if not output_file.endswith(f'.{format}'):
+            output_file = f"{output_file}.{format}"
+            
+        # Save with maximum quality
+        if format.lower() == 'jpg' or format.lower() == 'jpeg':
+            plt.savefig(output_file, dpi=dpi, bbox_inches='tight', pad_inches=0, 
+                       format=format, quality=100)
+        elif format.lower() == 'tiff':
+            plt.savefig(output_file, dpi=dpi, bbox_inches='tight', pad_inches=0, 
+                       format=format, compression='lzw')
+        elif format.lower() == 'png':
+            plt.savefig(output_file, dpi=dpi, bbox_inches='tight', pad_inches=0, 
+                       format=format, transparent=False, optimize=True)
+        else:
+            plt.savefig(output_file, dpi=dpi, bbox_inches='tight', pad_inches=0, 
+                       format=format)
+            
         plt.close()
-        print(f"RGB image saved to {output_file}")
+        print(f"High quality RGB image saved to {output_file} at {dpi} DPI")
     else:
         plt.tight_layout()
         plt.show()
@@ -752,3 +880,166 @@ class gtan_cross_1D:
                 counts[i] = 0
 
         return bin_centers, g_tan_profile, g_tan_err, g_x_profile, g_x_err, counts
+
+    def calculate_shear_bias(self, g_tan, g_true, g_tan_err, r_bins=None, weights=None):
+        """
+        Calculate the shear bias parameter α and its uncertainty using the Cramér-Rao bound.
+        
+        Parameters:
+        -----------
+        g_tan : numpy.ndarray
+            Measured tangential shear profile
+        g_true : numpy.ndarray
+            True tangential shear profile
+        g_tan_err : numpy.ndarray
+            Error on the tangential shear measurements (standard deviation)
+        r_bins : numpy.ndarray, optional
+            Radial bins for optional weighting (not used if weights are provided)
+        weights : numpy.ndarray, optional
+            Optional weights for the calculation. If None, uses inverse variance weights.
+            
+        Returns:
+        --------
+        alpha : float
+            Shear bias parameter
+        alpha_err : float
+            Uncertainty on the shear bias parameter
+        """
+        # Ensure inputs are numpy arrays
+        g_tan = np.asarray(g_tan)
+        g_true = np.asarray(g_true)
+        g_tan_err = np.asarray(g_tan_err)
+        
+        # Remove any NaN values
+        valid = np.isfinite(g_tan) & np.isfinite(g_true) & np.isfinite(g_tan_err) & (g_tan_err > 0) & (g_true<0.06)
+        g_tan = g_tan[valid]
+        g_true = g_true[valid]
+        g_tan_err = g_tan_err[valid]
+        
+        if len(g_tan) == 0:
+            return np.nan, np.nan
+        
+        # Create the covariance matrix (diagonal with variance terms)
+        # C^-1 is simply a diagonal matrix with 1/σ^2 terms
+        C_inv = np.diag(1.0 / (g_tan_err**2))
+        
+        # Calculate g_true^T C^-1 g_tan  (numerator)
+        g_true_T_C_inv_g_tan = g_true @ C_inv @ g_tan
+        
+        # Calculate g_true^T C^-1 g_true (denominator)
+        g_true_T_C_inv_g_true = g_true @ C_inv @ g_true
+        
+        # Calculate α
+        alpha = g_true_T_C_inv_g_tan / g_true_T_C_inv_g_true
+        
+        # Calculate uncertainty on α using the Cramér-Rao bound
+        alpha_err = np.sqrt(1.0 / g_true_T_C_inv_g_true)
+        
+        return alpha, alpha_err
+
+    def plot_shear_bias(self, r, g_tan_profile, g_tan_err, g_true_profile, counts=None, save_path=None):
+        """
+        Calculate and plot the shear bias and its uncertainty with the bias value printed on the plot.
+        
+        Parameters:
+        -----------
+        r : numpy.ndarray
+            Radial bins
+        g_tan_profile : numpy.ndarray
+            Measured tangential shear profile
+        g_tan_err : numpy.ndarray
+            Error on the tangential shear measurements
+        g_true_profile : numpy.ndarray
+            True tangential shear profile
+        counts : numpy.ndarray, optional
+            Number of objects in each bin for error scaling
+        save_path : str, optional
+            Path to save the figure. If None, the figure is not saved.
+            
+        Returns:
+        --------
+        alpha : float
+            Shear bias parameter
+        alpha_err : float
+            Uncertainty on the shear bias parameter
+        """
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Rectangle
+        
+        # Scale errors if counts are provided
+        if counts is not None:
+            scaled_err = g_tan_err * np.sqrt(counts)
+        else:
+            scaled_err = g_tan_err
+        
+        # Calculate shear bias and its uncertainty
+        alpha, alpha_err = self.calculate_shear_bias(g_tan_profile, g_true_profile, scaled_err)
+        
+        # Create figure
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10), sharex=True, 
+                                    gridspec_kw={'height_ratios': [2, 1]})
+        
+        # Add a title with the shear bias value
+        fig.suptitle(rf'Shear Bias: $\alpha = {alpha:.4f} \pm {alpha_err:.4f}$', 
+                    fontsize=16, y=0.95)
+        
+        # Plot profiles in top panel
+        ax1.errorbar(r, g_tan_profile, yerr=scaled_err, fmt='o-', color='blue', 
+                    label=r'$g_{\mathrm{tan}}$ (measured)', capsize=4)
+        ax1.fill_between(r, g_tan_profile-scaled_err, g_tan_profile+scaled_err, color='blue', alpha=0.2, zorder=1)
+        ax1.plot(r, g_true_profile, 'k--', label=r'$g_{\mathrm{tan}}$ (true)')
+        #ax1.plot(r, alpha * g_true_profile, 'r-', 
+        #        label=rf'$\alpha \cdot g_{{true}}$')
+        
+        # Add a text box with the shear bias in the upper right corner
+        props = dict(boxstyle='round', facecolor='white', alpha=0.8)
+        bias_text = rf'$\alpha = {alpha:.4f} \pm {alpha_err:.4f}$'
+        ax1.text(0.95, 0.95, bias_text, transform=ax1.transAxes, fontsize=14,
+                verticalalignment='top', horizontalalignment='right', bbox=props)
+        
+        ax1.set_ylabel('Shear', fontsize=12)
+        ax1.legend(loc='upper left', fontsize=11)
+        ax1.grid(True, alpha=0.3)
+        ax1.set_title('Tangential Shear Profiles', fontsize=14)
+        
+        # Calculate chi residuals (measured - model) / error
+        # For our case: (g_tan - α·g_true) / σ_tan
+        chi_residuals = (g_tan_profile - alpha * g_true_profile) / scaled_err
+        valid = g_true_profile < 0.06
+        # Calculate chi-square and reduced chi-square
+        chi_sq = np.sum(chi_residuals[valid]**2)
+        dof = len(chi_residuals[valid]) - 1  # Degrees of freedom (number of points - number of parameters)
+        reduced_chi_sq = chi_sq / dof if dof > 0 else np.nan
+
+        # Plot chi residuals in bottom panel
+        ax2.axhline(y=0, color='k', linestyle='--', alpha=0.7)
+        ax2.axhline(y=1, color='grey', linestyle=':', alpha=0.5)
+        ax2.axhline(y=-1, color='grey', linestyle=':', alpha=0.5)
+        ax2.scatter(r, chi_residuals, color='blue', s=40)
+        ax2.errorbar(r, chi_residuals, yerr= scaled_err, fmt='none', 
+                    ecolor='blue', alpha=0.3, capsize=4)
+        
+        # Add a text box with chi-square information
+        chi_text = rf'$\chi^2 = {chi_sq:.2f}$, $\chi^2/\mathrm{{dof}} = {reduced_chi_sq:.2f}$'
+        ax2.text(0.95, 0.95, chi_text, transform=ax2.transAxes, fontsize=12,
+                verticalalignment='top', horizontalalignment='right', bbox=props)
+        
+        ax2.set_ylabel(r'$\chi = (g_{\mathrm{tan}} - \alpha \cdot g_{\mathrm{true}})/\sigma$', fontsize=12)
+        ax2.set_xlabel('Radius (arcmin)', fontsize=12)
+        ax2.grid(True, alpha=0.3)
+        ax2.set_title('Chi Residuals', fontsize=14)
+        
+        # Set reasonable y-limits for the residual plot
+        y_max = max(3, np.max(np.abs(chi_residuals)) * 1.2)
+        ax2.set_ylim(-y_max, y_max)
+        
+        # Tighten the layout but leave room for the overall title
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        
+        # Save the figure if a path is provided
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        
+        plt.show()
+        
+        return alpha, alpha_err, chi_sq

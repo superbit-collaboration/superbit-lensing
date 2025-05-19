@@ -916,7 +916,7 @@ class BITMeasurement():
                                         )
 
                     og_len = len(ss); ss = ss[matches]
-                    wg_stars = (ss['SNR_WIN'] > star_config['MIN_SNR'])
+                    wg_stars = (ss['SNR_WIN'] > star_config['MIN_SNR']) & (ss['MAG_AUTO'] > star_config['MAX_MAG'])
 
                     self.logprint(f'{len(dist)}/{og_len} objects ' +
                                 'matched to reference (truth) star catalog \n' +
@@ -948,6 +948,10 @@ class BITMeasurement():
         
         outname = sscat.replace('_cat.fits','_starcat.fits')
         ss_fits.writeto(outname, overwrite=True)
+
+        ss_fits_union[ext].data = ss
+        union_outname = sscat.replace('_cat.fits','_starcat_union.fits')
+        ss_fits_union.writeto(union_outname, overwrite=True)
 
         return outname
 
