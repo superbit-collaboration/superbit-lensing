@@ -42,7 +42,7 @@ class BITMeasurement():
         self.ext_header = ext_header
         self.band = band
         self.detection_bandpass = detection_bandpass
-        self.exposure_mask_fname = "/work/mccleary_group/superbit/union/masks/mask_dark_55percent_300.npy" 
+        self.exposure_mask_fname = "/projects/mccleary_group/superbit/union/masks/mask_dark_55percent_300.npy" 
 
         self.image_cats = []
         self.detect_img_path = None
@@ -115,6 +115,7 @@ class BITMeasurement():
                                           config_dir=config_dir,
                                           cat_dir=cat_dir)
             self.image_cats.append(sexcat)
+        self.cat_dir = cat_dir
 
     def make_exposure_weights(self):
         '''
@@ -949,6 +950,7 @@ class BITMeasurement():
         outname = sscat.replace('_cat.fits','_starcat.fits')
         ss_fits.writeto(outname, overwrite=True)
 
+        ss_fits_union = fits.HDUList([hdu.copy() for hdu in ss_fits])
         ss_fits_union[ext].data = ss
         union_outname = sscat.replace('_cat.fits','_starcat_union.fits')
         ss_fits_union.writeto(union_outname, overwrite=True)

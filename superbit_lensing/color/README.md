@@ -4,10 +4,10 @@ This folder contains scripts to generate color-magnitude and size-magnitude plot
 
 1. **Export the Data Directory**
     
-    Before running the scripts, ensure you export the path to your data directory. Replace `/work/mccleary_group/saha/codes/superbit-lensing/data` with the actual path to your data directory.
+    Before running the scripts, ensure you export the path to your data directory. Replace `/projects/mccleary_group/saha/codes/superbit-lensing/data` with the actual path to your data directory.
     
     ```bash
-    export DATADIR="/work/mccleary_group/saha/codes/superbit-lensing/data"
+    export DATADIR="/projects/mccleary_group/saha/codes/superbit-lensing/data"
     ```
     
 

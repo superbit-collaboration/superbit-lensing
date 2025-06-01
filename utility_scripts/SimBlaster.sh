@@ -8,8 +8,8 @@ START_SEED=${4:-42} # Default starting seed
 EXP_TYPE=${5:-"forecast"} # Default experiment type is 'forecast', can be 'backcast'
 
 # Define directories
-DATADIR="/work/mccleary_group/saha/simulated_data"
-CODEDIR="/work/mccleary_group/saha/codes/superbit-lensing"
+DATADIR="/projects/mccleary_group/saha/simulated_data"
+CODEDIR="/projects/mccleary_group/saha/codes/superbit-lensing"
 
 echo "Starting simulation batch: $RUN_NAME"
 echo "Will run $NUM_SIMS simulations starting from sim$START_SIM"

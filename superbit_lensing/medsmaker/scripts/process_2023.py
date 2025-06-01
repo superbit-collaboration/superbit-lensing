@@ -216,6 +216,11 @@ def main(args):
         logprint(f'Writing to {outfile} \n')
         medsObj.write(outfile)
 
+        logprint(f'Removing _starcat_union.fits for single exposure images in {bm.cat_dir}')
+        for file in glob(os.path.join(bm.cat_dir, '*_starcat_union.fits')):
+            os.remove(file)
+            logprint(f'  Removed: {os.path.basename(file)}')        
+
     logprint('Done!')
 
     return 0

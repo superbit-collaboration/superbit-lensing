@@ -147,7 +147,7 @@ class make_coadds_for_dualmode():
 
         self.data_dir = data_dir
         self.cluster_name = cluster_name
-        self.exposure_mask_fname = "/work/mccleary_group/superbit/union/masks/mask_dark_55percent_300.npy" 
+        self.exposure_mask_fname = "/projects/mccleary_group/superbit/union/masks/mask_dark_55percent_300.npy" 
         self.bands = ["b", "g", "u"]
         self.image_files = {band: self.set_image_files(band) for band in self.bands}
         self.sex_wgt_files = {band: self.set_weight_files(self.image_files[band]) for band in self.bands}

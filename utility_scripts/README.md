@@ -39,4 +39,4 @@ python data_downloader.py {cluster_name} [--username USERNAME] [--data-dir DATA_
 **Parameters:**
 - `cluster_name`: Name of the cluster (e.g., Abell3411)
 - `-username`: (Optional) Your username for hen.astro.utoronto.ca. If not provided, you will be prompted.
-- `-data-dir`: (Optional) Base directory for data. Default: /work/mccleary_group/superbit/union
+- `-data-dir`: (Optional) Base directory for data. Default: /projects/mccleary_group/superbit/union

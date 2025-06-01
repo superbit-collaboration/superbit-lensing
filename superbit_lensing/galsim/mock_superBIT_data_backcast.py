@@ -1295,7 +1295,7 @@ def main(args):
         truth_catalog = galsim.OutputCatalog(names, types)
 
     all_psf_files = []
-    search_path = os.path.join('/work/mccleary_group/superbit/emp_psfs/psfex-output', '*.psf')
+    search_path = os.path.join('/projects/mccleary_group/superbit/emp_psfs/psfex-output', '*.psf')
     all_psf_files.extend(glob(search_path))
 
     for i in np.arange(1, sbparams.nexp+1):

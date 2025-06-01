@@ -17,7 +17,7 @@ date
 which python
 
 # Path checking
-export PATH=$PATH:'/work/mccleary_group/Software/texlive-bin/x86_64-linux'
+export PATH=$PATH:'/projects/mccleary_group/Software/texlive-bin/x86_64-linux'
 echo $PATH
 echo $PYTHONPATH
 

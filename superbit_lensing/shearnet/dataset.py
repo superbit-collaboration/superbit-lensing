@@ -6,8 +6,8 @@ from scipy.signal import convolve2d
 from .utils import fft_ifft, get_memory_usage #, convolve2d
 import ipdb
 
-psf_fnmae = '/work/mccleary_group/saha/codes/.empty/psf_cutouts_superbit.npy'
-weight_fname = '/work/mccleary_group/saha/codes/.empty/weights_cutouts_superbit.npy'
+psf_fnmae = '/projects/mccleary_group/saha/codes/.empty/psf_cutouts_superbit.npy'
+weight_fname = '/projects/mccleary_group/saha/codes/.empty/weights_cutouts_superbit.npy'
 
 def generate_dataset(samples, psf_fwhm, npix=53, scale=0.2, exp='ideal'):
     images = []

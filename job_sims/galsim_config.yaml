@@ -25,7 +25,7 @@ sky_bkg:            0.0519      # mean sky background from AG's paper       [e- 
 sky_sigma:          0.02        # standard deviation of sky background      [e- / s / px]
 nobj:               34300         # Number of galaxies (COSMOS 25.2 depth)    []
 nstars:                        # Number of stars in the field              []
-nexp:               36          # Number of exposures per PSF model         []
+nexp:               40          # Number of exposures per PSF model         []
 nclustergal:        100         # Number of cluster galaxies (arbitrary)    []
 bandpass:     'crates_b'        # Catalog filter name for simulation        []
 jitter_fwhm:        0.315         # Kernel size of SuperBIT jitter            [arcsec]
@@ -44,8 +44,8 @@ omega_lam:          0.7         # Omega lambda for the background cosmology []
 # Run parameters
 # --------------
 # Define some paths and filenames
-cosmosdir:         '/work/mccleary_group/superbit/galsim_data/galsim_cosmos_catalogs' # Path to COSMOS data directory
-datadir:           '/work/mccleary_group/superbit/galsim_data' # Path to repo/galsim data directory
+cosmosdir:         '/projects/mccleary_group/superbit/galsim_data/galsim_cosmos_catalogs' # Path to COSMOS data directory
+datadir:           '/projects/mccleary_group/superbit/galsim_data' # Path to repo/galsim data directory
 cat_file_name:     'cosmos15_superbit2023_phot_shapes_with_sigma.csv' #'cosmos2015_cam2021_filt2021.csv' catalog file name for COSMOS (in cosmosdir)
 cluster_cat_name:  'real_galaxy_catalog_23.5_example.fits' # path to cluster catalog
 star_cat_name:      'APRA_cluster_GAIA_starcats/GAIAstars_1E0657.csv' #'master_gaiastar_cat.fits' # File containing GAIA star fluxes

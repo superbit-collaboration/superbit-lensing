@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Source the configuration file
-
 source "./config.sh"
 
 # Submit first job and capture its ID
 JOBID1=$(sbatch ./scripts/make_meds.sh | awk '{print $4}')
+JOBID_CC=$(sbatch ./scripts/color_color_run.sh | awk '{print $4}')
 
 # Define variables
 base_arraroutdir="${DATADIR}/${cluster_name}/${band_name}/arr/run"
@@ -44,18 +44,17 @@ do
   echo "Job script $job_script_name created and submitted with seed $new_seed, job ID: $job_id"
 done
 
-# Create a dependency string with all job IDs
-dependency_string="afterok"
+# Create a dependency string with all job IDs including JOBID_CC
+dependency_string="afterok:$JOBID_CC"
 for job_id in "${job_ids[@]}"
 do
   dependency_string+=":$job_id"
 done
 
-# Submit a final job that runs make_annular.sh after all ngmix jobs complete
+# Submit a final job that runs make_annular.sh after all ngmix jobs AND color_color_run complete
 sbatch --dependency=$dependency_string \
        --time=00:05:00 \
        --job-name=make_annular \
        --output=logs/annular_out.log \
        --error=logs/annular_err.log \
        --wrap="bash ./scripts/make_annular.sh"
-

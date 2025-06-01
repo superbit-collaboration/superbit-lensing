@@ -6,7 +6,7 @@ import subprocess
 import argparse
 from astropy.io import fits
 
-def create_cluster_directory(cluster_name, data_dir="/work/mccleary_group/superbit/union"):
+def create_cluster_directory(cluster_name, data_dir="/projects/mccleary_group/superbit/union"):
     """
     Create a new cluster directory based on the template directory or create it manually if template doesn't exist.
     
@@ -134,6 +134,11 @@ def filter_fits_files(directory):
     os.makedirs(good_dir, exist_ok=True)
     os.makedirs(bad_dir, exist_ok=True)
     
+    # Initialize counters
+    good_count = 0
+    bad_count = 0
+    error_count = 0
+    
     # Change to the directory
     original_dir = os.getcwd()
     os.chdir(directory)
@@ -148,10 +153,21 @@ def filter_fits_files(directory):
                     img_qual = header.get('IMG_QUAL', 'BAD')  # Default to 'BAD' if not present
                     if img_qual == 'GOOD':
                         shutil.move(filepath, os.path.join(good_dir, file))
+                        good_count += 1
                     else:
                         shutil.move(filepath, os.path.join(bad_dir, file))
+                        bad_count += 1
             except Exception as e:
                 print(f"Error processing file {file}: {e}")
+                error_count += 1
+    
+    # Print summary
+    print(f"\nFile filtering complete:")
+    print(f"  Good files: {good_count}")
+    print(f"  Bad files: {bad_count}")
+    if error_count > 0:
+        print(f"  Errors: {error_count}")
+    print(f"  Total processed: {good_count + bad_count}")
     
     # Return to original directory
     os.chdir(original_dir)
@@ -204,6 +220,12 @@ def organize_by_band(good_dir, cluster_dir, cluster_name):
     os.makedirs(b_dir, exist_ok=True)
     os.makedirs(g_dir, exist_ok=True)
     
+    # Initialize counters
+    u_count = 0
+    b_count = 0
+    g_count = 0
+    unknown_count = 0
+    
     # Move files to appropriate directories
     for file in os.listdir(good_dir):
         file_path = os.path.join(good_dir, file)
@@ -214,22 +236,35 @@ def organize_by_band(good_dir, cluster_dir, cluster_name):
         # Band 0 (u)
         if f"{cluster_name}_0" in file:
             shutil.move(file_path, os.path.join(u_dir, file))
+            u_count += 1
         # Band 1 (b)
         elif f"{cluster_name}_1" in file:
             shutil.move(file_path, os.path.join(b_dir, file))
+            b_count += 1
         # Band 2 (g)
         elif f"{cluster_name}_2" in file:
             shutil.move(file_path, os.path.join(g_dir, file))
+            g_count += 1
         else:
             print(f"Warning: Could not determine band for {file}")
+            unknown_count += 1
+    
+    # Print summary statistics
+    print(f"\nBand organization complete:")
+    print(f"  u-band exposures: {u_count}")
+    print(f"  b-band exposures: {b_count}")
+    print(f"  g-band exposures: {g_count}")
+    if unknown_count > 0:
+        print(f"  Unknown band: {unknown_count}")
+    print(f"  Total organized: {u_count + b_count + g_count}")
 
 def main():
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Download and organize superbit data for a cluster.')
     parser.add_argument('cluster_name', type=str, help='Name of the cluster (e.g., Abell3411)')
     parser.add_argument('--username', type=str, help='Username for hen.astro.utoronto.ca')
-    parser.add_argument('--data-dir', type=str, default="/work/mccleary_group/superbit/union",
-                        help='Base directory for data (default: /work/mccleary_group/superbit/union)')
+    parser.add_argument('--data-dir', type=str, default="/projects/mccleary_group/superbit/union",
+                        help='Base directory for data (default: /projects/mccleary_group/superbit/union)')
     
     args = parser.parse_args()
     
@@ -254,6 +289,9 @@ def main():
         print("Organizing files by band...")
         organize_by_band(good_dir, cluster_dir, args.cluster_name)
         
+        print("Remove Preliminary Directory..")
+        shutil.rmtree(prelim_dir)
+
         print(f"Successfully processed data for cluster: {args.cluster_name}")
         print(f"Data organized in: {cluster_dir}")
         

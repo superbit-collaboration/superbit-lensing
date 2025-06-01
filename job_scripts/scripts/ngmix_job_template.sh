@@ -16,7 +16,7 @@ date
 
 which python
 
-export ARRAROUTDIR="/work/mccleary_group/saha/data/Abell3411/b/arr/run1"
+export ARRAROUTDIR="/projects/mccleary_group/saha/data/Abell3411/b/arr/run1"
 
 # Ensure ARRAROUTDIR exists
 mkdir -p $ARRAROUTDIR

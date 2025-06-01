@@ -26,6 +26,11 @@ from shapely.geometry import Point, Polygon
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 CLUSTERS_CSV = os.path.join(PROJECT_ROOT, 'data', 'SuperBIT_target_galactic_coords.csv')
 TARGET_LIST = os.path.join(PROJECT_ROOT, 'data', 'SuperBIT_target_list.csv')
+DESI_MASTER_FILE = "/projects/mccleary_group/superbit/desi_data/zall-pix-iron.fits"
+desi_table = [
+    'TARGETID', 'SURVEY', 'PROGRAM', 'OBJTYPE', 'SPECTYPE', 
+    'TARGET_RA', 'TARGET_DEC', 'Z', 'ZERR', 'ZWARN', 'ZCAT_NSPEC', 'ZCAT_PRIMARY'
+]
 
 class AttrDict(dict):
     '''
@@ -848,6 +853,66 @@ def ned_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None):
         table = table[mask]
 
     return table
+
+def desi_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None):
+    """
+    Query DESI for objects around a given cluster name or RA/Dec.
+
+    Parameters
+    ----------
+    cluster_name : str, optional
+        Name of the cluster to look up from CSV. Ignored if ra_center and dec_center are provided.
+    rad_deg : float
+        Search radius in degrees.
+    ra_center : float, optional
+        RA center in degrees. Overrides cluster_name if provided.
+    dec_center : float, optional
+        Dec center in degrees. Overrides cluster_name if provided.
+
+    Returns
+    -------
+    astropy.table.Table
+        DESI query results.
+    """
+    if ra_center is not None and dec_center is not None:
+        coord = SkyCoord(ra=ra_center, dec=dec_center, unit='deg')
+    elif cluster_name is not None:
+        cluster_data = pd.read_csv(CLUSTERS_CSV)
+        idx = cluster_data['Name'] == cluster_name
+        if not idx.any():
+            raise ValueError(f"Cluster name '{cluster_name}' not found in {CLUSTERS_CSV}")
+        ra_center = cluster_data.loc[idx, 'RA'].values[0]
+        dec_center = cluster_data.loc[idx, 'Dec'].values[0]
+        coord = SkyCoord(ra=ra_center, dec=dec_center, unit='deg')
+    else:
+        raise ValueError("Either cluster_name or both ra_center and dec_center must be provided.")    
+    
+    try:
+        col_data = {}
+        with fits.open(desi_file, memmap=True) as hdul:
+            for col in desi_table:
+                col_data[col] = hdul[1].data[col]
+
+        desi = Table(col_data)
+        desi = desi[
+            (desi['ZCAT_PRIMARY'] == True) &
+            (desi['OBJTYPE'] == 'TGT') &
+            (desi['ZWARN'] == 0)
+        ]
+
+    except Exception as e:
+        print(f"Failed to read desi file ({e}), creating an empty catalog.")
+        desi = Table(names=desi_table, dtype=['f8'] * len(desi_table))    
+
+    desi_ra = desi['TARGET_RA'].astype(float)
+    desi_dec = desi['TARGET_DEC'].astype(float)
+
+    desi_coord = SkyCoord(ra = desi_ra, dec = desi_dec, unit = u.deg)
+    distances = coord.separation(desi_coord)
+    rad_deg = rad_deg * u.deg 
+    mask = distances <= rad_deg
+
+    return desi[mask]
 
 def radec_to_xy(header, ra, dec):
     """

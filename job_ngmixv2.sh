@@ -26,9 +26,9 @@ which python
 ### Define variables
 ###
 
-export OUTDIR="/work/mccleary_group/saha/data/${cluster_name}/${band_name}/backups"
-export DATADIR="/work/mccleary_group/saha/data"
-export CODEDIR="/work/mccleary_group/saha/codes/3d2c93d-jmac/superbit-metacal"
+export OUTDIR="/projects/mccleary_group/saha/data/${cluster_name}/${band_name}/backups"
+export DATADIR="/projects/mccleary_group/saha/data"
+export CODEDIR="/projects/mccleary_group/saha/codes/3d2c93d-jmac/superbit-metacal"
 export PSF_MODEL="coellip5"
 export GAL_MODEL="gauss"
 
@@ -38,7 +38,7 @@ export GAL_MODEL="gauss"
 
 echo $OUTDIR/${cluster_name}_${band_name}_meds.fits
 
-export PATH=$PATH:'/work/mccleary_group/Software/texlive-bin/x86_64-linux'
+export PATH=$PATH:'/projects/mccleary_group/Software/texlive-bin/x86_64-linux'
 echo $PATH
 echo $PYTHONPATH
 dirname="slurm_outfiles"

@@ -11,7 +11,7 @@ from argparse import ArgumentParser
 from annular_jmac import Annular, ShearCalc
 from make_redshift_cat import make_redshift_catalog
 from superbit_lensing import utils
-
+from superbit_lensing.match import SkyCoordMatcher
 
 def parse_args():
 
@@ -84,6 +84,7 @@ class AnnularCatalog():
         self.annular_info = annular_info
         self.config = config
         self.detect_cat = cat_info['detect_cat']
+        self.data_dir = cat_info['data_dir']
         self.mcal_file = cat_info['mcal_file']
         self.outfile = cat_info['mcal_selected']
         self.outdir = cat_info['outdir']
@@ -114,6 +115,106 @@ class AnnularCatalog():
         self.Nmcal = len(self.mcal)
 
         return
+
+    def match_and_merge_color_mag(self, selected_catalog, color_mag_file, tolerance_deg=1e-4):
+        """
+        Match selected catalog with color magnitude catalog by position and ID,
+        then merge color/magnitude columns into the selected catalog.
+        
+        Parameters:
+        -----------
+        selected_catalog : astropy.table.Table
+            The primary catalog to which columns will be added
+        color_mag_file : str
+            Path to the color magnitude catalog file
+        tolerance_deg : float
+            Matching tolerance in degrees (default: 1e-4)
+        
+        Returns:
+        --------
+        astropy.table.Table
+            Updated catalog with color/magnitude columns added
+        """
+        
+        if not os.path.exists(color_mag_file):
+            print(f"Color magnitude file not found: {color_mag_file}")
+            return selected_catalog
+        
+        # Read color magnitude catalog
+        color_mag = Table.read(color_mag_file)
+        
+        print(f"\nMatching catalogs:")
+        print(f"  Selected catalog: {len(selected_catalog)} objects")
+        print(f"  Color-mag catalog: {len(color_mag)} objects")
+        
+        # Perform sky coordinate matching
+        matcher = SkyCoordMatcher(selected_catalog, color_mag, 
+                                cat1_ratag='ra', cat1_dectag='dec',
+                                return_idx=True, match_radius=1 * tolerance_deg)
+        matched_selected, matched_color_mag, idx1, idx2 = matcher.get_matched_pairs()
+        
+        print(f"  Position matches found: {len(idx1)}")
+        
+        idx1 = np.array(idx1)
+        idx2 = np.array(idx2)
+
+        # Further filter to keep only matches where IDs are equal
+        id_match_mask = (matched_selected['id'] == matched_color_mag['id'])
+        valid_idx1 = idx1[id_match_mask]
+        valid_idx2 = idx2[id_match_mask]
+        
+        print(f"  Valid ID matches: {len(valid_idx1)}")
+        print(f"  Filtered out (position match but ID mismatch): {len(idx1) - len(valid_idx1)}")
+        
+        # Columns to fetch from color_mag
+        columns_to_add = ['m_b', 'm_b_err', 'm_g', 'm_g_err', 'm_u', 'm_u_err', 
+                        'color_bg', 'color_bg_err', 'color_ub', 'color_ub_err', 'Z_best', 
+                          'ZERR_best', 'Z_source']
+        
+        string_columns = ['Z_source']    
+        # Create a copy of the original selected catalog
+        result_catalog = selected_catalog.copy()
+        
+        # Check which columns actually exist in color_mag
+        available_columns = [col for col in columns_to_add if col in color_mag.colnames]
+        missing_columns = [col for col in columns_to_add if col not in color_mag.colnames]
+        
+        if missing_columns:
+            print(f"\n  Warning: Following columns not found in color_mag catalog: {missing_columns}")
+        
+        # Initialize new columns with NaN or appropriate empty values
+        for col in available_columns:
+            if col in string_columns:
+                # Initialize string columns with empty strings, all masked
+                result_catalog[col] = np.ma.masked_array(
+                    np.array([''] * len(result_catalog), dtype='U50'),
+                    mask=np.ones(len(result_catalog), dtype=bool)
+                )
+            else:
+                # Initialize numeric columns with NaN, all masked
+                result_catalog[col] = np.ma.masked_array(
+                    np.full(len(result_catalog), np.nan),
+                    mask=np.ones(len(result_catalog), dtype=bool)
+                )
+        
+        # Fill in the matched values
+        for idx_selected, idx_color in zip(valid_idx1, valid_idx2):
+            for col in available_columns:
+                result_catalog[col][idx_selected] = color_mag[col][idx_color]
+                result_catalog[col].mask[idx_selected] = False
+        
+        # Calculate final statistics
+        n_matched = len(valid_idx1)
+        n_unmatched = len(result_catalog) - n_matched
+        match_rate = (n_matched / len(result_catalog)) * 100
+        
+        print(f"\nFinal statistics:")
+        print(f"  Objects with color/mag data: {n_matched} ({match_rate:.1f}%)")
+        print(f"  Objects without color/mag data: {n_unmatched} ({100-match_rate:.1f}%)")
+        print(f"  Columns added: {available_columns}")
+        
+        return result_catalog
+
 
     def join(self, overwrite=False):
 
@@ -261,6 +362,7 @@ class AnnularCatalog():
         cat_info = self.cat_info
         data_dir = self.cat_info['data_dir']
         redshift_cat = self.redshift_cat
+        color_mag_file = os.path.join(data_dir, self.run_name, 'sextractor_dualmode', 'out', f'{self.run_name}_colors_mags.fits')
 
         # Filter out foreground galaxies using redshifts in truth file
         self._redshift_select(redshift_cat, overwrite=overwrite)
@@ -273,6 +375,8 @@ class AnnularCatalog():
         # Save selected galaxies to file
         for key, val in self.config['mcal_cuts'].items():
             self.selected.meta[key] = val
+
+        self.selected = self.match_and_merge_color_mag(self.selected, color_mag_file, tolerance_deg=1e-4)       
 
         self.selected.write(self.outfile, format='fits', overwrite=overwrite)
         print("==Some Stats==\n")

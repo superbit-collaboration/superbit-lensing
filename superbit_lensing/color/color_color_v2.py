@@ -20,7 +20,7 @@ desi_table = [
 ]
 desi_table_primary = ['TARGET_RA', 'TARGET_DEC', 'ZCAT_PRIMARY', 'OBJTYPE', 'ZWARN']
 ned_table = ['RA', 'DEC', 'Redshift']
-DESI_MASTER_FILE = "/work/mccleary_group/superbit/desi_data/zall-pix-iron.fits"
+DESI_MASTER_FILE = "/projects/mccleary_group/superbit/desi_data/zall-pix-iron.fits"
 
 MAG_ZP_b = 28.66794
 MAG_ZP_g = 27.490537
@@ -240,8 +240,8 @@ def main(args):
     flux_g = matched_data_g['FLUX_AUTO']
     flux_u = matched_data_u['FLUX_AUTO']
 
-    valid_flux = (flux_b > 0) & (flux_g > 0) & (flux_u > 0)
-    #valid_flux = np.ones(len(matched_data_b), dtype=bool)
+    #valid_flux = (flux_b > 0) & (flux_g > 0) & (flux_u > 0)
+    valid_flux = np.ones(len(matched_data_b), dtype=bool)
     matched_data_b_valid = matched_data_b[valid_flux]
     matched_data_g_valid = matched_data_g[valid_flux]
     matched_data_u_valid = matched_data_u[valid_flux]
@@ -250,8 +250,16 @@ def main(args):
     m_b = matched_data_b_valid["MAG_AUTO"] #-2.5 * np.log10(flux_b[valid_flux])
     m_g = matched_data_g_valid["MAG_AUTO"] #-2.5 * np.log10(flux_g[valid_flux])
     m_u = matched_data_u_valid["MAG_AUTO"] #-2.5 * np.log10(flux_u[valid_flux])
+    m_b_err = matched_data_b_valid["MAGERR_AUTO"]  # Error in b-band magnitude
+    m_g_err = matched_data_g_valid["MAGERR_AUTO"]  # Error in g-band magnitude  
+    m_u_err = matched_data_u_valid["MAGERR_AUTO"]  # Error in u-band magnitude    
+    
     color_index_bg = m_b - m_g
     color_index_ub = m_u - m_b
+
+    # Calculate errors on color indices
+    color_index_bg_err = np.sqrt(m_b_err**2 + m_g_err**2)
+    color_index_ub_err = np.sqrt(m_u_err**2 + m_b_err**2)    
 
     # Use SkyCoordMatcher for NED matching
     matcher_ned = SkyCoordMatcher(ned_cat, matched_data_b, cat1_ratag='RA', cat1_dectag='DEC',
@@ -340,6 +348,7 @@ def main(args):
         ra_dec_table.rename_columns(['ALPHAWIN_J2000', 'DELTAWIN_J2000'], ['ra', 'dec'])
         # Create a new table with the selected columns and computed values
         final_table = Table()
+        final_table['id'] = matched_data_b[valid_flux]["NUMBER"]
         final_table['ra'] = ra_dec_table['ra'][valid_flux]
         final_table['dec'] = ra_dec_table['dec'][valid_flux]
         final_table['m_b'] = m_b
@@ -383,6 +392,8 @@ def main(args):
         final_table['SNR_combined'] = np.sqrt(final_table['SNR_b']**2 + final_table['SNR_g']**2 + final_table['SNR_u']**2)
         final_table['color_bg'] = color_index_bg
         final_table['color_ub'] = color_index_ub
+        final_table['color_bg_err'] = color_index_bg_err
+        final_table['color_ub_err'] = color_index_ub_err
         final_table['Z_ned'] = redshifts_ned[valid_flux]
         final_table['Z_lovoccs'] = redshifts_lovoccs[valid_flux]
         final_table['ZERR_lovoccs'] = redshift_err_lovoccs[valid_flux]
