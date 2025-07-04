@@ -13,7 +13,7 @@ from argparse import ArgumentParser
 
 
 from annular_jmac import Annular, ShearCalc
-from make_redshift_cat import make_redshift_catalog
+from make_redshift_cat_sims import make_redshift_catalog
 from superbit_lensing import utils
 from superbit_lensing.match import SkyCoordMatcher
 
@@ -224,7 +224,7 @@ class AnnularCatalog():
                                             ra = joined_cat['ra'],
                                             dec = joined_cat['dec'],
                                             maxmatch = 1,
-                                            radius = 1./3600.
+                                            radius = 1e-4
                                             )
 
         print(f"# {len(dist)} of {len(joined_cat['ra'])}"+\

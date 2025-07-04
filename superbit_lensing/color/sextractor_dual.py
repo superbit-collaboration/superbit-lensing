@@ -2,6 +2,7 @@ import os
 from glob import glob
 import numpy as np
 from astropy.io import fits
+from pathlib import Path
 import copy
 import subprocess
 import multiprocessing
@@ -24,7 +25,7 @@ def run_command(cmd, cores):
     print(f"Running: {full_cmd}")
     subprocess.run(full_cmd, shell=True)
 
-def _run_sextractor_dual(image_file1, image_file2, cat_dir, config_dir, diag_dir=None, back_type='AUTO', mag_zp=28.66794, use_weight=True):
+def _run_sextractor_dual(image_file1, image_file2, cat_dir, config_dir, diag_dir=None, back_type='MANUAL', mag_zp=28.66794, use_weight=True):
     '''
     Utility method to invoke Source Extractor on supplied detection file
     Returns: file path of catalog
@@ -39,7 +40,7 @@ def _run_sextractor_dual(image_file1, image_file2, cat_dir, config_dir, diag_dir
     cat_name = os.path.basename(image_file2).replace('.fits','_cat.fits')
     cat_file = os.path.join(cat_dir, cat_name)
 
-    mag_arg = f'-MAG_ZEROPINT {mag_zp}'
+    mag_arg = f'-MAG_ZEROPOINT {mag_zp}'
     print(f'Using mag zero-point: {mag_zp}')
 
     image_arg  = f'"{image_file1}[0], {image_file2}[0]"'
@@ -77,7 +78,7 @@ def _run_sextractor_dual(image_file1, image_file2, cat_dir, config_dir, diag_dir
     print(f'cat_name is {cat_file} \n')
     return cat_file
 
-def _run_sextractor_single(image_file1, cat_dir, config_dir, diag_dir=None, back_type='AUTO', mag_zp=28.66794, use_weight=True):
+def _run_sextractor_single(image_file1, cat_dir, config_dir, diag_dir=None, back_type='MANUAL', mag_zp=28.66794, use_weight=True):
     '''
     Utility method to invoke Source Extractor on supplied detection file
     Returns: file path of catalog
@@ -89,7 +90,7 @@ def _run_sextractor_single(image_file1, cat_dir, config_dir, diag_dir=None, back
     if diag_dir is None:
         diag_dir = cat_dir
 
-    mag_arg = f'-MAG_ZEROPINT {mag_zp}'
+    mag_arg = f'-MAG_ZEROPOINT {mag_zp}'
     print(f'Using mag zero-point: {mag_zp}')
 
     cat_name = os.path.basename(image_file1).replace('.fits','_cat.fits')
@@ -147,7 +148,10 @@ class make_coadds_for_dualmode():
 
         self.data_dir = data_dir
         self.cluster_name = cluster_name
-        self.exposure_mask_fname = "/projects/mccleary_group/superbit/union/masks/mask_dark_55percent_300.npy" 
+        current_file_path = Path(__file__).resolve()
+        self.exposure_mask_fname = str(
+            current_file_path.parent.parent.parent / "data" / "masks" / "mask_dark_55percent_300.npy"
+        )
         self.bands = ["b", "g", "u"]
         self.image_files = {band: self.set_image_files(band) for band in self.bands}
         self.sex_wgt_files = {band: self.set_weight_files(self.image_files[band]) for band in self.bands}

@@ -694,8 +694,10 @@ def get_sky_footprint_center_radius(data_table, buffer_fraction=0.05):
     radius_deg : float
         Radius in degrees that encloses all objects from the center
     """
-    ra = data_table['ALPHAWIN_J2000']
-    dec = data_table['DELTAWIN_J2000']
+    for ra_col, dec_col in [('RA', 'DEC'), ('ra', 'dec'), ('ALPHAWIN_J2000', 'DELTAWIN_J2000')]:
+        if ra_col in data_table.columns and dec_col in data_table.columns:
+            ra, dec = data_table[ra_col], data_table[dec_col]
+            break
     
     # Handle RA wrap-around for midpoint calculation
     ra_wrapped = np.array(ra)
@@ -786,7 +788,13 @@ def gaia_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None, 
         raise ValueError("Either cluster_name or both ra_center and dec_center must be provided.")
 
     radius = rad_deg * u.deg
-    result = Vizier.query_region(coord, radius=radius, catalog=catalog_id)
+    try:
+        result = Vizier.query_region(coord, radius=radius, catalog=catalog_id)
+        print("The default query was successful")
+    except:
+        Vizier.VIZIER_SERVER = 'vizier.iucaa.in'
+        result = Vizier.query_region(coord, radius=radius, catalog=catalog_id)
+        print("The custom query with vizier.iucaa.in was successful")
 
     if not result:
         raise RuntimeError("Gaia query returned no results.")
@@ -809,6 +817,126 @@ def gaia_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None, 
         return final_table[final_table["class"]=='star']
 
     return final_table
+
+def gaia_query_v2(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None, catalog_id = "I/355/gaiadr3", pure=True):
+    """
+    Query Gaia DR3 directly using TAP service with specific columns needed for classification
+    """
+    if ra_center is not None and dec_center is not None:
+        coord = SkyCoord(ra=ra_center, dec=dec_center, unit='deg')
+    elif cluster_name is not None:
+        cluster_data = pd.read_csv(CLUSTERS_CSV)
+        idx = cluster_data['Name'] == cluster_name
+        if not idx.any():
+            raise ValueError(f"Cluster name '{cluster_name}' not found in {CLUSTERS_CSV}")
+        ra_center = cluster_data.loc[idx, 'RA'].values[0]
+        dec_center = cluster_data.loc[idx, 'Dec'].values[0]
+        print(f"Using cluster coordinates: RA={ra_center}, Dec={dec_center}")
+        coord = SkyCoord(ra=ra_center, dec=dec_center, unit='deg')
+    else:
+        raise ValueError("Either cluster_name or both ra_center and dec_center must be provided.")
+    try:
+        print(f"\nUsing Gaia TAP service directly...")
+        print(f"Coordinates: RA={ra_center:.6f}, Dec={dec_center:.6f}, Radius={rad_deg}°")
+
+        # Define the columns needed based on add_object_class function
+        columns = [
+            # Basic identification and position
+            'source_id',
+            'ra', 
+            'ra_error',
+            'dec',
+            'dec_error',
+            
+            # Photometry
+            'phot_g_mean_mag',
+            'phot_g_mean_mag_error',
+            'phot_bp_mean_mag',
+            'phot_bp_mean_mag_error', 
+            'phot_rp_mean_mag',
+            'phot_rp_mean_mag_error',
+            'phot_bp_rp_excess_factor',  # This is E(BP/RP) in your function
+            
+            # Astrometry
+            'parallax',
+            'parallax_error',
+            'pmra',
+            'pmra_error',
+            'pmdec',
+            'pmdec_error',
+            
+            # Classification columns
+            'classprob_dsc_combmod_star',      # PSS
+            'classprob_dsc_combmod_galaxy',    # PGal
+            'classprob_dsc_combmod_quasar',    # PQSO
+            'in_qso_candidates',               # QSO flag
+            'in_galaxy_candidates',            # Gal flag
+            'non_single_star',                 # NSS
+            
+            # Quality indicators
+            'astrometric_excess_noise',
+            'astrometric_excess_noise_sig',
+            'astrometric_sigma5d_max',        # amax
+            'ruwe',                           # RUWE
+            
+            # Additional useful columns
+            'radial_velocity',
+            'radial_velocity_error',
+            'teff_gspphot',
+            'logg_gspphot',
+            'mh_gspphot'
+        ]
+
+        # Construct ADQL query with column aliases for easier use
+        query = f"""
+        SELECT TOP 10000
+            {', '.join(columns)},
+            phot_bp_mean_mag - phot_rp_mean_mag as bp_rp
+        FROM gaiadr3.gaia_source
+        WHERE CONTAINS(
+            POINT('ICRS', ra, dec),
+            CIRCLE('ICRS', {ra_center}, {dec_center}, {rad_deg})
+        ) = 1
+        """
+        
+        start = time.time()
+        job = Gaia.launch_job(query)
+        result = job.get_results()
+        
+        # Create column aliases to match your add_object_class function
+        result.rename_column('classprob_dsc_combmod_star', 'PSS')
+        result.rename_column('classprob_dsc_combmod_galaxy', 'PGal')
+        result.rename_column('classprob_dsc_combmod_quasar', 'PQSO')
+        result.rename_column('in_qso_candidates', 'QSO')
+        result.rename_column('in_galaxy_candidates', 'Gal')
+        result.rename_column('non_single_star', 'NSS')
+        result.rename_column('astrometric_sigma5d_max', 'amax')
+        result.rename_column('ruwe', 'RUWE')
+        result.rename_column('phot_bp_rp_excess_factor', 'E(BP/RP)')
+        result.rename_column('bp_rp', 'BP-RP')
+        result.rename_column('ra', 'ALPHAWIN_J2000')
+        result.rename_column('dec', 'DELTAWIN_J2000')
+
+        
+        elapsed = time.time() - start
+        print(f"✓ Success! Retrieved {len(result)} sources via TAP")
+        print(f"  Time taken: {elapsed:.2f} seconds")
+        print(f"  Columns: {len(result.columns)}")
+        
+        # Add object class column
+        final_table = add_object_class(result)
+
+        if pure:
+            return final_table[final_table["class"]=='star']
+
+        return final_table
+
+    except ImportError:
+        print("✗ astroquery.gaia not available")
+        return None
+    except Exception as e:
+        print(f"✗ Error: {type(e).__name__}: {str(e)}")
+        return None
 
 def ned_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None):
     """

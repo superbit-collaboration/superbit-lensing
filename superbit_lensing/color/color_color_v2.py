@@ -68,13 +68,13 @@ def main(args):
         print(f"Warning: Using Gaia fallback star catalog for band b: {file_b_stars}")
     
     try:
-        star_data_b = Table.read(file_b_stars, format='fits', hdu=2)
+        star_data_b = gaia_query(cluster_name)
     except Exception as e:
         print(f"Failed to read star catalog for band b ({e}), trying to query Gaia...")
         try:
             star_data_b = gaia_query(cluster_name)
             print(f"Gaia query was sucessfull, found {len(star_data_b)} objects")
-            star_data_b.write(file_b_stars_fallback_2nd, format='fits', overwrite=True)
+            #star_data_b.write(file_b_stars_fallback_2nd, format='fits', overwrite=True)
         except Exception as e:
             print(f"Failed to query Gaia for star catalog for band b ({e}), creating an empty catalog.")   
             star_data_b = Table(names=['ALPHAWIN_J2000', 'DELTAWIN_J2000'], dtype=['f8', 'f8'])
@@ -88,6 +88,7 @@ def main(args):
     output_file = f"{plot_dir}/{cluster_name}_ubg_color_color.png"
     out_file_cm_bg = f"{plot_dir}/{cluster_name}_b_g_color_mag.png"
     out_file_cm_ub = f"{plot_dir}/{cluster_name}_u_b_color_mag.png"
+    size_mag_file = f"{plot_dir}/{cluster_name}_b_size_mag.png"
     output_fits = f"{output_dir}/{cluster_name}_colors_mags.fits"
     output_star_fits = f"{output_dir}/{cluster_name}_colors_mags_stars.fits"
     os.makedirs(plot_dir, exist_ok=True)
@@ -165,22 +166,46 @@ def main(args):
     try:
         ned_cat = Table.read(redshift_file, format='csv')
         ned_cat = ned_cat[ned_table]
+        print(f"Successfully used saved NED file: {redshift_file}, Objects found: {len(ned_cat)}")
     except Exception as e:
-        print(f"Failed to read redshift file ({e}), Trying ned query...")
-        try:
-            ned_cat = ned_query(rad_deg=radius_b, ra_center=center_ra_b, dec_center=center_dec_b)
-            print(f"NED query was sucessfull, found {len(ned_cat)} objects")
-            ned_cat.write(redshift_file, format='csv', overwrite=True)
-        except Exception as e:
+        print(f"Could not load {redshift_file} because: {e}")
+        # Fall back to NED query with three attempts
+        print("Falling back to NED query with decreasing radius...")
+        max_attempts = 3
+        ned_query_success = False
+        current_radius = radius_b  # Start with the original radius
+        
+        for attempt in range(max_attempts):
             try:
-                print(f"Failed to query NED for redshift file ({e}), trying again....")
-                time.sleep(3)
-                ned_cat = ned_query(rad_deg=radius_b/1.1, ra_center=center_ra_b, dec_center=center_dec_b)
-                print(f"2nd NED query was sucessfull, found {len(ned_cat)} objects")
-                ned_cat.write(redshift_file, format='csv', overwrite=True)
+                print(f"Attempting NED query (attempt {attempt+1}/{max_attempts}) with radius={current_radius:.4f} deg...")
+                ned_cat = utils.ned_query(rad_deg=current_radius, ra_center=center_ra_b, dec_center=center_dec_b)
+                print(f"Successfully queried NED with {len(ned_cat)} results at radius {current_radius:.4f} deg")
+                ned_query_success = True
+                
+                # Optionally save the results for future use
+                try:
+                    print(f"Saving results to {redshift_file}")
+                    ned_cat.write(redshift_file, format='csv', overwrite=True)
+                    print("Results saved successfully")
+                except Exception as save_error:
+                    print(f"Warning: Could not save NED results to file: {save_error}")
+                
+                break  # Exit retry loop if successful
+                
             except Exception as e:
-                print(f"Ned query failed for 2nd time ({e}), creating an empty catalog.")
-                ned_cat = Table(names=ned_table, dtype=['f8'] * len(ned_table))
+                print(f"NED query attempt {attempt+1} failed with radius {current_radius:.4f} deg: {e}")
+                if attempt < max_attempts - 1:
+                    wait_time = 5  # Longer wait for external API
+                    # Reduce radius for next attempt
+                    current_radius = current_radius / 1.06
+                    print(f"Waiting {wait_time} seconds before retrying with smaller radius ({current_radius:.4f} deg)...")
+                    time.sleep(wait_time)
+        
+        # If all NED query attempts failed, raise an error
+        if not ned_query_success:
+            error_msg = "All NED query attempts failed, creating empty ned catalog"
+            print(error_msg)
+            ned_cat = Table(names=ned_table, dtype=['f8'] * len(ned_table))
 
     try:
         # Read the Lovoccs catalog
@@ -572,7 +597,8 @@ def main(args):
 
     # Step 8: Plot the Color-Magnitude Diagram
     plt.figure(figsize=(8, 6))
-    plt.scatter(color_index_bg, color_index_ub, s=5, alpha=0.10, color='blue', label='Galaxies')
+    valid_flux = (flux_b > 0) & (flux_g > 0) & (flux_u > 0)
+    plt.scatter(color_index_bg[valid_flux], color_index_ub[valid_flux], s=5, alpha=0.10, color='blue', label='Galaxies')
     if args.plot_stars:
         plt.scatter(color_bg_stars, color_ub_stars, s=5, alpha=0.10, color='red', label='Stars')
 
@@ -593,14 +619,14 @@ def main(args):
 
     if args.plot_color_mag:
         plt.figure(figsize=(8, 6))
-        plt.scatter(m_b, color_index_bg, s=5, alpha=0.10, color='blue', label='Galaxies')
+        plt.scatter(m_b[valid_flux], color_index_bg[valid_flux], s=5, alpha=0.10, color='blue', label='Galaxies')
         if args.plot_stars:
             plt.scatter(m_stars_b, color_bg_stars, s=5, alpha=0.10, color='red', label='Stars')
 
         if args.plot_redshifts:
-            plt.scatter(m_b_high, color_index_bg_high, s=10, alpha=0.3, facecolors='orange', label=f'High-z (z > {cluster_redshift_up:.2f}): : {len(high_z_indices)}')
-            plt.scatter(m_b_low, color_index_bg_low, s=10, alpha=0.3, facecolors='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
-            plt.scatter(m_b_mid, color_index_bg_mid, s=10, alpha=0.3, facecolors='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}): {len(mid_z_indices)}')
+            plt.scatter(m_b_high, color_index_bg_high, s=10, edgecolors='black', facecolors='orange', label=f'High-z (z > {cluster_redshift_up:.2f}): : {len(high_z_indices)}')
+            plt.scatter(m_b_low, color_index_bg_low, s=10, edgecolors='black', facecolors='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
+            plt.scatter(m_b_mid, color_index_bg_mid, s=10, edgecolors='black', facecolors='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}): {len(mid_z_indices)}')
 
 
         #plt.ylim(-4.2, 3.8)
@@ -614,7 +640,7 @@ def main(args):
         print(f"Plot saved to '{out_file_cm_bg}'")        
 
         plt.figure(figsize=(8, 6))
-        plt.scatter(m_b, color_index_ub, s=5, alpha=0.10, color='blue', label='Galaxies')
+        plt.scatter(m_b[valid_flux], color_index_ub[valid_flux], s=5, alpha=0.10, color='blue', label='Galaxies')
         if args.plot_stars:
             plt.scatter(m_stars_b, color_ub_stars, s=5, alpha=0.10, color='red', label='Stars')
 
@@ -633,6 +659,20 @@ def main(args):
         plt.savefig(out_file_cm_ub, dpi=300)
         print(f"Plot saved to '{out_file_cm_ub}'")   
 
+    if True:
+        plt.figure(figsize=(8, 6))
+        plt.scatter(matched_data_b_valid[valid_flux]['FLUX_RADIUS'], m_b[valid_flux], s=5, alpha=0.3, color='blue', label="galaxies")
+        plt.scatter(matched_star_data_b[valid_flux_stars]['FLUX_RADIUS'], m_stars_b, s=5, alpha=0.3, color='red', label="stars")        
+        plt.xlim(0, 50)
+        plt.xlabel("Half-light radius")
+        plt.ylabel(f"$m_b$")
+        plt.title(f"{cluster_name}")
+        plt.gca().invert_yaxis()
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.5)
+        plt.savefig(size_mag_file, dpi=300)
+        print(f"Plot saved to '{size_mag_file}'")
+        plt.show()            
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Combine bands for a given cluster.")

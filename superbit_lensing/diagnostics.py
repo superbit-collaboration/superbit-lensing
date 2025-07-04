@@ -414,3 +414,257 @@ def combine_simulation_catalogs(base_path, output_file=None, start_sim=0, num_si
         print(f"Finished in {end_time - start_time:.2f} seconds")
     
     return mega_catalog
+
+def compute_metacal_quantities(mcal, qual_cuts, mcal_shear, shape_noise, cluster_redshift=None):
+    """
+    Compute metacalibration quantities for weak lensing analysis.
+    
+    Parameters
+    ----------
+    mcal : astropy.table.Table or similar
+        The metacal catalog containing galaxy measurements
+    qual_cuts : dict
+        Dictionary containing quality cuts with keys:
+        - 'min_Tpsf': minimum T/Tpsf ratio
+        - 'max_sn': maximum signal-to-noise
+        - 'min_sn': minimum signal-to-noise  
+        - 'min_T': minimum size T
+        - 'max_T': maximum size T
+        - 'admom_flag' (optional): required admom flag value
+        - 'min_admom_sigma' (optional): minimum admom sigma value
+    mcal_shear : float
+        The metacal shear value (typically 0.01)
+    shape_noise : float
+        The shape noise value
+    cluster_redshift : float, optional
+        Cluster redshift for background selection
+        
+    Returns
+    -------
+    selected : astropy.table.Table
+        The selected catalog with computed metacal quantities added as columns
+    """
+    
+    # Extract individual selection cuts
+    min_Tpsf = qual_cuts['min_Tpsf']
+    max_sn = qual_cuts['max_sn']
+    min_sn = qual_cuts['min_sn']
+    min_T = qual_cuts['min_T']
+    max_T = qual_cuts['max_T']
+    
+    # Extract optional admom cuts
+    admom_flag = qual_cuts.get('admom_flag', None)
+    min_admom_sigma = qual_cuts.get('min_admom_sigma', None)
+
+    if cluster_redshift is not None:
+        # Add in a little bit of a safety margin
+        min_redshift = float(cluster_redshift) + 0.025
+    else:
+        min_redshift = 0
+
+    cut_msg = (
+        f"#\n# cuts applied: Tpsf_ratio > {min_Tpsf:.2f}"
+        + f"\n# SN > {min_sn:.1f} T > {min_T:.2f}"
+        + f"\n# redshift = {min_redshift:.3f}"
+    )
+    if admom_flag is not None:
+        cut_msg += f"\n# admom_flag = {admom_flag}"
+    if min_admom_sigma is not None:
+        cut_msg += f"\n# admom_sigma > {min_admom_sigma:.2f}"
+    cut_msg += " \n#\n"
+    print(cut_msg)
+
+    # Apply selection cuts for different shear configurations
+    # Base selection for noshear
+    noshear_mask = (
+        (mcal['T_noshear'] >= min_Tpsf * mcal['Tpsf_noshear'])
+        & (mcal['T_noshear'] < max_T)
+        & (mcal['T_noshear'] >= min_T)
+        & (mcal['s2n_noshear'] > min_sn)
+        & (mcal['s2n_noshear'] < max_sn)
+        # Note: redshift cut commented out in original for noshear
+        & (mcal['redshift'] > min_redshift)
+    )
+    
+    # Add optional admom cuts for noshear (only applied here since admom columns don't have suffixes)
+    if admom_flag is not None:
+        noshear_mask &= (mcal['admom_flag'] == admom_flag)
+    if min_admom_sigma is not None:
+        noshear_mask &= (mcal['admom_sigma'] > min_admom_sigma)
+    
+    noshear_selection = mcal[noshear_mask]
+
+    # Selection for 1p shear
+    selection_1p = mcal[
+        (mcal['T_1p'] >= min_Tpsf * mcal['Tpsf_1p'])
+        & (mcal['T_1p'] <= max_T)
+        & (mcal['T_1p'] >= min_T)
+        & (mcal['s2n_1p'] > min_sn)
+        & (mcal['s2n_1p'] < max_sn)
+        & (mcal['redshift'] > min_redshift)
+    ]
+
+    # Selection for 1m shear
+    selection_1m = mcal[
+        (mcal['T_1m'] >= min_Tpsf * mcal['Tpsf_1m'])
+        & (mcal['T_1m'] <= max_T)
+        & (mcal['T_1m'] >= min_T)
+        & (mcal['s2n_1m'] > min_sn)
+        & (mcal['s2n_1m'] < max_sn)
+        & (mcal['redshift'] > min_redshift)
+    ]
+
+    # Selection for 2p shear
+    selection_2p = mcal[
+        (mcal['T_2p'] >= min_Tpsf * mcal['Tpsf_2p'])
+        & (mcal['T_2p'] <= max_T)
+        & (mcal['T_2p'] >= min_T)
+        & (mcal['s2n_2p'] > min_sn)
+        & (mcal['s2n_2p'] < max_sn)
+        & (mcal['redshift'] > min_redshift)
+    ]
+
+    # Selection for 2m shear
+    selection_2m = mcal[
+        (mcal['T_2m'] >= min_Tpsf * mcal['Tpsf_2m'])
+        & (mcal['T_2m'] <= max_T)
+        & (mcal['T_2m'] >= min_T)
+        & (mcal['s2n_2m'] > min_sn)
+        & (mcal['s2n_2m'] < max_sn)
+        & (mcal['redshift'] > min_redshift)
+    ]
+
+    # Compute response matrix components for gamma (shear response)
+    r11_gamma = (np.mean(noshear_selection['g_1p'][:, 0]) -
+                 np.mean(noshear_selection['g_1m'][:, 0])) / (2. * mcal_shear)
+    r22_gamma = (np.mean(noshear_selection['g_2p'][:, 1]) -
+                 np.mean(noshear_selection['g_2m'][:, 1])) / (2. * mcal_shear)
+    r12_gamma = (np.mean(noshear_selection['g_2p'][:, 0]) -
+                 np.mean(noshear_selection['g_2m'][:, 0])) / (2. * mcal_shear)
+    r21_gamma = (np.mean(noshear_selection['g_1p'][:, 1]) -
+                 np.mean(noshear_selection['g_1m'][:, 1])) / (2. * mcal_shear)
+
+    # Compute response matrix components for selection bias
+    r11_S = (np.mean(selection_1p['g_noshear'][:, 0]) -
+             np.mean(selection_1m['g_noshear'][:, 0])) / (2. * mcal_shear)
+    r22_S = (np.mean(selection_2p['g_noshear'][:, 1]) -
+             np.mean(selection_2m['g_noshear'][:, 1])) / (2. * mcal_shear)
+    r12_S = (np.mean(selection_2p['g_noshear'][:, 0]) -
+             np.mean(selection_2m['g_noshear'][:, 0])) / (2. * mcal_shear)
+    r21_S = (np.mean(selection_1p['g_noshear'][:, 1]) -
+             np.mean(selection_1m['g_noshear'][:, 1])) / (2. * mcal_shear)
+
+    # Compute PSF and gamma corrections
+    c1_psf = np.mean((noshear_selection['g_1p_psf'][:, 0] + noshear_selection['g_1m_psf'][:, 0])/2 - 
+                     noshear_selection['g_noshear'][:, 0])
+    c2_psf = np.mean((noshear_selection['g_2p_psf'][:, 1] + noshear_selection['g_2m_psf'][:, 1])/2 - 
+                     noshear_selection['g_noshear'][:, 1])
+    c1_gamma = np.mean((noshear_selection['g_1p'][:, 0] + noshear_selection['g_1m'][:, 0])/2 - 
+                       noshear_selection['g_noshear'][:, 0])
+    c2_gamma = np.mean((noshear_selection['g_2p'][:, 1] + noshear_selection['g_2m'][:, 1])/2 - 
+                       noshear_selection['g_noshear'][:, 1])
+
+    # Construct response matrices
+    R_gamma = np.array([
+        [r11_gamma, r12_gamma],
+        [r21_gamma, r22_gamma]
+    ])
+
+    R_S = np.array([
+        [r11_S, r12_S],
+        [r21_S, r22_S]
+    ])
+
+    # Compute the final response matrix
+    R = R_gamma + R_S
+    R_inv = np.linalg.inv(R)
+
+    # Correction vectors
+    c_psf = np.array([c1_psf, c2_psf])
+    c_gamma = np.array([c1_gamma, c2_gamma])
+    c_total = c_psf + c_gamma
+
+    # Print diagnostics
+    print("Gamma Response Matrix (R_gamma):")
+    print(R_gamma)
+    print("\nSelection Bias Response Matrix (R_S):")
+    print(R_S)
+    print("\nPSF Correction Vector (c_psf):")
+    print(c_psf)
+    print("\nGamma Correction Vector (c_gamma):")
+    print(c_gamma)
+    print(f'\n{len(noshear_selection)} objects passed selection criteria')
+    print(f'shape noise is {shape_noise}')
+
+    # Create a copy of the selected catalog to avoid modifying the original
+    selected = noshear_selection.copy()
+
+    # Get covariance and compute weights
+    g_cov_noshear = selected['g_cov_noshear']
+    
+    # Transform the covariance matrix
+    corrected_cov = np.einsum('ij,njk,lk->nil', R_inv, g_cov_noshear, R_inv)
+    
+    tot_covar = shape_noise + corrected_cov[:, 0, 0] + corrected_cov[:, 1, 1]
+    weight = 1. / tot_covar
+
+    # Compute per-object response values
+    try:
+        r11 = (selected['g_1p'][:, 0] - selected['g_1m'][:, 0]) / (2. * mcal_shear)
+        r12 = (selected['g_2p'][:, 0] - selected['g_2m'][:, 0]) / (2. * mcal_shear)
+        r21 = (selected['g_1p'][:, 1] - selected['g_1m'][:, 1]) / (2. * mcal_shear)
+        r22 = (selected['g_2p'][:, 1] - selected['g_2m'][:, 1]) / (2. * mcal_shear)
+        c1_psf_obj = ((selected['g_1p_psf'][:, 0] + selected['g_1m_psf'][:, 0])/2 - 
+                      selected['g_noshear'][:, 0])
+        c2_psf_obj = ((selected['g_2p_psf'][:, 1] + selected['g_2m_psf'][:, 1])/2 - 
+                      selected['g_noshear'][:, 1])
+        c1_gamma_obj = ((selected['g_1p'][:, 0] + selected['g_1m'][:, 0])/2 - 
+                        selected['g_noshear'][:, 0])
+        c2_gamma_obj = ((selected['g_2p'][:, 1] + selected['g_2m'][:, 1])/2 - 
+                        selected['g_noshear'][:, 1])
+
+        # Add per-object quantities to table
+        selected.add_columns(
+            [r11, r12, r21, r22, c1_gamma_obj, c2_gamma_obj, c1_psf_obj, c2_psf_obj],
+            names=['r11', 'r12', 'r21', 'r22', 'c1', 'c2', 'c1_psf', 'c2_psf']
+        )
+
+    except ValueError as e:
+        print('WARNING: mcal r{ij} value-added cols not added; ' +
+              'already present in catalog')
+
+    # Compute per-object metacal corrected shears
+    try:
+        R_obj = np.array([[r11, r12], [r21, r22]])
+        g1_MC = np.zeros_like(r11)
+        g2_MC = np.zeros_like(r22)
+
+        N = len(g1_MC)
+        for k in range(N):
+            Rinv = np.linalg.inv(R_obj[:, :, k])
+            gMC = np.dot(Rinv, selected[k]['g_noshear'])
+            g1_MC[k] = gMC[0]
+            g2_MC[k] = gMC[1]
+
+        selected.add_columns(
+            [g1_MC, g2_MC],
+            names=['g1_MC', 'g2_MC']
+        )
+
+    except ValueError as e:
+        print('WARNING: mcal g{1/2}_MC value-added cols not added; ' +
+              'already present in catalog')
+
+    # Apply bias corrections and response matrix
+    g_biased = selected['g_noshear'] - c_total  # Shape: (n, 2)
+    g_corrected = np.einsum('ij,nj->ni', R_inv, g_biased)  # Shape: (n, 2)
+
+    # Add final corrected quantities
+    selected['g1_Rinv'] = g_corrected[:, 0]
+    selected['g2_Rinv'] = g_corrected[:, 1]
+    selected['g_cov_Rinv'] = corrected_cov
+    selected['R11_S'] = r11_S
+    selected['R22_S'] = r22_S
+    selected['weight'] = weight
+
+    return selected

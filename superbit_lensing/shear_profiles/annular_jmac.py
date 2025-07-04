@@ -96,7 +96,7 @@ class ShearCalc():
 
         if apply_cut is True:
             wg = (g >= 0.)
-            nbad = len(wg[wg < 0])
+            nbad = np.sum(~wg)  # Count False values
             print(f'## {nbad} of {len(g)} galaxies removed due to |g| < 0')
         else:
             # do nothing
@@ -166,8 +166,8 @@ class Annular(object):
             self.y = tab[self.annular_info['xy_args'][1]]
             self.g1 = tab[self.annular_info['shear_args'][0]]
             self.g2 = tab[self.annular_info['shear_args'][1]]
-            self.ra = tab['ra']
-            self.dec = tab['dec']
+            #self.ra = tab['ra']
+            #self.dec = tab['dec']
             self.z = tab['redshift']
             self.weight = tab['weight']
 

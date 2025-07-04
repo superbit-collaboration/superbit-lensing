@@ -19,9 +19,11 @@ from reproject import reproject_interp
 import astropy.units as u
 from astropy.table import Table
 import random
+import os
 from superbit_lensing.match import SkyCoordMatcher
 import matplotlib.colors as colors
-from superbit_lensing.utils import build_clean_tan_wcs, read_ds9_ctr
+from matplotlib.path import Path
+from superbit_lensing.utils import build_clean_tan_wcs, read_ds9_ctr, get_cluster_info
 
 def plot_comparison(cat, 
                    reference_key, 
@@ -320,7 +322,7 @@ def plot_gridwise_residuals_vs_truth(g1_grid, g2_grid, g1_grid_truth, g2_grid_tr
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
-def plot_kappa_with_counts(kappa_file, count_file, figsize=(20, 16), vmin=-0.1, vmax=0.1, draw_rect=True, frac=0.25**0.5):
+def plot_kappa_with_counts(kappa_file, count_file, figsize=(20, 16), plot_title='Convergence (Kappa) with Galaxy Counts', vmin=-0.1, vmax=0.1, draw_rect=True, frac=0.25**0.5):
     # Load data from FITS files
     with fits.open(count_file) as hdul:
         count_data = hdul[0].data
@@ -357,7 +359,7 @@ def plot_kappa_with_counts(kappa_file, count_file, figsize=(20, 16), vmin=-0.1, 
         plt.gca().add_patch(rect)
 
     # Title and labels
-    plt.title('Convergence (Kappa) with Galaxy Counts', fontsize=12)
+    plt.title(plot_title, fontsize=12)
     plt.xlabel('X Pixel', fontsize=12)
     plt.ylabel('Y Pixel', fontsize=12)
     
@@ -730,6 +732,10 @@ class gtan_cross_1D:
         # resolution in pixels (arcmin to pixels)
         self.resolution_pix = int(np.ceil((resolution * 60) / pix_scale))
 
+    def create_gtan_gcross_col(self):
+        dx = self.x_col - self.x_c
+        dy = self.y_col - self.y_c        
+
     def create_g1_g2_grid(self):
         # Shift coordinates relative to center
         dx = self.x_col - self.x_c
@@ -1043,3 +1049,660 @@ class gtan_cross_1D:
         plt.show()
         
         return alpha, alpha_err, chi_sq
+
+class ClusterRedSequenceAnalysis:
+    """
+    Class to perform red sequence analysis and cluster member identification
+    for galaxy clusters.
+    """
+    
+    def __init__(self, cluster_name, datadir, delz=0.02):
+        """
+        Initialize the cluster analysis.
+        
+        Parameters:
+        -----------
+        cluster_name : str
+            Name of the cluster
+        datadir : str
+            Base directory containing cluster data
+        delz : float
+            Redshift tolerance for cluster membership (default: 0.02)
+        """
+        self.cluster_name = cluster_name
+        self.datadir = datadir
+        self.delz = delz
+        
+        # Initialize attributes that will be populated
+        self.ra_center = None
+        self.dec_center = None
+        self.cluster_redshift = None
+        self.cm_cat = None
+        self.red_sequence_mask = None
+        self.cluster_member_indices = None
+        
+    def load_data(self):
+        """
+        Load all necessary data for the cluster.
+        """
+        # Get cluster info
+        self.ra_center, self.dec_center, self.cluster_redshift = get_cluster_info(self.cluster_name)
+        
+        # Load catalog
+        base_path = os.path.join(self.datadir, self.cluster_name)
+        color_mag_file = os.path.join(self.datadir, 
+                                      f'{self.cluster_name}/sextractor_dualmode/out/{self.cluster_name}_colors_mags.fits')
+        
+        self.cm_cat = Table.read(color_mag_file)
+        
+        # Filter valid detections
+        valid = (self.cm_cat['FLUX_AUTO_b'] > 0) & \
+                (self.cm_cat["FLUX_AUTO_g"] > 0) & \
+                (self.cm_cat["FLUX_AUTO_u"] > 0)
+        self.cm_cat = self.cm_cat[valid]
+        
+        # Extract magnitudes and colors
+        self.m_b = self.cm_cat["m_b"]
+        self.m_g = self.cm_cat["m_g"]
+        self.color_index = self.cm_cat["color_bg"]
+        
+        # Process redshift data
+        self._process_redshift_data()
+        
+    def _process_redshift_data(self):
+        """Process redshift data and classify galaxies by redshift."""
+        z = self.cm_cat['Z_best']
+        z_matched = z[~np.isnan(z)]
+        matched_data_b_ned = self.cm_cat[~np.isnan(z)]
+        
+        # Redshift boundaries
+        self.cluster_redshift_up = self.cluster_redshift + self.delz
+        self.cluster_redshift_down = self.cluster_redshift - self.delz
+        
+        # Classify by redshift
+        high_z_indices = np.where(z_matched > self.cluster_redshift_up)[0]
+        low_z_indices = np.where(z_matched <= self.cluster_redshift_down)[0]
+        mid_z_indices = np.where((z_matched > self.cluster_redshift_down) & 
+                                (z_matched <= self.cluster_redshift_up))[0]
+        
+        # Extract data for each redshift class
+        self.high_z_b = matched_data_b_ned[high_z_indices]
+        self.low_z_b = matched_data_b_ned[low_z_indices]
+        self.mid_z_b = matched_data_b_ned[mid_z_indices]
+        
+        print(f"Galaxies with z > {self.cluster_redshift_up:0.2f}: {len(high_z_indices)}")
+        print(f'Galaxies with {self.cluster_redshift_down:0.2f} < z ≤ {self.cluster_redshift_up:0.2f}: {len(mid_z_indices)}')
+        print(f"Galaxies with z ≤ {self.cluster_redshift_down:0.2f}: {len(low_z_indices)}")
+        
+        # Store colors and magnitudes for each class
+        self.color_index_high = self.high_z_b["color_bg"]
+        self.m_b_high = self.high_z_b["m_b"]
+        self.color_index_mid = self.mid_z_b["color_bg"]
+        self.m_b_mid = self.mid_z_b["m_b"]
+        self.color_index_low = self.low_z_b["color_bg"]
+        self.m_b_low = self.low_z_b["m_b"]
+        
+    def compute_red_sequence(self, a=0.0, b=1.55, tolerance=0.1, resolution=0.5, sigma=1.5, save_path=None):
+        """
+        Compute the red sequence mask.
+        
+        Parameters:
+        -----------
+        a : float
+            Slope of red sequence line
+        b : float
+            Intercept of red sequence line
+        tolerance : float
+            Tolerance for red sequence selection
+        """
+        self.a = a
+        self.b = b
+        self.tolerance = tolerance
+        
+        # Get RA/Dec boundaries
+        self.ra_max = np.max(self.cm_cat["ra"])
+        self.ra_min = np.min(self.cm_cat["ra"])
+        self.dec_max = np.max(self.cm_cat["dec"])
+        self.dec_min = np.min(self.cm_cat["dec"])
+        self.ra_center_inverted = self.ra_max + self.ra_min - self.ra_center
+        
+        # Compute red sequence mask
+        predicted_color = self.a * self.m_b + self.b
+        self.red_sequence_mask = np.abs(self.color_index - predicted_color) < self.tolerance
+        print(f"Number of objects in the red sequence: {np.sum(self.red_sequence_mask)}")
+        
+        # Extract red sequence galaxy positions
+        self.ra_red = self.cm_cat["ra"][self.red_sequence_mask]
+        self.dec_red = self.cm_cat["dec"][self.red_sequence_mask]
+
+        self.create_density_map(resolution=resolution, sigma=sigma)
+        self.plot_red_sequence_analysis(save_path=save_path)
+        
+    def create_density_map(self, resolution=0.5, sigma=1.5):
+        """
+        Create smoothed density map of red sequence galaxies.
+        
+        Parameters:
+        -----------
+        resolution : float
+            Spatial resolution in arcmin
+        sigma : float
+            Gaussian smoothing kernel size
+        """
+        self.resolution = resolution
+        self.sigma = sigma
+        
+        # Define RA and Dec boundaries
+        n_bins_ra = int(np.ceil((self.ra_max - self.ra_min) * 60 / resolution))
+        n_bins_dec = int(np.ceil((self.dec_max - self.dec_min) * 60 / resolution))
+        
+        # Create the 2D histogram
+        self.hist, self.xedges, self.yedges = np.histogram2d(
+            self.ra_red, self.dec_red, bins=[n_bins_ra, n_bins_dec]
+        )
+        
+        # Apply Gaussian smoothing
+        self.smoothed_hist = gaussian_filter(self.hist, sigma=sigma)
+        
+    def plot_red_sequence_analysis(self, save_path=None):
+        """Plot the red sequence analysis with spatial distribution."""
+        # Create side-by-side plots
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+        
+        # First plot: Color-Magnitude Diagram
+        axes[0].scatter(self.m_b, self.color_index, s=5, alpha=0.1, color='blue', label="All Galaxies")
+        axes[0].scatter(self.m_b[self.red_sequence_mask], self.color_index[self.red_sequence_mask], 
+                       s=15, color='red', edgecolors='black', label="Red Sequence Galaxies")
+        m_b_range = np.linspace(min(self.m_b), max(self.m_b), 100)
+        axes[0].plot(m_b_range, self.a * m_b_range + self.b, color='red', linestyle='--', 
+                    label=f"red-seq line, $m_b - m_g$ = {self.b}")
+        axes[0].scatter(self.m_b_high, self.color_index_high, s=12, edgecolors='black', 
+                       facecolors='orange', label=f'High-z (z > {self.cluster_redshift_up:.2f})')
+        axes[0].scatter(self.m_b_mid, self.color_index_mid, s=12, edgecolors='black', 
+                       facecolors='lime', label=f'Members ({self.cluster_redshift_down:.2f} < z ≤ {self.cluster_redshift_up:.2f})')
+        axes[0].scatter(self.m_b_low, self.color_index_low, s=12, edgecolors='black', 
+                       facecolors='red', label=f'Low-z (z ≤ {self.cluster_redshift_down:.2f})')
+        axes[0].set_xlabel(r"$m_b$")
+        axes[0].set_ylabel(r"$m_b - m_g$")
+        axes[0].set_title(f"Red Sequence in {self.cluster_name}")
+        axes[0].legend()
+        axes[0].grid(True, linestyle='--', alpha=0.5)
+        
+        # Second plot: Spatial distribution of red-sequence galaxies
+        im = axes[1].imshow(self.smoothed_hist.T[:, ::-1], origin='lower', aspect='auto', cmap='magma',
+                           extent=[self.ra_max, self.ra_min, self.dec_min, self.dec_max])
+        axes[1].scatter(self.ra_center_inverted, self.dec_center, color='lime', marker='x', 
+                       s=50, label="X-ray Center")
+        axes[1].set_xlabel("Right Ascension (deg)")
+        axes[1].set_ylabel("Declination (deg)")
+        axes[1].set_title(f"Resolution: {self.resolution} arcmin, kernel: {self.sigma}")
+        axes[1].legend()
+        fig.colorbar(im, ax=axes[1], label="Count")
+        n_red_seq = np.sum(self.red_sequence_mask)
+        fig.suptitle(f"Red Sequence Evolution (b = {self.b:.1f}, {n_red_seq} galaxies selected)", 
+                    fontsize=16)
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"Saved red sequence analysis plot to: {save_path}")
+                
+        plt.show()
+        
+    def identify_cluster_members(self, percentiles=[85, 98], sigma_smooth=2.5, save_path=None):
+        """
+        Identify cluster members using contour selection.
+        
+        Parameters:
+        -----------
+        percentiles : list
+            Percentile levels for contour selection
+        sigma_smooth : float
+            Smoothing kernel for contour finding (can be different from density map)
+            
+        Returns:
+        --------
+        cluster_catalog : astropy.table.Table
+            Catalog of identified cluster member galaxies
+        """
+        # Re-smooth if different sigma requested
+        if sigma_smooth != self.sigma:
+            smoothed_for_contours = gaussian_filter(self.hist, sigma=sigma_smooth)
+        else:
+            smoothed_for_contours = self.smoothed_hist
+            
+        # Find contour levels
+        contour_levels = [np.percentile(smoothed_for_contours[smoothed_for_contours > 0], p) 
+                         for p in percentiles]
+        
+        # Create meshgrid for contour finding
+        X, Y = np.meshgrid(self.xedges[:-1], self.yedges[:-1])
+        
+        # Create figure (only spatial plot)
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+        
+        # Spatial distribution with contours
+        im = ax.imshow(smoothed_for_contours.T[:, ::-1], origin='lower', aspect='auto', cmap='magma',
+                      extent=[self.ra_max, self.ra_min, self.dec_min, self.dec_max])
+        
+        # Draw contours
+        cs = ax.contour(X, Y, smoothed_for_contours.T, levels=contour_levels, 
+                       colors=['cyan', 'yellow'], linewidths=2)
+        
+        # Find galaxies within the highest density contour
+        innermost_contour = cs.collections[-1].get_paths()[0]
+        contour_polygon = Path(innermost_contour.vertices)
+        
+        # Check which red sequence galaxies are inside this contour
+        points = np.column_stack((self.ra_red, self.dec_red))
+        inside_contour = contour_polygon.contains_points(points)
+        
+        # Get cluster member indices
+        self.cluster_member_indices = np.where(self.red_sequence_mask)[0][inside_contour]
+        n_cluster_members = len(self.cluster_member_indices)
+        
+        # Plot cluster members
+        ax.scatter(self.ra_red[inside_contour], self.dec_red[inside_contour], 
+                  color='yellow', s=30, edgecolors='black', 
+                  label=f"Cluster Members (n={n_cluster_members})")
+        ax.scatter(self.ra_red[~inside_contour], self.dec_red[~inside_contour], 
+                  color='red', s=10, alpha=0.5, label="Red Seq (field)")
+        
+        ax.set_xlabel("Right Ascension (deg)")
+        ax.set_ylabel("Declination (deg)")
+        ax.set_title(f"Cluster Members (within {percentiles[-1]}% density contour)")
+        ax.legend()
+        fig.colorbar(im, ax=ax, label="Count")
+        
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"Saved cluster member identification plot to: {save_path}")
+        
+        plt.show()
+        
+        # Print summary
+        print(f"\nCluster Member Selection Summary:")
+        print(f"================================")
+        print(f"Total red sequence galaxies: {np.sum(self.red_sequence_mask)}")
+        print(f"Galaxies within cluster contour: {n_cluster_members}")
+        print(f"Fraction in cluster: {n_cluster_members/np.sum(self.red_sequence_mask)*100:.1f}%")
+        
+        # Return cluster member catalog
+        cluster_catalog = self.cm_cat[self.cluster_member_indices]
+        return cluster_catalog
+    
+    def save_cluster_catalog(self, output_path, format='fits'):
+        """
+        Save the cluster member catalog to disk.
+        
+        Parameters:
+        -----------
+        output_path : str
+            Path where to save the catalog
+        format : str
+            Format for saving ('fits', 'csv', 'ascii', etc.)
+        """
+        if self.cluster_member_indices is None:
+            print("No cluster members identified yet. Run identify_cluster_members() first.")
+            return
+        
+        cluster_catalog = self.cm_cat[self.cluster_member_indices]
+        
+        # Add a column to mark these as cluster members
+        cluster_catalog['is_cluster_member'] = True
+        
+        # Save the catalog
+        cluster_catalog.write(output_path, format=format, overwrite=True)
+        print(f"Saved cluster member catalog to: {output_path}")
+        print(f"Total cluster members saved: {len(cluster_catalog)}")
+        
+    def update_original_catalog(self):
+        """
+        Update the original color_mag_file with cluster membership information.
+        This overwrites the original file with the new columns added.
+        """
+        if self.cluster_member_indices is None:
+            print("No cluster members identified yet. Run identify_cluster_members() first.")
+            return
+        
+        # Path to original file
+        original_file = os.path.join(self.datadir, 
+                                    f'{self.cluster_name}/sextractor_dualmode/out/{self.cluster_name}_colors_mags.fits')
+        
+        # Create backup first
+        backup_file = original_file.replace('.fits', '_backup.fits')
+        if not os.path.exists(backup_file):
+            import shutil
+            shutil.copy2(original_file, backup_file)
+            print(f"Created backup: {backup_file}")
+        
+        # Read the original full catalog (before any filtering)
+        full_catalog = Table.read(original_file)
+        
+        # Initialize new columns
+        full_catalog['is_cluster_member'] = False
+        full_catalog['is_red_sequence'] = False
+        
+        # Find which indices in the full catalog correspond to our filtered catalog
+        # Match based on multiple columns to ensure correct identification
+        for idx, obj in enumerate(self.cm_cat):
+            mask = (full_catalog['ra'] == obj['ra']) & \
+                   (full_catalog['dec'] == obj['dec']) & \
+                   (full_catalog['id'] == obj['id'])
+            
+            if np.sum(mask) == 1:  # Unique match found
+                full_idx = np.where(mask)[0][0]
+                
+                # Mark if red sequence
+                if self.red_sequence_mask[idx]:
+                    full_catalog['is_red_sequence'][full_idx] = True
+                
+                # Mark if cluster member
+                if idx in self.cluster_member_indices:
+                    full_catalog['is_cluster_member'][full_idx] = True
+        
+        # Save the updated catalog
+        full_catalog.write(original_file, format='fits', overwrite=True)
+        print(f"Updated original catalog: {original_file}")
+        print(f"Total red sequence galaxies marked: {np.sum(full_catalog['is_red_sequence'])}")
+        print(f"Total cluster members marked: {np.sum(full_catalog['is_cluster_member'])}")
+        
+    def get_cluster_catalog(self):
+        """
+        Get the catalog of identified cluster members.
+        
+        Returns:
+        --------
+        cluster_catalog : astropy.table.Table or None
+            Catalog of cluster members if identified, None otherwise
+        """
+        if self.cluster_member_indices is not None:
+            return self.cm_cat[self.cluster_member_indices]
+        else:
+            print("No cluster members identified yet. Run identify_cluster_members() first.")
+            return None
+
+
+from matplotlib.widgets import Slider, Button
+from scipy.ndimage import gaussian_filter
+from matplotlib.path import Path
+from IPython.display import display
+import ipywidgets as widgets
+from IPython.display import clear_output
+
+class InteractiveRedSequenceAnalysis:
+    """
+    Interactive version of ClusterRedSequenceAnalysis that allows
+    real-time adjustment of red sequence parameters.
+    """
+    
+    def __init__(self, analyzer):
+        """
+        Initialize with an existing ClusterRedSequenceAnalysis instance.
+        
+        Parameters:
+        -----------
+        analyzer : ClusterRedSequenceAnalysis
+            An instance that has already loaded data
+        """
+        self.analyzer = analyzer
+        self.current_b = 1.55
+        self.current_a = 0.0
+        self.current_tolerance = 0.1
+        
+    def interactive_matplotlib(self, b_range=(1.0, 2.0), tolerance_range=(0.05, 0.3)):
+        """
+        Create an interactive plot using matplotlib sliders.
+        """
+        # Initial computation
+        self.analyzer.compute_red_sequence(a=self.current_a, b=self.current_b, 
+                                         tolerance=self.current_tolerance)
+        self.analyzer.create_density_map(resolution=0.5, sigma=1.5)
+        
+        # Create figure
+        fig = plt.figure(figsize=(16, 10))
+        
+        # Create grid for subplots and sliders
+        gs = fig.add_gridspec(3, 2, height_ratios=[8, 1, 1], hspace=0.3)
+        ax1 = fig.add_subplot(gs[0, 0])
+        ax2 = fig.add_subplot(gs[0, 1])
+        ax_slider_b = fig.add_subplot(gs[1, :])
+        ax_slider_tol = fig.add_subplot(gs[2, :])
+        
+        # Create sliders
+        slider_b = Slider(ax_slider_b, 'Red Sequence b', b_range[0], b_range[1], 
+                         valinit=self.current_b, valstep=0.01)
+        slider_tol = Slider(ax_slider_tol, 'Tolerance', tolerance_range[0], 
+                           tolerance_range[1], valinit=self.current_tolerance, valstep=0.01)
+        
+        def update(val):
+            # Clear axes
+            ax1.clear()
+            ax2.clear()
+            
+            # Update parameters
+            self.current_b = slider_b.val
+            self.current_tolerance = slider_tol.val
+            
+            # Recompute red sequence
+            self.analyzer.compute_red_sequence(a=self.current_a, b=self.current_b, 
+                                             tolerance=self.current_tolerance)
+            self.analyzer.create_density_map(resolution=0.5, sigma=1.5)
+            
+            # Plot Color-Magnitude Diagram
+            ax1.scatter(self.analyzer.m_b, self.analyzer.color_index, s=5, alpha=0.1, 
+                       color='blue', label="All Galaxies")
+            ax1.scatter(self.analyzer.m_b[self.analyzer.red_sequence_mask], 
+                       self.analyzer.color_index[self.analyzer.red_sequence_mask], 
+                       s=15, color='red', edgecolors='black', label="Red Sequence")
+            
+            m_b_range = np.linspace(min(self.analyzer.m_b), max(self.analyzer.m_b), 100)
+            ax1.plot(m_b_range, self.current_a * m_b_range + self.current_b, 
+                    color='red', linestyle='--', linewidth=2)
+            
+            # Show tolerance bands
+            ax1.fill_between(m_b_range, 
+                           self.current_a * m_b_range + self.current_b - self.current_tolerance,
+                           self.current_a * m_b_range + self.current_b + self.current_tolerance,
+                           color='red', alpha=0.2, label='Tolerance band')
+            
+            ax1.set_xlabel(r"$m_b$")
+            ax1.set_ylabel(r"$m_b - m_g$")
+            ax1.set_title(f"Red Sequence (b={self.current_b:.2f}, tol={self.current_tolerance:.2f})")
+            ax1.legend()
+            ax1.grid(True, alpha=0.3)
+            
+            # Plot spatial distribution
+            im = ax2.imshow(self.analyzer.smoothed_hist.T[:, ::-1], origin='lower', 
+                           aspect='auto', cmap='magma',
+                           extent=[self.analyzer.ra_max, self.analyzer.ra_min, 
+                                  self.analyzer.dec_min, self.analyzer.dec_max])
+            
+            # Find and draw contours
+            percentiles = [85, 95]
+            contour_levels = [np.percentile(self.analyzer.smoothed_hist[self.analyzer.smoothed_hist > 0], p) 
+                             for p in percentiles]
+            X, Y = np.meshgrid(self.analyzer.xedges[:-1], self.analyzer.yedges[:-1])
+            cs = ax2.contour(X, Y, self.analyzer.smoothed_hist.T, levels=contour_levels, 
+                            colors=['cyan', 'yellow'], linewidths=2)
+            
+            ax2.set_xlabel("Right Ascension (deg)")
+            ax2.set_ylabel("Declination (deg)")
+            n_red = np.sum(self.analyzer.red_sequence_mask)
+            ax2.set_title(f"Spatial Distribution ({n_red} red sequence galaxies)")
+            
+            plt.draw()
+        
+        # Connect slider to update function
+        slider_b.on_changed(update)
+        slider_tol.on_changed(update)
+        
+        # Initial plot
+        update(None)
+        
+        plt.show()
+        
+    def interactive_jupyter(self, b_range=(1.0, 2.0), tolerance_range=(0.05, 0.3), 
+                          percentiles=[85, 95], sigma_smooth=2.5):
+        """
+        Create an interactive widget for Jupyter notebooks using ipywidgets.
+        """
+        # Create widgets
+        b_slider = widgets.FloatSlider(
+            value=self.current_b,
+            min=b_range[0],
+            max=b_range[1],
+            step=0.01,
+            description='b value:',
+            continuous_update=False
+        )
+        
+        tolerance_slider = widgets.FloatSlider(
+            value=self.current_tolerance,
+            min=tolerance_range[0],
+            max=tolerance_range[1],
+            step=0.01,
+            description='Tolerance:',
+            continuous_update=False
+        )
+        
+        update_button = widgets.Button(description="Identify Cluster Members")
+        
+        output = widgets.Output()
+        
+        def update_plots(change):
+            with output:
+                clear_output(wait=True)
+                
+                # Update parameters
+                self.current_b = b_slider.value
+                self.current_tolerance = tolerance_slider.value
+                
+                # Recompute
+                self.analyzer.compute_red_sequence(a=self.current_a, b=self.current_b, 
+                                                 tolerance=self.current_tolerance)
+                self.analyzer.create_density_map(resolution=0.5, sigma=1.5)
+                
+                # Create plots
+                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+                
+                # CMD plot
+                ax1.scatter(self.analyzer.m_b, self.analyzer.color_index, s=5, alpha=0.1, 
+                           color='blue', label="All Galaxies")
+                ax1.scatter(self.analyzer.m_b[self.analyzer.red_sequence_mask], 
+                           self.analyzer.color_index[self.analyzer.red_sequence_mask], 
+                           s=15, color='red', edgecolors='black', label="Red Sequence")
+                
+                m_b_range = np.linspace(min(self.analyzer.m_b), max(self.analyzer.m_b), 100)
+                ax1.plot(m_b_range, self.current_a * m_b_range + self.current_b, 
+                        color='red', linestyle='--', linewidth=2)
+                ax1.fill_between(m_b_range, 
+                               self.current_a * m_b_range + self.current_b - self.current_tolerance,
+                               self.current_a * m_b_range + self.current_b + self.current_tolerance,
+                               color='red', alpha=0.2, label='Tolerance band')
+                
+                ax1.set_xlabel(r"$m_b$")
+                ax1.set_ylabel(r"$m_b - m_g$")
+                ax1.set_title(f"Red Sequence Selection")
+                ax1.legend()
+                ax1.grid(True, alpha=0.3)
+                
+                # Spatial plot with contours
+                im = ax2.imshow(self.analyzer.smoothed_hist.T[:, ::-1], origin='lower', 
+                               aspect='auto', cmap='magma',
+                               extent=[self.analyzer.ra_max, self.analyzer.ra_min, 
+                                      self.analyzer.dec_min, self.analyzer.dec_max])
+                
+                # Add contours
+                contour_levels = [np.percentile(self.analyzer.smoothed_hist[self.analyzer.smoothed_hist > 0], p) 
+                                 for p in percentiles]
+                X, Y = np.meshgrid(self.analyzer.xedges[:-1], self.analyzer.yedges[:-1])
+                cs = ax2.contour(X, Y, self.analyzer.smoothed_hist.T, levels=contour_levels, 
+                                colors=['cyan', 'yellow'], linewidths=2)
+                
+                ax2.set_xlabel("Right Ascension (deg)")
+                ax2.set_ylabel("Declination (deg)")
+                n_red = np.sum(self.analyzer.red_sequence_mask)
+                ax2.set_title(f"Spatial Distribution ({n_red} galaxies)")
+                plt.colorbar(im, ax=ax2, label="Count")
+                
+                fig.suptitle(f"b = {self.current_b:.2f}, tolerance = {self.current_tolerance:.2f}")
+                plt.tight_layout()
+                plt.show()
+                
+                # Print statistics
+                print(f"Red sequence galaxies: {n_red}")
+                print(f"Parameters: b={self.current_b:.2f}, tolerance={self.current_tolerance:.2f}")
+        
+        def identify_members(b):
+            with output:
+                print("\n" + "="*50)
+                print("Identifying cluster members with current parameters...")
+                
+                # Re-smooth for contour finding if needed
+                smoothed_for_contours = gaussian_filter(self.analyzer.hist, sigma=sigma_smooth)
+                
+                # Find contour levels
+                contour_levels = [np.percentile(smoothed_for_contours[smoothed_for_contours > 0], p) 
+                                 for p in percentiles]
+                
+                # Create meshgrid
+                X, Y = np.meshgrid(self.analyzer.xedges[:-1], self.analyzer.yedges[:-1])
+                
+                # Find contours (matplotlib contour finding)
+                fig_temp, ax_temp = plt.subplots()
+                cs = ax_temp.contour(X, Y, smoothed_for_contours.T, levels=contour_levels)
+                plt.close(fig_temp)
+                
+                # Get innermost contour
+                innermost_contour = cs.collections[-1].get_paths()[0]
+                contour_polygon = Path(innermost_contour.vertices)
+                
+                # Check which galaxies are inside
+                points = np.column_stack((self.analyzer.ra_red, self.analyzer.dec_red))
+                inside_contour = contour_polygon.contains_points(points)
+                
+                cluster_member_indices = np.where(self.analyzer.red_sequence_mask)[0][inside_contour]
+                n_members = len(cluster_member_indices)
+                
+                print(f"Cluster members identified: {n_members}")
+                print(f"Fraction of red sequence: {n_members/np.sum(self.analyzer.red_sequence_mask)*100:.1f}%")
+                
+                # Show final plot
+                fig, ax = plt.subplots(figsize=(8, 6))
+                im = ax.imshow(smoothed_for_contours.T[:, ::-1], origin='lower', 
+                              aspect='auto', cmap='magma',
+                              extent=[self.analyzer.ra_max, self.analyzer.ra_min, 
+                                     self.analyzer.dec_min, self.analyzer.dec_max])
+                
+                cs = ax.contour(X, Y, smoothed_for_contours.T, levels=contour_levels, 
+                               colors=['cyan', 'yellow'], linewidths=2)
+                
+                ax.scatter(self.analyzer.ra_red[inside_contour], 
+                          self.analyzer.dec_red[inside_contour], 
+                          color='yellow', s=30, edgecolors='black', 
+                          label=f"Cluster Members (n={n_members})")
+                ax.scatter(self.analyzer.ra_red[~inside_contour], 
+                          self.analyzer.dec_red[~inside_contour], 
+                          color='red', s=10, alpha=0.5, label="Red Seq (field)")
+                
+                ax.set_xlabel("Right Ascension (deg)")
+                ax.set_ylabel("Declination (deg)")
+                ax.set_title(f"Final Cluster Selection")
+                ax.legend()
+                plt.colorbar(im, ax=ax, label="Count")
+                plt.show()
+        
+        # Connect events
+        b_slider.observe(update_plots, names='value')
+        tolerance_slider.observe(update_plots, names='value')
+        update_button.on_click(identify_members)
+        
+        # Create layout
+        controls = widgets.VBox([b_slider, tolerance_slider, update_button])
+        
+        # Initial plot
+        update_plots(None)
+        
+        # Display
+        display(controls, output)

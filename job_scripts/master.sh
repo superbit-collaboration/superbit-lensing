@@ -4,8 +4,11 @@
 source "./config.sh"
 
 # Submit first job and capture its ID
-JOBID1=$(sbatch ./scripts/make_meds.sh | awk '{print $4}')
+# Submit color_color_run.sh first
 JOBID_CC=$(sbatch ./scripts/color_color_run.sh | awk '{print $4}')
+
+# Submit make_meds.sh only after color_color_run.sh completes successfully
+JOBID1=$(sbatch --dependency=afterok:$JOBID_CC ./scripts/make_meds.sh | awk '{print $4}')
 
 # Define variables
 base_arraroutdir="${DATADIR}/${cluster_name}/${band_name}/arr/run"

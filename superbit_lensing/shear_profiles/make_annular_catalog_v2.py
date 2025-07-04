@@ -116,7 +116,7 @@ class AnnularCatalog():
 
         return
 
-    def match_and_merge_color_mag(self, selected_catalog, color_mag_file, tolerance_deg=1e-4):
+    def match_and_merge_color_mag(self, selected_catalog, color_mag_file, tolerance_deg=5e-5, idx_matcher=False):
         """
         Match selected catalog with color magnitude catalog by position and ID,
         then merge color/magnitude columns into the selected catalog.
@@ -158,13 +158,19 @@ class AnnularCatalog():
         idx1 = np.array(idx1)
         idx2 = np.array(idx2)
 
-        # Further filter to keep only matches where IDs are equal
-        id_match_mask = (matched_selected['id'] == matched_color_mag['id'])
-        valid_idx1 = idx1[id_match_mask]
-        valid_idx2 = idx2[id_match_mask]
-        
-        print(f"  Valid ID matches: {len(valid_idx1)}")
-        print(f"  Filtered out (position match but ID mismatch): {len(idx1) - len(valid_idx1)}")
+        if idx_matcher:
+            # Further filter to keep only matches where IDs are equal
+            id_match_mask = (matched_selected['id'] == matched_color_mag['id'])
+            valid_idx1 = idx1[id_match_mask]
+            valid_idx2 = idx2[id_match_mask]
+            
+            print(f"  Valid ID matches: {len(valid_idx1)}")
+            print(f"  Filtered out (position match but ID mismatch): {len(idx1) - len(valid_idx1)}")
+        else:
+            # Use all position matches without ID filtering
+            valid_idx1 = idx1
+            valid_idx2 = idx2
+            print(f"  Using all position matches (ID matching disabled)")
         
         # Columns to fetch from color_mag
         columns_to_add = ['m_b', 'm_b_err', 'm_g', 'm_g_err', 'm_u', 'm_u_err', 
@@ -376,7 +382,7 @@ class AnnularCatalog():
         for key, val in self.config['mcal_cuts'].items():
             self.selected.meta[key] = val
 
-        self.selected = self.match_and_merge_color_mag(self.selected, color_mag_file, tolerance_deg=1e-4)       
+        self.selected = self.match_and_merge_color_mag(self.selected, color_mag_file, tolerance_deg=5e-5, idx_matcher=False)       
 
         self.selected.write(self.outfile, format='fits', overwrite=overwrite)
         print("==Some Stats==\n")

@@ -128,6 +128,7 @@ class truth():
         self.n = 0.0
         self.hlr = 0.0
         self.scale_h_over_r = 0.0
+        self.flux = 0.0
 
 def nfw_lensing(nfw_halo, pos, nfw_z_source):
     """
@@ -1507,7 +1508,10 @@ def main(args):
 
                     with fits.open(truth_file_name, mode='update') as handle:
                         handle[0].header['psf_pkl'] = psf_outfile
-
+                        handle[0].header['NFW_XCENTER'] = full_image.true_center.x
+                        handle[0].header['NFW_YCENTER'] = full_image.true_center.y
+                        handle[0].header['nfw_halo_mass'] = sbparams.mass
+                        handle[0].header['nfw_halo_z'] = sbparams.nfw_z_halo
                 except OSError as e:
                     logprint(f'OSError: {e}')
                     raise e

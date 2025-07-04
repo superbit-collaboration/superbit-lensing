@@ -85,8 +85,8 @@ def main(cluster_name, band, datadir, save_union_catalog, mag_low, mag_high, rad
     # Plot the filtered catalog
     plt.figure(figsize=(8, 6))
     plt.scatter(flux_radius_filtered, mag_calc, s=5, alpha=0.3, color='blue', label="Original Data")
-    plt.scatter(union_flux_radius, union_mag, s=5, alpha=0.3, color='red', label="Union Catalog")
-    plt.scatter(gaia_cat["FLUX_RADIUS"], gaia_cat["MAG_AUTO"], s=5, alpha=0.3, color='green', label="Gaia Catalog")
+    #plt.scatter(union_flux_radius, union_mag, s=5, alpha=0.3, color='red', label="Union Catalog")
+    plt.scatter(gaia_cat["FLUX_RADIUS"], gaia_cat["MAG_AUTO"], s=5, alpha=0.3, color='red', label="Gaia Catalog")
     plt.axvline(x=radius_low, color='red', linestyle='--', label=f'Half-light radius={radius_low}')
     plt.axhline(y=mag_high, color='green', linestyle='--', label=f'Magnitude={mag_high}')
     plt.axhline(y=mag_low, color='orange', linestyle='--', label=f'Magnitude={mag_low}')

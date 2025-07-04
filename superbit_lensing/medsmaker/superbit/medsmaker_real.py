@@ -42,7 +42,6 @@ class BITMeasurement():
         self.ext_header = ext_header
         self.band = band
         self.detection_bandpass = detection_bandpass
-        self.exposure_mask_fname = "/projects/mccleary_group/superbit/union/masks/mask_dark_55percent_300.npy" 
 
         self.image_cats = []
         self.detect_img_path = None
@@ -60,6 +59,9 @@ class BITMeasurement():
         # Set up base (code) directory
         filepath = Path(os.path.realpath(__file__))
         self.base_dir = filepath.parents[1]
+
+        project_root = filepath.parents[3]  # This points to superbit-lensing/
+        self.exposure_mask_fname = str(project_root / "data" / "masks" / "mask_dark_55percent_300.npy")
 
         # If desired, set a tmp output directory
         self._set_work_dir(work_dir)
@@ -482,7 +484,7 @@ class BITMeasurement():
             weight_file=self.coadd_img_file,
             cat_dir=coadd_dir,
             config_dir=config_dir, 
-            back_type='AUTO'
+            back_type='MANUAL'
         )
 
         try:
@@ -888,7 +890,10 @@ class BITMeasurement():
                                 )
 
             og_len = len(ss); ss = ss[matches]
-            wg_stars = (ss['SNR_WIN'] > star_config['MIN_SNR'])
+            if self.gaia_query_happened:
+                wg_stars = (ss['SNR_WIN'] > star_config['MIN_SNR']) & (ss['MAG_AUTO'] > 16)
+            else:
+                wg_stars = (ss['SNR_WIN'] > star_config['MIN_SNR'])
 
             self.logprint(f'{len(dist)}/{og_len} objects ' +
                           'matched to reference (truth) star catalog \n' +
