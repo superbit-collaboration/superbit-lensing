@@ -56,7 +56,7 @@ def sim_func(g1, g2, sigma=1.0, flux=1.0, psf_sigma=0.5, nse_sd = 1e-5,  type='e
 
     # Convolve with PSF
     if exp == 'ideal':
-        psf = galsim.Gaussian(sigma=psf_sigma)
+        psf = galsim.Gaussian(sigma=psf_sigma).shear(g1=-0.09190977, g2=0.03838577)
         obj = galsim.Convolve(sheared_gal, psf)
 
         # Draw images

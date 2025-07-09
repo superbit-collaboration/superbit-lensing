@@ -1056,7 +1056,7 @@ class ClusterRedSequenceAnalysis:
     for galaxy clusters.
     """
     
-    def __init__(self, cluster_name, datadir, delz=0.02):
+    def __init__(self, cluster_name, datadir=None, datafilename=None, delz=0.02):
         """
         Initialize the cluster analysis.
         
@@ -1069,8 +1069,11 @@ class ClusterRedSequenceAnalysis:
         delz : float
             Redshift tolerance for cluster membership (default: 0.02)
         """
+        if datafilename is None and datadir is None:
+            raise ValueError("Either datafilename or datadir must be provided.")        
         self.cluster_name = cluster_name
         self.datadir = datadir
+        self.datafilename = datafilename
         self.delz = delz
         
         # Initialize attributes that will be populated
@@ -1089,9 +1092,13 @@ class ClusterRedSequenceAnalysis:
         self.ra_center, self.dec_center, self.cluster_redshift = get_cluster_info(self.cluster_name)
         
         # Load catalog
-        base_path = os.path.join(self.datadir, self.cluster_name)
-        color_mag_file = os.path.join(self.datadir, 
-                                      f'{self.cluster_name}/sextractor_dualmode/out/{self.cluster_name}_colors_mags.fits')
+        if self.datafilename is not None:
+            color_mag_file = self.datafilename
+        else:
+            color_mag_file = os.path.join(
+                self.datadir, 
+                f'{self.cluster_name}/sextractor_dualmode/out/{self.cluster_name}_colors_mags.fits'
+            )
         
         self.cm_cat = Table.read(color_mag_file)
         
