@@ -63,6 +63,7 @@ def make_redshift_catalog(datadir, target, band, detect_cat_path, tolerance_deg=
         for attempt in range(max_attempts):
             try:
                 print(f"Attempting NED query (attempt {attempt+1}/{max_attempts}) with radius={current_radius:.4f} deg...")
+                #raise Exception("Forced NED query failure for testing")
                 ned_redshifts = utils.ned_query(rad_deg=current_radius, ra_center=center_ra, dec_center=center_dec)
                 print(f"Successfully queried NED with {len(ned_redshifts)} results at radius {current_radius:.4f} deg")
                 ned_query_success = True

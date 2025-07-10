@@ -10,6 +10,8 @@ from astropy.visualization.wcsaxes import SphericalCircle
 from astropy.coordinates import SkyCoord
 from astropy.visualization import ZScaleInterval
 import matplotlib.patches as patches
+from matplotlib.patches import Circle
+
 from astropy.visualization import (MinMaxInterval, SqrtStretch, 
                                   AsinhStretch, LogStretch,
                                   ImageNormalize)
@@ -556,7 +558,7 @@ def plot_kappa_with_coadd(kappa_file, coadd_file, figsize=(10, 10), kappa_vmin=N
 def make_rgb_image(u_fits, b_fits, g_fits, stretch='asinh', output_file=None, 
                    percentile_limits=(0.5, 99.5),
                    red_boost_factor=1.1, green_supression=0.9, blue_suppression=0.9,
-                   dpi=600, format='png', figsize=(12, 12)):
+                   dpi=600, format='png', figsize=(12, 12), catalog=None):
     """
     Create an RGB image from three FITS files with enhanced red coloration for galaxies.
     
@@ -582,12 +584,42 @@ def make_rgb_image(u_fits, b_fits, g_fits, stretch='asinh', output_file=None,
         File format for saved image ('png', 'tiff', 'jpg', etc.) (default: 'png')
     figsize : tuple, optional
         Figure size in inches (default: (12, 12))
+    catalog : pandas.DataFrame or astropy.table.Table, optional
+        Catalog with 'ra' and 'dec' columns to mark objects on the image
     """
-    # Load the data
+    
+    # Import WCS for coordinate transformation if catalog is provided
+    if catalog is not None:
+        from astropy.wcs import WCS
+    
+    # Load the data and get WCS info for coordinate transformation
     if isinstance(u_fits, str):
-        u_data = fits.getdata(u_fits)
+        u_hdu = fits.open(u_fits)[0]
+        u_data = u_hdu.data
+        if catalog is not None:
+            # Create WCS with simple TAN projection
+            header = u_hdu.header.copy()
+            if 'CTYPE1' in header and 'TPV' in header['CTYPE1']:
+                header['CTYPE1'] = header['CTYPE1'].replace('TPV', 'TAN')
+                header['CTYPE2'] = header['CTYPE2'].replace('TPV', 'TAN')
+            wcs = WCS(header)
     else:
         u_data = u_fits
+        if catalog is not None:
+            # If HDU object is passed, try to get WCS from it
+            try:
+                if hasattr(u_fits, 'header'):
+                    header = u_fits.header.copy()
+                    if 'CTYPE1' in header and 'TPV' in header['CTYPE1']:
+                        header['CTYPE1'] = header['CTYPE1'].replace('TPV', 'TAN')
+                        header['CTYPE2'] = header['CTYPE2'].replace('TPV', 'TAN')
+                    wcs = WCS(header)
+                else:
+                    print("Warning: Cannot extract WCS from non-string input. Catalog objects will not be marked.")
+                    catalog = None
+            except:
+                print("Warning: Failed to extract WCS. Catalog objects will not be marked.")
+                catalog = None
         
     if isinstance(b_fits, str):
         b_data = fits.getdata(b_fits)
@@ -648,11 +680,55 @@ def make_rgb_image(u_fits, b_fits, g_fits, stretch='asinh', output_file=None,
     rgb_image = np.clip(rgb_image, 0, 1)
     
     # Create figure with high resolution
-    plt.figure(figsize=figsize, dpi=dpi)
+    fig = plt.figure(figsize=figsize, dpi=dpi)
+    ax = plt.gca()
     
     # Use interpolation='nearest' for astronomical images to preserve details
-    plt.imshow(rgb_image, origin='lower', interpolation='nearest')
-    plt.axis('off')
+    ax.imshow(rgb_image, origin='lower', interpolation='nearest')
+    ax.axis('off')
+    
+    # Mark catalog objects if catalog is provided
+    if catalog is not None and 'wcs' in locals():
+        try:
+            # Get RA and Dec columns (handle different column name cases)
+            ra_col = None
+            dec_col = None
+            
+            # Check for different possible column names
+            for col in catalog.columns:
+                col_lower = col.lower()
+                if col_lower == 'ra' or col_lower == 'right_ascension':
+                    ra_col = col
+                elif col_lower == 'dec' or col_lower == 'declination':
+                    dec_col = col
+            
+            if ra_col is None or dec_col is None:
+                print("Warning: Could not find 'ra' and 'dec' columns in catalog. Objects will not be marked.")
+            else:
+                # Get RA and Dec values
+                ra_values = catalog[ra_col]
+                dec_values = catalog[dec_col]
+                
+                # Convert RA/Dec to pixel coordinates
+                x_pixels, y_pixels = wcs.all_world2pix(ra_values, dec_values, 0)
+                
+                # Calculate marker size based on image dimensions
+                marker_radius = max(rgb_image.shape) / 1200  # 0.5% of image size
+                
+                # Plot markers for each object
+                for x, y in zip(x_pixels, y_pixels):
+                    # Check if the object is within the image bounds
+                    if 0 <= x < rgb_image.shape[1] and 0 <= y < rgb_image.shape[0]:
+                        # Draw a circle marker
+                        circle = Circle((x, y), radius=marker_radius, 
+                                       fill=False, edgecolor='cyan', 
+                                       linewidth=0.1, alpha=1.0)
+                        ax.add_patch(circle)
+                        
+                print(f"Marked {len(ra_values)} catalog objects on the image")
+                
+        except Exception as e:
+            print(f"Warning: Failed to mark catalog objects. Error: {str(e)}")
     
     if output_file:
         # Determine format from filename if not explicitly provided
@@ -672,18 +748,113 @@ def make_rgb_image(u_fits, b_fits, g_fits, stretch='asinh', output_file=None,
                        format=format, compression='lzw')
         elif format.lower() == 'png':
             plt.savefig(output_file, dpi=dpi, bbox_inches='tight', pad_inches=0, 
-                       format=format, transparent=False, optimize=True)
+                       format=format, transparent=False)
         else:
             plt.savefig(output_file, dpi=dpi, bbox_inches='tight', pad_inches=0, 
                        format=format)
             
-        plt.close()
+        plt.close(fig)
         print(f"High quality RGB image saved to {output_file} at {dpi} DPI")
     else:
         plt.tight_layout()
         plt.show()
     
     return rgb_image
+
+def get_wcs_from_fits(fits_file):
+    """Extract WCS information from a FITS file"""
+    with fits.open(fits_file) as hdul:
+        # Usually WCS is in the primary HDU (index 0)
+        # But sometimes it might be in extension 1
+        header = hdul[0].header
+        if 'CRVAL1' not in header and len(hdul) > 1:
+            header = hdul[1].header
+        
+        wcs = WCS(header)
+    return wcs
+
+def save_display_ready_rgb_fits(rgb_image, wcs, output_file, 
+                               preserve_scale=True, 
+                               add_history=True,
+                               compression=None):
+    """
+    Save a display-ready RGB image as FITS with WCS information
+    
+    Parameters:
+    -----------
+    rgb_image : numpy array 
+        Shape (height, width, 3) with values 0-255 (uint8) or 0-1 (float)
+    wcs : astropy.wcs.WCS object
+        WCS information to embed
+    output_file : str
+        Output filename
+    preserve_scale : bool
+        If True, preserves the exact scaling (recommended)
+    add_history : bool
+        Add processing history to header
+    compression : str or None
+        'GZIP', 'RICE', etc. for compressed FITS
+    """
+    
+    # Make a copy to avoid modifying original
+    rgb_data = rgb_image.copy()
+    
+    # Convert to float32 and normalize to 0-1 if needed
+    if rgb_data.dtype == np.uint8:
+        rgb_data = rgb_data.astype(np.float32) / 255.0
+    elif rgb_data.dtype != np.float32:
+        rgb_data = rgb_data.astype(np.float32)
+    
+    # Ensure values are in 0-1 range
+    if preserve_scale:
+        rgb_data = np.clip(rgb_data, 0, 1)
+    
+    # Transpose from (height, width, 3) to (3, height, width)
+    if rgb_data.shape[2] == 3:
+        rgb_data = np.transpose(rgb_data, (2, 0, 1))
+    
+    # Create FITS HDU
+    if compression:
+        hdu = fits.CompImageHDU(rgb_data, compression_type=compression)
+    else:
+        hdu = fits.PrimaryHDU(rgb_data)
+    
+    # Add WCS to header
+    hdu.header.update(wcs.to_header())
+    
+    # Add important metadata
+    hdu.header['NAXIS'] = 3
+    hdu.header['NAXIS1'] = rgb_data.shape[2]  # width
+    hdu.header['NAXIS2'] = rgb_data.shape[1]  # height  
+    hdu.header['NAXIS3'] = 3  # RGB channels
+    
+    # Display scaling information
+    hdu.header['DATAMIN'] = 0.0
+    hdu.header['DATAMAX'] = 1.0
+    hdu.header['BUNIT'] = 'Normalized'
+    
+    # Channel information
+    hdu.header['CTYPE3'] = 'RGB'
+    hdu.header['CHANNEL1'] = 'RED'
+    hdu.header['CHANNEL2'] = 'GREEN'
+    hdu.header['CHANNEL3'] = 'BLUE'
+    
+    # Add history if requested
+    if add_history:
+        hdu.header['HISTORY'] = 'RGB composite image created for display'
+        hdu.header['HISTORY'] = 'Channels: 1=Red, 2=Green, 3=Blue'
+        hdu.header['HISTORY'] = 'Pixel values normalized to [0,1]'
+        hdu.header['COMMENT'] = 'Load in DS9 with RGB mode'
+    
+    # Save
+    if compression:
+        hdul = fits.HDUList([fits.PrimaryHDU(), hdu])
+        hdul.writeto(output_file, overwrite=True)
+    else:
+        hdu.writeto(output_file, overwrite=True)
+    
+    print(f"Saved RGB FITS to: {output_file}")
+    print(f"Image dimensions: {rgb_data.shape[2]} x {rgb_data.shape[1]} x 3")
 
 
 class gtan_cross_1D:
@@ -1093,14 +1264,22 @@ class ClusterRedSequenceAnalysis:
         
         # Load catalog
         if self.datafilename is not None:
-            color_mag_file = self.datafilename
+            self.color_mag_file = self.datafilename
         else:
-            color_mag_file = os.path.join(
+            self.color_mag_file = os.path.join(
                 self.datadir, 
                 f'{self.cluster_name}/sextractor_dualmode/out/{self.cluster_name}_colors_mags.fits'
             )
-        
-        self.cm_cat = Table.read(color_mag_file)
+
+        self.plot_out_path = os.path.join(
+            self.datadir, 
+            f'{self.cluster_name}', "sextractor_dualmode", "plots")
+        os.makedirs(self.plot_out_path, exist_ok=True)
+        self.coadd_path = os.path.join(
+            self.datadir, 
+            f'{self.cluster_name}', "sextractor_dualmode", "coadd")        
+
+        self.cm_cat = Table.read(self.color_mag_file)
         
         # Filter valid detections
         valid = (self.cm_cat['FLUX_AUTO_b'] > 0) & \
@@ -1213,6 +1392,8 @@ class ClusterRedSequenceAnalysis:
         
     def plot_red_sequence_analysis(self, save_path=None):
         """Plot the red sequence analysis with spatial distribution."""
+        if save_path is None:
+            save_path = os.path.join(self.plot_out_path, f'{self.cluster_name}_red_sequence_analysis.png')
         # Create side-by-side plots
         fig, axes = plt.subplots(1, 2, figsize=(14, 6))
         
@@ -1271,6 +1452,8 @@ class ClusterRedSequenceAnalysis:
         cluster_catalog : astropy.table.Table
             Catalog of identified cluster member galaxies
         """
+        if save_path is None:
+            save_path = os.path.join(self.plot_out_path, f'{self.cluster_name}_cluster_members.png')        
         # Re-smooth if different sigma requested
         if sigma_smooth != self.sigma:
             smoothed_for_contours = gaussian_filter(self.hist, sigma=sigma_smooth)
@@ -1336,9 +1519,10 @@ class ClusterRedSequenceAnalysis:
         
         # Return cluster member catalog
         cluster_catalog = self.cm_cat[self.cluster_member_indices]
+        self.cluster_catalog = cluster_catalog
         return cluster_catalog
     
-    def save_cluster_catalog(self, output_path, format='fits'):
+    def save_cluster_catalog(self, output_path=None, format='fits'):
         """
         Save the cluster member catalog to disk.
         
@@ -1349,6 +1533,12 @@ class ClusterRedSequenceAnalysis:
         format : str
             Format for saving ('fits', 'csv', 'ascii', etc.)
         """
+        if output_path is None:
+            output_path = os.path.join(
+                self.datadir, 
+                f'{self.cluster_name}/sextractor_dualmode/out/{self.cluster_name}_coadd_redseq.fits'
+            )
+
         if self.cluster_member_indices is None:
             print("No cluster members identified yet. Run identify_cluster_members() first.")
             return
@@ -1373,8 +1563,7 @@ class ClusterRedSequenceAnalysis:
             return
         
         # Path to original file
-        original_file = os.path.join(self.datadir, 
-                                    f'{self.cluster_name}/sextractor_dualmode/out/{self.cluster_name}_colors_mags.fits')
+        original_file = self.color_mag_file
         
         # Create backup first
         backup_file = original_file.replace('.fits', '_backup.fits')
@@ -1428,6 +1617,64 @@ class ClusterRedSequenceAnalysis:
         else:
             print("No cluster members identified yet. Run identify_cluster_members() first.")
             return None
+
+    def _make_rgb_image(self, u_fits=None, b_fits=None, g_fits=None, stretch='asinh', 
+                    percentile_limits=(0.5, 99.5),
+                    red_boost_factor=1.1, green_supression=0.9, blue_suppression=0.9,
+                    dpi=600, format='png', figsize=(12, 12), save_output=False, mark_members=True):
+        """
+        Create an RGB image from three FITS files with enhanced red coloration for galaxies.
+        
+        Parameters
+        ----------
+        u_fits, b_fits, g_fits : str or HDUList or HDU
+            FITS files for the u, b, and g bands
+        stretch : str, optional
+            Stretching function to apply ('linear', 'sqrt', 'log', 'asinh')
+        output_file : str, optional
+            If provided, save the image to this file
+        percentile_limits : tuple, optional
+            Lower and upper percentiles for scaling (default: 0.5, 99.5)
+        red_boost_factor : float, optional
+            Extra boost to the red channel (default: 1.1)
+        green_suppression: float, optional
+            Factor to reduce green channel (default: 0.9)
+        blue_suppression : float, optional
+            Factor to reduce blue channel (default: 0.9)
+        dpi : int, optional
+            Resolution in dots per inch for saved file (default: 600)
+        format : str, optional
+            File format for saved image ('png', 'tiff', 'jpg', etc.) (default: 'png')
+        figsize : tuple, optional
+            Figure size in inches (default: (12, 12))
+        """
+        # Load the data
+        if u_fits is None:
+            u_fits = os.path.join(self.coadd_path, 'u', f'{self.cluster_name}_coadd_u.fits')
+        if b_fits is None:
+            b_fits = os.path.join(self.coadd_path, 'b', f'{self.cluster_name}_coadd_b.fits')
+        if g_fits is None:
+            g_fits = os.path.join(self.coadd_path, 'g', f'{self.cluster_name}_coadd_g.fits')        
+
+        if save_output:
+            output_file = os.path.join(self.plot_out_path, f"{self.cluster_name}_rgb.png")
+            #output_fitsfile = os.path.join(self.plot_out_path, f"{self.cluster_name}_rbg.fits")
+        else:
+            output_file = None
+        if mark_members:
+            catalog = self.cluster_catalog
+        else:
+            catalog = None
+        rgb = make_rgb_image(u_fits=u_fits, b_fits=b_fits, g_fits=g_fits, stretch=stretch, output_file=output_file, 
+                    percentile_limits=percentile_limits,
+                    red_boost_factor=red_boost_factor, green_supression=green_supression, blue_suppression=blue_suppression,
+                    dpi=dpi, format=format, figsize=figsize, catalog=catalog)
+
+        #wcs = get_wcs_from_fits(b_fits)
+        #if save_output:
+        #    save_display_ready_rgb_fits(rgb, wcs, output_fitsfile)
+
+        return rgb
 
 
 from matplotlib.widgets import Slider, Button
