@@ -1621,7 +1621,7 @@ class ClusterRedSequenceAnalysis:
     def _make_rgb_image(self, u_fits=None, b_fits=None, g_fits=None, stretch='asinh', 
                     percentile_limits=(0.5, 99.5),
                     red_boost_factor=1.1, green_supression=0.9, blue_suppression=0.9,
-                    dpi=600, format='png', figsize=(12, 12), save_output=False, mark_members=True):
+                    dpi=600, format='png', figsize=(12, 12), save_path=None, mark_members=True):
         """
         Create an RGB image from three FITS files with enhanced red coloration for galaxies.
         
@@ -1660,16 +1660,15 @@ class ClusterRedSequenceAnalysis:
         print(f"  U band: {u_fits}")
         print(f"  B band: {b_fits}")
         print(f"  G band: {g_fits}")
-        if save_output:
-            output_file = os.path.join(self.plot_out_path, f"{self.cluster_name}_rgb.png")
+        if save_path is None:
+            save_path = os.path.join(self.plot_out_path, f"{self.cluster_name}_rgb.png")
             #output_fitsfile = os.path.join(self.plot_out_path, f"{self.cluster_name}_rbg.fits")
-        else:
-            output_file = None
+
         if mark_members:
             catalog = self.cluster_catalog
         else:
             catalog = None
-        rgb = make_rgb_image(u_fits=u_fits, b_fits=b_fits, g_fits=g_fits, stretch=stretch, output_file=output_file, 
+        rgb = make_rgb_image(u_fits=u_fits, b_fits=b_fits, g_fits=g_fits, stretch=stretch, output_file=save_path, 
                     percentile_limits=percentile_limits,
                     red_boost_factor=red_boost_factor, green_supression=green_supression, blue_suppression=blue_suppression,
                     dpi=dpi, format=format, figsize=figsize, catalog=catalog)
