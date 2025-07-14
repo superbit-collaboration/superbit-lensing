@@ -237,11 +237,12 @@ def mcal_dict2tab(mcal, obsdict, ident):
 
         for i in range(len(obs)):
             try:
-                tpsf_list.append(obs[i].psf.meta['result']['T'])
-            except:
-                pass
-            try:
-                gpsf_list.append(obs[i].psf.meta['result']['g'])
+                resdict = obs[i].psf.meta['result']
+                gm = resdict.get_gmix()
+                g1psf, g2psf, Tpsf = gm.get_g1g2T()
+                gpsf = np.array([g1,g2])
+                tpsf_list.append(Tpsf)
+                gpsf_list.append(gpsf)
             except:
                 pass
 
