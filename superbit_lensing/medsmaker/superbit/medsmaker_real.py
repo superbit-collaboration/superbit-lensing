@@ -1107,6 +1107,7 @@ class BITMeasurement():
         obj_str['XWIN_IMAGE'] = catalog['XWIN_IMAGE']
         obj_str['YWIN_IMAGE'] = catalog['YWIN_IMAGE']
         obj_str['KRON_RADIUS'] = catalog['KRON_RADIUS']
+        obj_str['FLUX_RADIUS'] = catalog['FLUX_RADIUS']
 
         return obj_str
 

@@ -46,7 +46,7 @@ class MetacalFitter:
         self.avg_galaxy_residual = None
         self.avg_psf_residual = None
     
-    def get_priors(self):
+    def get_priors(self, Tmaxval = 1.5):
 
         # This bit is needed for ngmix v2.x.x
         # won't work for v1.x.x
@@ -71,7 +71,6 @@ class MetacalFitter:
         # try is the two-sided error function (TwoSidedErf)
 
         Tminval = -1.0 # arcsec squared
-        Tmaxval = 1000
         T_prior = ngmix.priors.FlatPrior(Tminval, Tmaxval, rng=rng)
 
         # similar for flux.  Make sure the bounds make sense for
@@ -91,7 +90,7 @@ class MetacalFitter:
 
         return priors
 
-    def mp_fit_one(self, psf_model='gauss', gal_model='gauss', mcal_pars= {'psf': 'dilate', 'mcal_shear': 0.01}):
+    def mp_fit_one(self, prior=None, psf_model='gauss', gal_model='gauss', mcal_pars= {'psf': 'dilate', 'mcal_shear': 0.01}):
         """
         Multiprocessing version of original _fit_one()
 
@@ -107,14 +106,16 @@ class MetacalFitter:
         cuts for each shear step (i.e. no_shear,1p,1m,2p,2m).
         """
         # get image pixel scale (assumes constant across list)
+        if prior is None:
+            prior = self.prior
         jacobian = self.obslist[0]._jacobian
         Tguess = 4*jacobian.get_scale()**2
         ntry = 20
         lm_pars = {'maxfev':2000, 'xtol':5.0e-5, 'ftol':5.0e-5}
         psf_lm_pars={'maxfev': 4000, 'xtol':5.0e-5,'ftol':5.0e-5}
 
-        fitter = ngmix.fitting.Fitter(model=gal_model, prior=self.prior, fit_pars=lm_pars)
-        guesser = ngmix.guessers.TPSFFluxAndPriorGuesser(rng=self.rng, T=Tguess, prior=self.prior)
+        fitter = ngmix.fitting.Fitter(model=gal_model, prior=prior, fit_pars=lm_pars)
+        guesser = ngmix.guessers.TPSFFluxAndPriorGuesser(rng=self.rng, T=Tguess, prior=prior)
 
         # psf fitting
         if 'em' in psf_model:

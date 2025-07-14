@@ -80,7 +80,9 @@ class SuperBITNgmixFitter():
             self.medsObj = NGMixMEDS(fname)
 
         self.catalog = self.medsObj.get_cat()
-
+        self.radius = self.medsObj["KRON_RADIUS"]
+        self.Tmax_vals = self.Tmax_from_radius()
+        
         self.has_coadd = bool(self.medsObj._meta['has_coadd'])
         self.use_coadd = config['use_coadd']
         self.use_coadd_only = config['use_coadd_only']
@@ -92,7 +94,10 @@ class SuperBITNgmixFitter():
 
         return
 
-    def _get_priors(self):
+    def Tmax_from_radius(self):
+        return (4*self.radius*0.141)**2
+
+    def _get_priors(self, Tmaxval = 1000):
 
         # This bit is needed for ngmix v2.x.x
         # won't work for v1.x.x
@@ -117,7 +122,6 @@ class SuperBITNgmixFitter():
         # try is the two-sided error function (TwoSidedErf)
 
         Tminval = -1.0 # arcsec squared
-        Tmaxval = 1000
         T_prior = ngmix.priors.FlatPrior(Tminval, Tmaxval, rng=rng)
 
         # similar for flux.  Make sure the bounds make sense for
@@ -444,8 +448,8 @@ def main():
         outdir = os.getcwd()
 
     if not os.path.isdir(outdir):
-       	  cmd = 'mkdir -p %s' % outdir
-          os.system(cmd)
+        cmd = 'mkdir -p %s' % outdir
+        os.system(cmd)
 
     # Added to handle rng initialization
     # Could put everything through here instead
@@ -507,7 +511,7 @@ def main():
                             i,
                             setup_obj(i, BITfitter.medsObj[i]),
                             BITfitter._get_source_observations(i),
-                            priors,
+                            BITfitter._get_priors(Tmaxval = BITfitter.Tmax_vals[i]),
                             logprint, rng, psf_model, gal_model, mcal_pars)
                             )
 
@@ -520,7 +524,7 @@ def main():
                                         [(i,
                                           setup_obj(i, BITfitter.medsObj[i]),
                                           BITfitter._get_source_observations(i),
-                                          priors,
+                                          BITfitter._get_priors(Tmaxval = BITfitter.Tmax_vals[i]),
                                           logprint, rng, psf_model, gal_model, mcal_pars) for i in range(index_start, index_end)
                                           ]
                                         )
