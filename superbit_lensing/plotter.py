@@ -1227,7 +1227,7 @@ class ClusterRedSequenceAnalysis:
     for galaxy clusters.
     """
     
-    def __init__(self, cluster_name, datadir=None, datafilename=None, delz=0.02):
+    def __init__(self, cluster_name, datadir=None, datafilename=None, delz=0.02, radius_th=-1):
         """
         Initialize the cluster analysis.
         
@@ -1246,6 +1246,7 @@ class ClusterRedSequenceAnalysis:
         self.datadir = datadir
         self.datafilename = datafilename
         self.delz = delz
+        self.radius_th=radius_th
         
         # Initialize attributes that will be populated
         self.ra_center = None
@@ -1284,7 +1285,8 @@ class ClusterRedSequenceAnalysis:
         # Filter valid detections
         valid = (self.cm_cat['FLUX_AUTO_b'] > 0) & \
                 (self.cm_cat["FLUX_AUTO_g"] > 0) & \
-                (self.cm_cat["FLUX_AUTO_u"] > 0)
+                (self.cm_cat["FLUX_AUTO_u"] > 0) & \
+                (self.cm_cat['R_b'] > self.radius_th)    
         self.cm_cat = self.cm_cat[valid]
         
         # Extract magnitudes and colors
