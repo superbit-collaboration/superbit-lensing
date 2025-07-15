@@ -1095,7 +1095,7 @@ class BITMeasurement():
             catalog = self.detection_cat
 
         obj_str = meds.util.get_meds_input_struct(catalog.size, \
-                  extra_fields = [('KRON_RADIUS', float), \
+                  extra_fields = [('KRON_RADIUS', float), ('FLUX_RADIUS', float), \
                   ('number', int), ('XWIN_IMAGE', float), \
                   ('YWIN_IMAGE', float)]
                   )

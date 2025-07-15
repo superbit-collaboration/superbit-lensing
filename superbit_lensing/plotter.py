@@ -1553,7 +1553,7 @@ class ClusterRedSequenceAnalysis:
         print(f"Saved cluster member catalog to: {output_path}")
         print(f"Total cluster members saved: {len(cluster_catalog)}")
         
-    def update_original_catalog(self):
+    def update_original_catalog(self, file_name=None):
         """
         Update the original color_mag_file with cluster membership information.
         This overwrites the original file with the new columns added.
@@ -1566,12 +1566,9 @@ class ClusterRedSequenceAnalysis:
         original_file = self.color_mag_file
         
         # Create backup first
-        backup_file = original_file.replace('.fits', '_backup.fits')
-        if not os.path.exists(backup_file):
-            import shutil
-            shutil.copy2(original_file, backup_file)
-            print(f"Created backup: {backup_file}")
-        
+        if file_name is None:
+            file_name = original_file.replace('.fits', '_updated.fits')
+
         # Read the original full catalog (before any filtering)
         full_catalog = Table.read(original_file)
         
@@ -1598,8 +1595,8 @@ class ClusterRedSequenceAnalysis:
                     full_catalog['is_cluster_member'][full_idx] = True
         
         # Save the updated catalog
-        full_catalog.write(original_file, format='fits', overwrite=True)
-        print(f"Updated original catalog: {original_file}")
+        full_catalog.write(file_name, format='fits', overwrite=True)
+        print(f"Updated original catalog: {file_name}")
         print(f"Total red sequence galaxies marked: {np.sum(full_catalog['is_red_sequence'])}")
         print(f"Total cluster members marked: {np.sum(full_catalog['is_cluster_member'])}")
         

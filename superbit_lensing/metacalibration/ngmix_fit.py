@@ -80,7 +80,7 @@ class SuperBITNgmixFitter():
             self.medsObj = NGMixMEDS(fname)
 
         self.catalog = self.medsObj.get_cat()
-        self.radius = self.medsObj["KRON_RADIUS"]
+        self.radius = self.medsObj["FLUX_RADIUS"]
         self.Tmax_vals = self.Tmax_from_radius()
         
         self.has_coadd = bool(self.medsObj._meta['has_coadd'])
@@ -244,7 +244,7 @@ def mcal_dict2tab(mcal, obsdict, ident):
                 resdict = obs[i].psf.meta['result']
                 gm = resdict.get_gmix()
                 g1psf, g2psf, Tpsf = gm.get_g1g2T()
-                gpsf = np.array([g1,g2])
+                gpsf = np.array([g1psf, g2psf])
                 tpsf_list.append(Tpsf)
                 gpsf_list.append(gpsf)
             except:
