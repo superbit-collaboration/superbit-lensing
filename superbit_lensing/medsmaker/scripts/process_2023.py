@@ -227,6 +227,11 @@ def main(args):
 
 if __name__ == '__main__':
     args = parse_args()
+    print("Arguments received:")
+    for arg, value in vars(args).items():
+        print(f"  {arg}: {value}")
+    print("-" * 50)
+
     rc = main(args)
 
     if rc !=0:

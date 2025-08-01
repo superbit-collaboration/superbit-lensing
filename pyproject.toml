@@ -1,0 +1,155 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "superbit-lensing"
+version = "1.0.0"
+description = "SuperBIT Lensing Analysis Pipeline"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "SuperBIT Collaboration"},
+]
+maintainers = [
+    {name = "SuperBIT Team"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+requires-python = ">=3.8"
+
+# Core dependencies
+dependencies = [
+    "galsim>=2.3",
+    "numba>=0.57.0",
+    "pympler>=1.0",
+    "numpy>=1.20",
+    "scipy>=1.7",
+    "matplotlib>=3.5",
+    "tqdm>=4.60",
+    "seaborn>=0.11",
+    "pyyaml>=5.4",
+    "astropy",
+    "fitsio",
+    "piff",
+    "shapely",
+    "Rtree",
+    "lenspack",
+    "pyregion",
+    "esutil",
+    "astroquery",
+    "ipdb",
+    "statsmodels",
+]
+
+[project.optional-dependencies]
+# Development dependencies
+dev = [
+    "pytest>=6.0",
+    "pytest-cov",
+    "black",
+    "flake8",
+    "mypy",
+    "pre-commit",
+    "ipython",
+    "jupyter",
+    "sphinx",
+    "sphinx-rtd-theme",
+]
+
+# Testing dependencies
+test = [
+    "pytest>=6.0",
+    "pytest-cov",
+    "pytest-mock",
+]
+
+# Documentation dependencies
+docs = [
+    "sphinx",
+    "sphinx-rtd-theme",
+    "sphinx-autoapi",
+    "myst-parser",
+]
+
+[project.urls]
+Homepage = "https://github.com/superbit-collaboration/superbit-lensing"
+Documentation = "https://superbit-lensing.readthedocs.io"
+Repository = "https://github.com/superbit-collaboration/superbit-lensing"
+Issues = "https://github.com/superbit-collaboration/superbit-lensing/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["superbit_lensing*"]
+exclude = ["tests*", "docs*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.yml", "*.json", "*.fits"]
+
+# Black configuration
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+# Pytest configuration
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--cov=superbit_lensing",
+    "--cov-report=html",
+    "--cov-report=term-missing",
+    "-v",
+]
+
+# Mypy configuration
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["superbit_lensing"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]

@@ -5,7 +5,11 @@ notebooks/*
 notebooks/simulations/*
 notebooks/red_sequence/*
 superbit_lensing.egg-info/
+superbit_lensing/medsmaker/configs/*
 superbit_lensing/medsmaker/configs
+job_scripts
+job_sims
+superbit_lensing/.ipynb_checkpoints
 .DS_Store
 configs/cl_m2.2e15_z0.44/
 configs/forecast_round1/

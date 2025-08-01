@@ -26,44 +26,14 @@ cd to this repo:
 cd /path/to/repos/superbit-lensing
 ```
 
-Create env from yml (e.g. `sblens.yml`):
+Run the makefile with preferred env_name:
 ```bash
-conda env create --name sblens --file sblens.yml
+make install ENV_NAME=sblens
 ```
 
-Activate new env:
+Now your environment is ready to run, Activate new env:
 ```bash
 conda activate sblens
-```
-
-Conda install ngmix:
-```bash
-conda install conda-forge::ngmix
-```
-
-Clone the meds repo outside of this repo:
-```bash
-git clone https://github.com/esheldon/meds.git
-```
-
-cd to meds repo:
-```bash
-cd /path/to/repos/meds
-```
-
-Build the meds repo:
-```bash
-python setup.py install
-```
-
-cd to this repo:
-```bash
-cd /path/to/repos/superbit-lensing
-```
-
-pip install repo:
-```bash
-pip install -e . 
 ```
 
 ## For the experts

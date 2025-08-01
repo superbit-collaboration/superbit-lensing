@@ -1074,40 +1074,39 @@ class BITMeasurement():
         '''
 
         pixel_scale = utils.get_pixel_scale(self.detect_img_file)
-        box_size_float = np.ceil(angular_size/pixel_scale)
+        box_size_float = np.ceil(angular_size * size_multiplier /pixel_scale)
 
         # Available box sizes to choose from -> 16 to 256 in increments of 2
         available_sizes = min_size * 2**(np.arange(np.ceil(np.log2(max_size)-np.log2(min_size)+1)).astype(int))
 
-        # If a single angular_size was proffered:
+        def get_box_size(val):
+            larger = available_sizes[available_sizes > val]
+            return np.min(larger) if larger.size > 0 else np.max(available_sizes)
+
         if isinstance(box_size_float, np.ndarray):
-            available_sizes_matrix = available_sizes.reshape(1,available_sizes.size).repeat(angular_size.size,axis=0)
-            box_size_float_matrix=box_size_float.reshape(box_size_float.size,1)
-            #available_sizes_matrix[box_size_float.reshape(box_size_float.size,1) > available_sizes.reshape(1,available_sizes.size)] = np.max(available_sizes)+1
-            available_sizes_matrix[box_size_float.reshape(box_size_float.size,1) > available_sizes_matrix] = np.max(available_sizes)+1
-            box_size = np.min(available_sizes_matrix,axis=1)
+            return np.array([get_box_size(val) for val in box_size_float])
         else:
-            box_size = np.min( available_sizes[ available_sizes > box_size_float ] )
-        return box_size
+            return get_box_size(box_size_float)
 
     def make_object_info_struct(self, catalog=None):
         if catalog is None:
             catalog = self.detection_cat
 
         obj_str = meds.util.get_meds_input_struct(catalog.size, \
-                  extra_fields = [('KRON_RADIUS', float), ('FLUX_RADIUS', float), \
+                  extra_fields = [('KRON_RADIUS', float), ('FLUX_RADIUS', float), ('apt_radius', float), \
                   ('number', int), ('XWIN_IMAGE', float), \
                   ('YWIN_IMAGE', float)]
                   )
         obj_str['id'] = catalog['NUMBER']
         obj_str['number'] = np.arange(catalog.size)+1
-        obj_str['box_size'] = self._calculate_box_size(catalog['KRON_RADIUS'])
+        obj_str['box_size'] = self._calculate_box_size(catalog['KRON_RADIUS'] * catalog['A_IMAGE'] * utils.get_pixel_scale(self.detect_img_file))
         obj_str['ra'] = catalog['ALPHAWIN_J2000']
         obj_str['dec'] = catalog['DELTAWIN_J2000']
         obj_str['XWIN_IMAGE'] = catalog['XWIN_IMAGE']
         obj_str['YWIN_IMAGE'] = catalog['YWIN_IMAGE']
         obj_str['KRON_RADIUS'] = catalog['KRON_RADIUS']
         obj_str['FLUX_RADIUS'] = catalog['FLUX_RADIUS']
+        obj_str['apt_radius'] = catalog['KRON_RADIUS'] * catalog['A_IMAGE'] * utils.get_pixel_scale(self.detect_img_file)
 
         return obj_str
 

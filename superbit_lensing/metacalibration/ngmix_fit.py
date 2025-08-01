@@ -12,37 +12,40 @@ import superbit_lensing.utils as utils
 
 import ipdb
 
-parser = ArgumentParser()
+DEFAULT_MCAL_PARS = {'psf': 'dilate', 'mcal_shear': 0.01, 'types' : ['noshear', '1p', '1m', '2p', '2m', '1p_psf', '1m_psf', '2p_psf', '2m_psf']}
 
-parser.add_argument('medsfile', type=str,
-                    help='MEDS file to process')
-parser.add_argument('outfile', type=str,
-                    help='Output filename')
-parser.add_argument('-outdir', type=str, default=None,
-                    help='Output directory')
-parser.add_argument('-start', type=int, default=None,
-                    help='Starting index for MEDS processing')
-parser.add_argument('-end', type=int, default=None,
-                    help='Ending index for MEDS processing')
-parser.add_argument('-n', type=int, default=1,
-                    help='Number of cores to use')
-parser.add_argument('-seed', type=int, default=None,
-                    help='Metacalibration seed')
-parser.add_argument('-psf_model', type=str, default='gauss',
-                    help='PSF model to use')
-parser.add_argument('-gal_model', type=str, default='gauss',
-                    help='Galaxy model to use')
-parser.add_argument('--plot', action='store_true', default=False,
-                    help='Set to make diagnstic plots')
-parser.add_argument('--use_coadd', action='store_true', default=False,
-                    help='Will use the coadd, if present')                    
-parser.add_argument('--use_coadd_only', action='store_true', default=False,
-                    help='Will use the coadd, if present')  
-parser.add_argument('--overwrite', action='store_true', default=False,
-                    help='Overwrite output mcal file')
-parser.add_argument('--vb', action='store_true', default=False,
-                    help='Make verbose')
+def parse_args():
+    parser = ArgumentParser()
 
+    parser.add_argument('medsfile', type=str,
+                        help='MEDS file to process')
+    parser.add_argument('outfile', type=str,
+                        help='Output filename')
+    parser.add_argument('-outdir', type=str, default=None,
+                        help='Output directory')
+    parser.add_argument('-start', type=int, default=None,
+                        help='Starting index for MEDS processing')
+    parser.add_argument('-end', type=int, default=None,
+                        help='Ending index for MEDS processing')
+    parser.add_argument('-n', type=int, default=1,
+                        help='Number of cores to use')
+    parser.add_argument('-seed', type=int, default=None,
+                        help='Metacalibration seed')
+    parser.add_argument('-psf_model', type=str, default='gauss',
+                        help='PSF model to use')
+    parser.add_argument('-gal_model', type=str, default='gauss',
+                        help='Galaxy model to use')
+    parser.add_argument('--plot', action='store_true', default=False,
+                        help='Set to make diagnstic plots')
+    parser.add_argument('--use_coadd', action='store_true', default=False,
+                        help='Will use the coadd, if present')                    
+    parser.add_argument('--use_coadd_only', action='store_true', default=False,
+                        help='Will use the coadd, if present')  
+    parser.add_argument('--overwrite', action='store_true', default=False,
+                        help='Overwrite output mcal file')
+    parser.add_argument('--vb', action='store_true', default=False,
+                        help='Make verbose')
+    return parser.parse_args()
 
 class SuperBITNgmixFitter():
     """
@@ -80,7 +83,7 @@ class SuperBITNgmixFitter():
             self.medsObj = NGMixMEDS(fname)
 
         self.catalog = self.medsObj.get_cat()
-        self.radius = self.medsObj["FLUX_RADIUS"]
+        self.radius = self.medsObj["apt_radius"]
         self.Tmax_vals = self.Tmax_from_radius()
         
         self.has_coadd = bool(self.medsObj._meta['has_coadd'])
@@ -95,7 +98,7 @@ class SuperBITNgmixFitter():
         return
 
     def Tmax_from_radius(self):
-        return (4*self.radius*0.141)**2
+        return np.maximum(0.5, 2*(self.radius)**2)
 
     def _get_priors(self, Tmaxval = 1000):
 
@@ -273,7 +276,7 @@ def mcal_dict2tab(mcal, obsdict, ident):
 
     return join_tab
 
-def mp_fit_one(obslist, prior, rng, psf_model='gauss', gal_model='gauss', mcal_pars= {'psf': 'dilate', 'mcal_shear': 0.01}):
+def mp_fit_one(obslist, prior, rng, psf_model='gauss', gal_model='gauss', mcal_pars= DEFAULT_MCAL_PARS):
     """
     Multiprocessing version of original _fit_one()
 
@@ -318,7 +321,7 @@ def mp_fit_one(obslist, prior, rng, psf_model='gauss', gal_model='gauss', mcal_p
 
     runner = ngmix.runners.Runner(fitter=fitter, guesser=guesser, ntry=ntry)
 
-    #types = ['noshear', '1p', '1m', '2p', '2m']
+    types = mcal_pars['types']
     psf = mcal_pars['psf']
     mcal_shear = mcal_pars['mcal_shear']
     boot = ngmix.metacal.MetacalBootstrapper(
@@ -326,7 +329,7 @@ def mp_fit_one(obslist, prior, rng, psf_model='gauss', gal_model='gauss', mcal_p
         rng=rng,
         psf=psf,
         step = mcal_shear,
-        #types=types,
+        types=types,
     )
 
     resdict, obsdict = boot.go(obslist)
@@ -425,8 +428,11 @@ def mp_run_fit(i, obj, obslist, prior,
 
 def main():
 
-    args = parser.parse_args()
-
+    args = parse_args()
+    print("Arguments received:")
+    for arg, value in vars(args).items():
+        print(f"  {arg}: {value}")
+    print("-" * 50)
     vb = args.vb # if True, prints out values of R11/R22 for every galaxy
     medsfile = args.medsfile
     outfilename = args.outfile
@@ -442,7 +448,7 @@ def main():
     use_coadd = args.use_coadd
     use_coadd_only = args.use_coadd_only
     rng  = np.random.RandomState(seed)
-    mcal_pars= {'psf': 'dilate', 'mcal_shear': 0.01}
+    mcal_pars= DEFAULT_MCAL_PARS
 
     if outdir is None:
         outdir = os.getcwd()

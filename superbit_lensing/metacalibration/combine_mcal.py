@@ -69,10 +69,12 @@ def main(args):
     # Combine filtered tables
     mcal_combined = {}
     mcal_combined["id"] = filtered_tables[0]["id"]
+    mcal_combined["meds_indx"] = filtered_tables[0]["meds_indx"]
     mcal_combined["ra"] = filtered_tables[0]["ra"]
     mcal_combined["dec"] = filtered_tables[0]["dec"]
     mcal_combined["XWIN_IMAGE"] = filtered_tables[0]["XWIN_IMAGE"]
     mcal_combined["YWIN_IMAGE"] = filtered_tables[0]["YWIN_IMAGE"]
+    mcal_combined["ncutout"] = filtered_tables[0]["ncutout"]
 
     # Metacalibration types
     types = ["noshear", "1p", "1m", "2p", "2m", "1p_psf", "1m_psf", "2p_psf", "2m_psf"]

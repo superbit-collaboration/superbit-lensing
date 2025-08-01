@@ -1087,12 +1087,13 @@ def radec_to_xy(header, ra, dec):
     # Set projection type based on checks
     if is_tpv and has_pv_terms:
         # Use TPV if it's specified and has polynomials
-        wcs_manual.wcs.ctype = [ctype1, ctype2]
-        #print("Using TPV projection with PV terms")
+        #wcs_manual.wcs.ctype = [ctype1, ctype2]
+        wcs_manual = WCS(header)
+        print("Using TPV projection with PV terms")
     elif is_tpv and not has_pv_terms:
         # Fall back to TAN-SIP if TPV is specified but no PV terms
         wcs_manual.wcs.ctype = ["RA---TAN-SIP", "DEC--TAN-SIP"]
-        #print("TPV specified but no PV terms found, falling back to TAN-SIP")
+        print("TPV specified but no PV terms found, falling back to TAN-SIP")
         
         # Check for SIP coefficients (should be present for TAN-SIP)
         has_sip = False
@@ -1106,15 +1107,15 @@ def radec_to_xy(header, ra, dec):
         if not has_sip:
             # If no SIP coefficients, fall back to plain TAN
             wcs_manual.wcs.ctype = ["RA---TAN", "DEC--TAN"]
-            #print("No SIP coefficients found, falling back to plain TAN")
+            print("No SIP coefficients found, falling back to plain TAN")
     else:
         # Use what's in the header or default to TAN
         if 'CTYPE1' in header and 'CTYPE2' in header:
             wcs_manual.wcs.ctype = [ctype1, ctype2]
-            #print(f"Using projection from header: {ctype1}, {ctype2}")
+            print(f"Using projection from header: {ctype1}, {ctype2}")
         else:
             wcs_manual.wcs.ctype = ["RA---TAN", "DEC--TAN"]
-            #print("No projection specified in header, using TAN")
+            print("No projection specified in header, using TAN")
     
     # Convert coordinates using the manual WCS
     coords = SkyCoord(ra*u.deg, dec*u.deg, frame='icrs')

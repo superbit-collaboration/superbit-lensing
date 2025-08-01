@@ -2,22 +2,24 @@ import numpy as np
 import ipdb
 from astropy.table import Table, vstack, hstack, join
 from astropy.wcs import WCS
+import astropy.units as u
+from astropy.coordinates import SkyCoord
+from astropy.table import hstack
 import glob
 import sys, os
 from astropy.io import fits
 from esutil import htm
 from argparse import ArgumentParser
 
+
 from annular_jmac import Annular, ShearCalc
 from make_redshift_cat import make_redshift_catalog
 from superbit_lensing import utils
 from superbit_lensing.match import SkyCoordMatcher
 
-def parse_args():
 
+def parse_args():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    default_config = os.path.join(script_dir, 'configs/default_annular_config.yaml')
-    
     parser = ArgumentParser()
 
     parser.add_argument('data_dir', type=str,
@@ -31,7 +33,7 @@ def parse_args():
     parser.add_argument('-outdir', type=str, default=None,
                         help='Output directory')
     parser.add_argument('-config', '-c', type=str,
-                        default=default_config,
+                        default=os.path.join(script_dir, 'configs/default_annular_config_sims.yaml'),
                         help='Configuration file with annular cuts etc.')
     parser.add_argument('-detection_band', type=str, default='b',
                         help='Detection bandpass [default: b]')
@@ -84,7 +86,6 @@ class AnnularCatalog():
         self.annular_info = annular_info
         self.config = config
         self.detect_cat = cat_info['detect_cat']
-        self.data_dir = cat_info['data_dir']
         self.mcal_file = cat_info['mcal_file']
         self.outfile = cat_info['mcal_selected']
         self.outdir = cat_info['outdir']
@@ -104,6 +105,8 @@ class AnnularCatalog():
         else:
             self.outdir = ''
 
+        self.outfile_w_truth = self.outfile.replace(".fits", "_with_truth.fits")
+
         self.det_cat = Table.read(self.detect_cat, hdu=2)
         self.mcal = Table.read(self.mcal_file)
         self.joined = None
@@ -113,114 +116,9 @@ class AnnularCatalog():
 
         self.Ndet = len(self.det_cat)
         self.Nmcal = len(self.mcal)
-
+        truthfile = f"{cat_info['data_dir']}/{self.run_name}/{cat_info['band']}/cal/{self.run_name}_truth_{cat_info['band']}.fits"
+        self.truth = Table.read(truthfile)
         return
-
-    def match_and_merge_color_mag(self, selected_catalog, color_mag_file, tolerance_deg=5e-5, idx_matcher=False):
-        """
-        Match selected catalog with color magnitude catalog by position and ID,
-        then merge color/magnitude columns into the selected catalog.
-        
-        Parameters:
-        -----------
-        selected_catalog : astropy.table.Table
-            The primary catalog to which columns will be added
-        color_mag_file : str
-            Path to the color magnitude catalog file
-        tolerance_deg : float
-            Matching tolerance in degrees (default: 1e-4)
-        
-        Returns:
-        --------
-        astropy.table.Table
-            Updated catalog with color/magnitude columns added
-        """
-        
-        if not os.path.exists(color_mag_file):
-            print(f"Color magnitude file not found: {color_mag_file}")
-            return selected_catalog
-        
-        # Read color magnitude catalog
-        color_mag = Table.read(color_mag_file)
-        
-        print(f"\nMatching catalogs:")
-        print(f"  Selected catalog: {len(selected_catalog)} objects")
-        print(f"  Color-mag catalog: {len(color_mag)} objects")
-        
-        # Perform sky coordinate matching
-        matcher = SkyCoordMatcher(selected_catalog, color_mag, 
-                                cat1_ratag='ra', cat1_dectag='dec',
-                                return_idx=True, match_radius=1 * tolerance_deg)
-        matched_selected, matched_color_mag, idx1, idx2 = matcher.get_matched_pairs()
-        
-        print(f"  Position matches found: {len(idx1)}")
-        
-        idx1 = np.array(idx1)
-        idx2 = np.array(idx2)
-
-        if idx_matcher:
-            # Further filter to keep only matches where IDs are equal
-            id_match_mask = (matched_selected['id'] == matched_color_mag['id'])
-            valid_idx1 = idx1[id_match_mask]
-            valid_idx2 = idx2[id_match_mask]
-            
-            print(f"  Valid ID matches: {len(valid_idx1)}")
-            print(f"  Filtered out (position match but ID mismatch): {len(idx1) - len(valid_idx1)}")
-        else:
-            # Use all position matches without ID filtering
-            valid_idx1 = idx1
-            valid_idx2 = idx2
-            print(f"  Using all position matches (ID matching disabled)")
-        
-        # Columns to fetch from color_mag
-        columns_to_add = ['m_b', 'm_b_err', 'm_g', 'm_g_err', 'm_u', 'm_u_err', 
-                        'color_bg', 'color_bg_err', 'color_ub', 'color_ub_err', 'Z_best', 
-                          'ZERR_best', 'Z_source']
-        
-        string_columns = ['Z_source']    
-        # Create a copy of the original selected catalog
-        result_catalog = selected_catalog.copy()
-        
-        # Check which columns actually exist in color_mag
-        available_columns = [col for col in columns_to_add if col in color_mag.colnames]
-        missing_columns = [col for col in columns_to_add if col not in color_mag.colnames]
-        
-        if missing_columns:
-            print(f"\n  Warning: Following columns not found in color_mag catalog: {missing_columns}")
-        
-        # Initialize new columns with NaN or appropriate empty values
-        for col in available_columns:
-            if col in string_columns:
-                # Initialize string columns with empty strings, all masked
-                result_catalog[col] = np.ma.masked_array(
-                    np.array([''] * len(result_catalog), dtype='U50'),
-                    mask=np.ones(len(result_catalog), dtype=bool)
-                )
-            else:
-                # Initialize numeric columns with NaN, all masked
-                result_catalog[col] = np.ma.masked_array(
-                    np.full(len(result_catalog), np.nan),
-                    mask=np.ones(len(result_catalog), dtype=bool)
-                )
-        
-        # Fill in the matched values
-        for idx_selected, idx_color in zip(valid_idx1, valid_idx2):
-            for col in available_columns:
-                result_catalog[col][idx_selected] = color_mag[col][idx_color]
-                result_catalog[col].mask[idx_selected] = False
-        
-        # Calculate final statistics
-        n_matched = len(valid_idx1)
-        n_unmatched = len(result_catalog) - n_matched
-        match_rate = (n_matched / len(result_catalog)) * 100
-        
-        print(f"\nFinal statistics:")
-        print(f"  Objects with color/mag data: {n_matched} ({match_rate:.1f}%)")
-        print(f"  Objects without color/mag data: {n_unmatched} ({100-match_rate:.1f}%)")
-        print(f"  Columns added: {available_columns}")
-        
-        return result_catalog
-
 
     def join(self, overwrite=False):
 
@@ -352,6 +250,20 @@ class AnnularCatalog():
             raise err
 
         self.joined_gals = gals_joined_cat
+        # Convert RA/Dec to SkyCoord objects
+        tolerance_deg = 1./3600.
+        matcher_truth = SkyCoordMatcher(gals_joined_cat, self.truth, cat1_ratag='ra', cat1_dectag='dec',
+                                return_idx=True, match_radius=1 * tolerance_deg)
+        matched_selected, matched_truth, idx1, idx2 = matcher_truth.get_matched_pairs()
+
+        # Apply mask and combine tables
+        self.joined_gals = hstack([matched_selected, matched_truth], table_names=["mcal", "truth"])
+        self.joined_gals.rename_column('redshift_mcal', 'redshift')
+        self.joined_gals.remove_column('redshift_truth')
+        self.joined_gals.rename_column('ra_mcal', 'ra')
+        self.joined_gals.rename_column('dec_mcal', 'dec')
+        self.joined_gals.remove_column('ra_truth')
+        self.joined_gals.remove_column('dec_truth')        
 
         return
 
@@ -368,25 +280,45 @@ class AnnularCatalog():
         cat_info = self.cat_info
         data_dir = self.cat_info['data_dir']
         redshift_cat = self.redshift_cat
-        color_mag_file = os.path.join(data_dir, self.run_name, 'sextractor_dualmode', 'out', f'{self.run_name}_colors_mags.fits')
 
         # Filter out foreground galaxies using redshifts in truth file
         self._redshift_select(redshift_cat, overwrite=overwrite)
 
 
         # Apply selection cuts and produce responsivity-corrected shear moments
-        # Return selection (quality) cuts
         self._compute_metacal_quantities()
 
         # Save selected galaxies to file
         for key, val in self.config['mcal_cuts'].items():
             self.selected.meta[key] = val
 
-        self.selected = self.match_and_merge_color_mag(self.selected, color_mag_file, tolerance_deg=5e-5, idx_matcher=False)       
-
         self.selected.write(self.outfile, format='fits', overwrite=overwrite)
+
+        truthfile = f"{cat_info['data_dir']}/{self.run_name}/{cat_info['band']}/cal/{self.run_name}_truth_{cat_info['band']}.fits"
+
+        truth = Table.read(truthfile)
+        
+        self.selected_with_truth = join(
+            self.selected, truth, join_type='inner',
+            keys=['ra', 'dec'], table_names=['mcal', 'truth']
+            )
+
+        # Convert RA/Dec to SkyCoord objects
+        tolerance_deg = 1./3600.
+        matcher_truth = SkyCoordMatcher(self.selected, truth, cat1_ratag='ra', cat1_dectag='dec',
+                                return_idx=True, match_radius=1 * tolerance_deg)
+        matched_selected, matched_truth, idx1, idx2 = matcher_truth.get_matched_pairs()
+
+        # Apply mask and combine tables
+        self.selected_with_truth = hstack([matched_selected, matched_truth], table_names=["mcal", "truth"])
+
+        print(f"Number of objects joined from truth file : {len(self.selected_with_truth)}")
+
+        self.selected_with_truth.write(self.outfile_w_truth, format='fits', overwrite=overwrite)
+        print(f'The final file with object truth values: {self.outfile_w_truth}')
+
         print("==Some Stats==\n")
-        _ = utils.analyze_mcal_fits(self.outfile, update_header=True)        
+        _ = utils.analyze_mcal_fits(self.outfile_w_truth, update_header=True)
 
         return
 
@@ -422,6 +354,7 @@ class AnnularCatalog():
         )
 
         mcal = self.joined_gals
+        mcal = mcal[mcal['admom_sigma']>0.19]
 
         noshear_selection = mcal[
             (mcal['T_noshear'] >= min_Tpsf * mcal['Tpsf_noshear'])\
@@ -429,7 +362,7 @@ class AnnularCatalog():
             & (mcal['T_noshear'] >= min_T) \
             & (mcal['s2n_noshear'] > min_sn) \
             & (mcal['s2n_noshear'] < max_sn) \
-            & (mcal['redshift'] > min_redshift)
+            #& (mcal['redshift'] > min_redshift)
         ]
 
         selection_1p = mcal[
@@ -551,14 +484,12 @@ class AnnularCatalog():
             c2_psf = ((noshear_selection['g_2p_psf'][:, 1] + noshear_selection['g_2m_psf'][:, 1])/2 - noshear_selection['g_noshear'][:, 1])
             c1_gamma = ((noshear_selection['g_1p'][:, 0] + noshear_selection['g_1m'][:, 0])/2 - noshear_selection['g_noshear'][:, 0])
             c2_gamma = ((noshear_selection['g_2p'][:, 1] + noshear_selection['g_2m'][:, 1])/2 - noshear_selection['g_noshear'][:, 1])
-            rT_1 = ( noshear_selection['T_1p'] - noshear_selection['T_1m'] ) / (2.*mcal_shear)
-            rT_2 = ( noshear_selection['T_2p'] - noshear_selection['T_2m'] ) / (2.*mcal_shear)
 
             #---------------------------------
             # Now add value-adds to table
             self.selected.add_columns(
-                [r11, r12, r21, r22, c1_gamma, c2_gamma, c1_psf, c2_psf, rT_1, rT_2],
-                names=['r11', 'r12', 'r21', 'r22', 'c1', 'c2', 'c1_psf', 'c2_psf', 'rT_1', 'rT_2']
+                [r11, r12, r21, r22, c1_gamma, c2_gamma, c1_psf, c2_psf],
+                names=['r11', 'r12', 'r21', 'r22', 'c1', 'c2', 'c1_psf', 'c2_psf']
                 )
 
         except ValueError as e:
@@ -598,6 +529,8 @@ class AnnularCatalog():
         self.selected['R11_S'] = r11_S
         self.selected['R22_S'] = r22_S
         self.selected['weight'] = weight
+
+        return
 
     def run(self, overwrite, vb=False):
 
@@ -710,7 +643,8 @@ def main(args):
         'cluster_redshift': cluster_redshift,
         'nfw_file': nfw_file,
         'Nresample': Nresample,
-        'nfw_seed': nfw_seed
+        'nfw_seed': nfw_seed,
+        'band': detection_band
         }
 
     annular_info = {
