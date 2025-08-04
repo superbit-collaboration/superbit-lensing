@@ -7,7 +7,7 @@ export cluster_redshift="0.296"
 export detection_band="b"
 
 # Define directories
-export DATADIR="/projects/mccleary_group/saha/data"
+export DATADIR="/scratch/sa.saha/data"
 export CODEDIR="/projects/mccleary_group/saha/codes/superbit-lensing"
 export OUTDIR="${DATADIR}/${cluster_name}/${band_name}/out"
 

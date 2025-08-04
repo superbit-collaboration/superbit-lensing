@@ -50,6 +50,7 @@ dependencies = [
     "astroquery",
     "ipdb",
     "statsmodels",
+    "reproject",
 ]
 
 [project.optional-dependencies]

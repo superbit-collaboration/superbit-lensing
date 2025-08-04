@@ -89,7 +89,8 @@ pip-deps: conda-deps
 		esutil \
 		astroquery \
 		ipdb \
-		statsmodels
+		statsmodels \
+		reproject
 
 # Install git dependencies
 git-deps: pip-deps
@@ -108,6 +109,10 @@ install: git-deps
 	$(PIP) install -e .
 	@printf "$(GREEN)Installation complete!$(NC)\n"
 	@printf "$(YELLOW)To use the environment, run: conda activate $(ENV_NAME)$(NC)\n"
+	@printf "\n$(GREEN)Running post-installation configuration...$(NC)\n"
+	@eval "$$(conda shell.bash hook)" && \
+	conda activate $(ENV_NAME) && \
+	$(PYTHON) post_installation.py
 
 # Development install (editable)
 dev-install: git-deps
