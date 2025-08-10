@@ -27,11 +27,11 @@ This leads to underestimated cluster masses.
 - Create convergence maps with the background-only catalog
 
 ## Files
-- `Color_Cutter_Notebook.ipynb` - This is the first iteration of the analysis notebook implementing color-color cuts.
-- It implements a singular parabolic cut
+- `Color_Cutter_Notebook.ipynb` - This is the first iteration of the parabola analysis notebook implementing color-color cuts. It implements a singular parabolic cut
+
+- `Pixel_Mask_Notebook.ipynb` - This is the first iteration of the pixel mask analysis notebook implementing color-cuts. It uses a mask to cut out the forgeround objects. 
 
 ## References
 
 Based on methods developed in:
 - Medezinski et al. (2018) - "Source selection for cluster weak lensing measurements in the Hyper Suprime-Cam survey"
-- Medezinski et al. (2010) - Color-color selection techniques for cluster lensing
