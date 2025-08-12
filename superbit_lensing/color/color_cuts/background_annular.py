@@ -1,5 +1,6 @@
 ## This script assumes you've already run annular!
-## Filter background objects from an annular catalog by removing foreground objects, calculate new response matrix and g_rinv
+## Filter background objects from an annular catalog by removing foreground objects
+## Calculate new response matrix and g_rinv
 ## Save as a fits file which you can then make a convergence map out of
 
 import argparse
@@ -13,10 +14,10 @@ from superbit_lensing.match import SkyCoordMatcher
 
 ## uses SkyCoordMatcher to match then filter out foreground
 
-def filter_background_objects(annular_fits, foreground_fits, 
+def remove_foreground_objects(annular_fits, foreground_fits, 
                              annular_ra_col='RA', annular_dec_col='DEC',
                              foreground_ra_col='RA', foreground_dec_col='DEC',
-                             match_radius=1.0, verbose=True):
+                             tolerance_degree=0.0001, verbose=True):
     """
     Filter background objects by removing foreground matches.
     
@@ -74,12 +75,9 @@ def filter_background_objects(annular_fits, foreground_fits,
         raise ValueError(f"Column '{foreground_dec_col}' not found in foreground catalog. "
                        f"Available columns: {foreground_cat.colnames}")
     
-    # Convert match radius from arcsec to degrees
-    tolerance_deg = match_radius / 3600.0
-    
     # Match coordinates using SkyCoordMatcher
     if verbose:
-        print(f"\nMatching coordinates (radius: {match_radius} arcsec)...")
+        print(f"\nMatching coordinates ({tolerance_degree} degree)...")
     
     # Create matcher instance
     matcher = SkyCoordMatcher(
@@ -90,7 +88,7 @@ def filter_background_objects(annular_fits, foreground_fits,
         cat2_ratag=foreground_ra_col,
         cat2_dectag=foreground_dec_col,
         return_idx=True,
-        match_radius=tolerance_deg
+        match_radius=1 * tolerance_deg
     )
     
     # Get matched pairs and indices
@@ -123,3 +121,82 @@ def filter_background_objects(annular_fits, foreground_fits,
             print(f"Available columns in matched catalog: {matched_annular.colnames[:5]}...")
     
     return background_catalog
+
+def main():
+    """Main function to run the script from command line."""
+    
+    parser = argparse.ArgumentParser(
+        description="Filter foreground objects from annular catalog keeping background only.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+
+        """
+    )
+    
+    # Required arguments
+    parser.add_argument('annular_fits', 
+                       help='Path to annular FITS file with all objects')
+    parser.add_argument('foreground_fits', 
+                       help='Path to FITS file with foreground objects')
+    
+    # Optional but recommended argument
+    parser.add_argument('-o', '--output', default=None,
+                       help='Output FITS file for background catalog '
+                            '(default: adds _background suffix)')
+    
+    # Fully optional
+    parser.add_argument('--annular-ra', default='RA',
+                       help='Name of RA column in annular catalog (default: RA)')
+    parser.add_argument('--annular-dec', default='DEC',
+                       help='Name of DEC column in annular catalog (default: DEC)')
+    parser.add_argument('--foreground-ra', default='RA',
+                       help='Name of RA column in foreground catalog (default: RA)')
+    parser.add_argument('--foreground-dec', default='DEC',
+                       help='Name of DEC column in foreground catalog (default: DEC)')
+    parser.add_argument('--match-radius', type=float, default=1.0,
+                       help='Match radius in arcseconds (default: 1.0)')
+    parser.add_argument('-q', '--quiet', action='store_true',
+                       help='Suppress progress messages')
+    
+    args = parser.parse_args()
+    
+    # Check input files exist
+    if not os.path.exists(args.annular_fits):
+        print(f"Error: Annular catalog not found: {args.annular_fits}")
+        sys.exit(1)
+    if not os.path.exists(args.foreground_fits):
+        print(f"Error: Foreground catalog not found: {args.foreground_fits}")
+        sys.exit(1)
+    
+    # Generate output filename if not specified
+    if args.output is None:
+        base = os.path.splitext(args.annular_fits)[0]
+        args.output = f"{base}_background.fits"
+    
+    # Run the filtering
+    try:
+        background_catalog = remove_background_objects(
+            args.annular_fits,
+            args.foreground_fits,
+            annular_ra_col=args.annular_ra,
+            annular_dec_col=args.annular_dec,
+            foreground_ra_col=args.foreground_ra,
+            foreground_dec_col=args.foreground_dec,
+            match_radius=args.match_radius,
+            verbose=not args.quiet
+        )
+        
+        # Save the result
+        if not args.quiet:
+            print(f"\nSaving background catalog: {args.output}")
+        background_catalog.write(args.output, overwrite=True)
+        
+        if not args.quiet:
+            print("Done!")
+            
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
