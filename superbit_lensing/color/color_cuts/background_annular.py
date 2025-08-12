@@ -35,8 +35,8 @@ def remove_foreground_objects(annular_fits, foreground_fits,
         Name of RA column in foreground catalog (default: 'RA')
     foreground_dec_col : str
         Name of DEC column in foreground catalog (default: 'DEC')
-    match_radius : float
-        Match radius in arcseconds (default: 1.0)
+    tolerance_degree : float
+        Match radius in degrees (default: 0.001)
     verbose : bool
         Print progress information
         
@@ -88,7 +88,7 @@ def remove_foreground_objects(annular_fits, foreground_fits,
         cat2_ratag=foreground_ra_col,
         cat2_dectag=foreground_dec_col,
         return_idx=True,
-        match_radius=1 * tolerance_deg
+        match_radius=1 * tolerance_degree
     )
     
     # Get matched pairs and indices
@@ -145,16 +145,16 @@ def main():
                             '(default: adds _background suffix)')
     
     # Fully optional
-    parser.add_argument('--annular-ra', default='RA',
+    parser.add_argument('--annular-ra', default='ra',
                        help='Name of RA column in annular catalog (default: RA)')
-    parser.add_argument('--annular-dec', default='DEC',
+    parser.add_argument('--annular-dec', default='dec',
                        help='Name of DEC column in annular catalog (default: DEC)')
-    parser.add_argument('--foreground-ra', default='RA',
+    parser.add_argument('--foreground-ra', default='ra',
                        help='Name of RA column in foreground catalog (default: RA)')
-    parser.add_argument('--foreground-dec', default='DEC',
+    parser.add_argument('--foreground-dec', default='dec',
                        help='Name of DEC column in foreground catalog (default: DEC)')
-    parser.add_argument('--match-radius', type=float, default=1.0,
-                       help='Match radius in arcseconds (default: 1.0)')
+    parser.add_argument('--tolerance-degree', type=float, default=0.001,
+                       help='Match radius in degrees (default: 0.001)')
     parser.add_argument('-q', '--quiet', action='store_true',
                        help='Suppress progress messages')
     
@@ -175,14 +175,14 @@ def main():
     
     # Run the filtering
     try:
-        background_catalog = remove_background_objects(
+        background_catalog = remove_foreground_objects(
             args.annular_fits,
             args.foreground_fits,
             annular_ra_col=args.annular_ra,
             annular_dec_col=args.annular_dec,
             foreground_ra_col=args.foreground_ra,
             foreground_dec_col=args.foreground_dec,
-            match_radius=args.match_radius,
+            tolerance_degree=args.tolerance_degree,
             verbose=not args.quiet
         )
         
