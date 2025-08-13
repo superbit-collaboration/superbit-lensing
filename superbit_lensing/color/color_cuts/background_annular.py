@@ -14,10 +14,108 @@ from superbit_lensing.match import SkyCoordMatcher
 
 ## uses SkyCoordMatcher to match then filter out foreground
 
+def calculate_shear_response(catalog, verbose=True):
+    """
+    Calculate shear response correction for the catalog.
+    
+    Parameters
+    ----------
+    catalog : astropy.table.Table
+        Catalog with r11, r22, and g_noshear columns
+    verbose : bool
+        Print progress information
+        
+    Returns
+    -------
+    catalog : astropy.table.Table
+        Catalog with updated g1_rinv and g2_rinv columns
+    """
+    # Check for required columns
+    required_cols = ['r11', 'r22', 'g_noshear']
+    missing_cols = [col for col in required_cols if col not in catalog.colnames]
+    
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}. "
+                       f"Available columns: {catalog.colnames}")
+    
+    if verbose:
+        print("\nCalculating shear response correction...")
+        print(f"  Found r11 column: Yes")
+        print(f"  Found r22 column: Yes")
+        print(f"  Found g_noshear column: Yes")
+        
+        # Check if g1_rinv and g2_rinv already exist
+        has_g1_rinv = 'g1_rinv' in catalog.colnames
+        has_g2_rinv = 'g2_rinv' in catalog.colnames
+        
+        if has_g1_rinv:
+            print(f"  Found existing g1_rinv column - will update")
+        else:
+            print(f"  No g1_rinv column found - will create")
+            
+        if has_g2_rinv:
+            print(f"  Found existing g2_rinv column - will update")
+        else:
+            print(f"  No g2_rinv column found - will create")
+    
+    # Calculate average response values
+    r11_avg = np.mean(catalog['r11'])
+    r22_avg = np.mean(catalog['r22'])
+    
+    if verbose:
+        print(f"\nResponse matrix averages (from {len(catalog)} background objects):")
+        print(f"  r11_avg = {r11_avg:.6f}")
+        print(f"  r22_avg = {r22_avg:.6f}")
+        print(f"  Response matrix R = [[{r11_avg:.6f}, 0], [0, {r22_avg:.6f}]]")
+    
+    # Extract g_noshear components
+    # Handle different possible formats for g_noshear
+    g_noshear = catalog['g_noshear']
+    
+    # Check if g_noshear is already a 2D array or needs to be parsed
+    if len(g_noshear.shape) == 1:
+        # It might be stored as tuples or strings, need to parse
+        if verbose:
+            print(f"\n  g_noshear format: {type(g_noshear[0])}")
+        
+        # Try to extract g1 and g2
+        if isinstance(g_noshear[0], (list, tuple, np.ndarray)):
+            g1_noshear = np.array([g[0] for g in g_noshear])
+            g2_noshear = np.array([g[1] for g in g_noshear])
+        else:
+            # Might need different parsing
+            raise ValueError(f"Unexpected g_noshear format: {type(g_noshear[0])}")
+    else:
+        # Already a 2D array
+        g1_noshear = g_noshear[:, 0]
+        g2_noshear = g_noshear[:, 1]
+    
+    # Calculate g_rinv = R * g_noshear
+    # For diagonal matrix: g1_rinv = r11_avg * g1, g2_rinv = r22_avg * g2
+    g1_rinv_new = r11_avg * g1_noshear
+    g2_rinv_new = r22_avg * g2_noshear
+    
+    # Update or add g1_rinv and g2_rinv columns
+    catalog['g1_rinv'] = g1_rinv_new
+    catalog['g2_rinv'] = g2_rinv_new
+    
+    if verbose:
+        print(f"\nShear correction applied:")
+        print(f"  g1_rinv = r11_avg * g1_noshear")
+        print(f"  g2_rinv = r22_avg * g2_noshear")
+        print(f"  Sample values:")
+        print(f"    g1_rinv[0] = {g1_rinv_new[0]:.6f}")
+        print(f"    g2_rinv[0] = {g2_rinv_new[0]:.6f}")
+        print(f"  Updated g1_rinv and g2_rinv columns")
+    
+    return catalog
+
+
+
 def remove_foreground_objects(annular_fits, foreground_fits, 
                              annular_ra_col='RA', annular_dec_col='DEC',
                              foreground_ra_col='RA', foreground_dec_col='DEC',
-                             tolerance_degree=0.0001, verbose=True):
+                             tolerance_degree=0.0001, calculate_response=True, verbose=True):
     """
     Filter background objects by removing foreground matches.
     
@@ -36,14 +134,16 @@ def remove_foreground_objects(annular_fits, foreground_fits,
     foreground_dec_col : str
         Name of DEC column in foreground catalog (default: 'DEC')
     tolerance_degree : float
-        Match radius in degrees (default: 0.001)
+        Match radius in degrees (default: 0.0001)
+    calculate_response : bool
+        Calculate shear response correction (default: True)
     verbose : bool
         Print progress information
         
     Returns
     -------
     background_catalog : astropy.table.Table
-        Filtered catalog containing only background objects
+        Filtered catalog containing only background objects with updated g1_rinv and g2_rinv columns
     """
     
     # Load the catalogs
@@ -120,7 +220,15 @@ def remove_foreground_objects(annular_fits, foreground_fits,
             print(f"\nMatched annular catalog has {len(matched_annular)} objects")
             print(f"Available columns in matched catalog: {matched_annular.colnames[:5]}...")
     
+    if calculate_response:
+        try:
+            background_catalog = calculate_shear_response(background_catalog, verbose=verbose)
+        except ValueError as e:
+            if verbose:
+                print(f"\nWarning: Could not calculate shear response: {e}")
+                print("Continuing without g_rinv calculation...")    
     return background_catalog
+
 
 def main():
     """Main function to run the script from command line."""
@@ -155,8 +263,11 @@ def main():
                        help='Name of DEC column in foreground catalog (default: DEC)')
     parser.add_argument('--tolerance-degree', type=float, default=0.001,
                        help='Match radius in degrees (default: 0.001)')
+    parser.add_argument('--no-response', action='store_true',
+                       help='Skip shear response calculation')
     parser.add_argument('-q', '--quiet', action='store_true',
                        help='Suppress progress messages')
+    
     
     args = parser.parse_args()
     
@@ -183,6 +294,7 @@ def main():
             foreground_ra_col=args.foreground_ra,
             foreground_dec_col=args.foreground_dec,
             tolerance_degree=args.tolerance_degree,
+            calculate_response=not args.no_response,
             verbose=not args.quiet
         )
         
