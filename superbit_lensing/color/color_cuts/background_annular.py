@@ -9,8 +9,11 @@ import sys
 from astropy.table import Table
 from astropy.coordinates import SkyCoord
 from astropy import units as u
+from astropy.io import fits
 import numpy as np
 from superbit_lensing.match import SkyCoordMatcher
+from superbit_lensing import utils
+
 
 ## uses SkyCoordMatcher to match then filter out foreground
 
@@ -265,6 +268,8 @@ def main():
                        help='Match radius in degrees (default: 0.001)')
     parser.add_argument('--no-response', action='store_true',
                        help='Skip shear response calculation')
+    parser.add_argument('--no-analysis', action='store_true',
+                       help='Skip convergence map analysis')
     parser.add_argument('-q', '--quiet', action='store_true',
                        help='Suppress progress messages')
     
@@ -302,6 +307,32 @@ def main():
         if not args.quiet:
             print(f"\nSaving background catalog: {args.output}")
         background_catalog.write(args.output, overwrite=True)
+
+        # Analyze the saved file for convergence map parameters
+        if not args.no_analysis:
+            if not args.quiet:
+                print("\n" + "="*60)
+                print("Analyzing catalog for convergence map parameters...")
+                print("="*60)
+                
+            try:
+                # Run analysis and update header with metadata
+                results = utils.analyze_mcal_fits(args.output, update_header=True, verbose=not args.quiet)
+                
+                # Extract and highlight the key recommendation
+                if not args.quiet:
+                    pixel_size = results['recommended_pixel_size_arcmin']
+                    print("\n" + "="*60)
+                    print(f"CONVERGENCE MAP RECOMMENDATION:")
+                    print(f"Recommended pixel size: {pixel_size:.2f} arcmin")
+                    print(f"This ensures ≥5 objects per pixel for reliable convergence maps")
+                    print("="*60)
+                    
+            except Exception as e:
+                if not args.quiet:
+                    print(f"\nWarning: Could not analyze output file: {e}")
+                    print("Continuing without pixel size recommendation...")
+        
         
         if not args.quiet:
             print("Done!")
