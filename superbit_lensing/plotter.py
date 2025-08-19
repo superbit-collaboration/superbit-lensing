@@ -1677,3 +1677,67 @@ class ClusterRedSequenceAnalysis:
         #    save_display_ready_rgb_fits(rgb, wcs, output_fitsfile)
 
         return rgb
+
+
+def plot_kappa_difference_with_count_difference(kappa_file1, count_file1, kappa_file2, count_file2, 
+                                                figsize=(20, 16), plot_title='Kappa Difference with Count Difference',
+                                                vmin=-0.1, vmax=0.1, draw_rect=True, frac=0.25**0.5):
+    # Load data from FITS files
+    with fits.open(count_file1) as hdul:
+        count_data1 = hdul[0].data
+    with fits.open(kappa_file1) as hdul:
+        kappa_data1 = hdul[0].data
+        
+    with fits.open(count_file2) as hdul:
+        count_data2 = hdul[0].data
+    with fits.open(kappa_file2) as hdul:
+        kappa_data2 = hdul[0].data
+    
+    # Compute differences
+    kappa_diff = kappa_data1 - kappa_data2
+    count_diff = count_data1 - count_data2
+    
+    # Debug: print some statistics
+    print(f"Count difference range: {count_diff.min()} to {count_diff.max()}")
+    print(f"Number of non-zero count differences: {(count_diff != 0).sum()}")
+    print(f"Kappa difference range: {kappa_diff.min()} to {kappa_diff.max()}")
+    
+    # Get shape of data
+    ny, nx = count_data1.shape
+    
+    # Compute 50% area bounds
+    dx = int(nx * frac / 2)
+    dy = int(ny * frac / 2)
+    x_center, y_center = nx // 2, ny // 2
+    x1, x2 = x_center - dx, x_center + dx
+    y1, y2 = y_center - dy, y_center + dy
+    
+    # Plot kappa difference
+    plt.figure(figsize=figsize)
+    plt.imshow(kappa_diff, origin='lower', cmap='magma', vmin=vmin, vmax=vmax)
+    plt.colorbar(label='Kappa Difference')
+    
+    # Overlay count differences as text
+    for y in range(ny):
+        for x in range(nx):
+            diff = count_diff[y, x]
+            if diff != 0:  # Only label non-zero differences
+                # Format with explicit sign
+                text = f'+{int(diff)}' if diff > 0 else f'{int(diff)}'
+                plt.text(x, y, text, ha='center', va='center', 
+                        fontsize=12, color='white')
+    
+    # Optional: Draw rectangle for central 50% area
+    if draw_rect:
+        rect = patches.Rectangle((x1, y1), x2 - x1, y2 - y1,
+                               linewidth=2, edgecolor='cyan', facecolor='none', linestyle='--')
+        plt.gca().add_patch(rect)
+    
+    # Title and labels
+    plt.title(plot_title, fontsize=12)
+    plt.xlabel('X Pixel', fontsize=12)
+    plt.ylabel('Y Pixel', fontsize=12)
+    
+    # Display the plot
+    plt.tight_layout()
+    plt.show()
