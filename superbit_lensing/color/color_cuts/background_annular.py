@@ -35,7 +35,7 @@ def calculate_shear_response(catalog, verbose=True):
     """
     # Check for required columns
     response_cols = ['r11', 'r12', 'r21', 'r22']
-    bias_cols = ['c1_psf', 'c2_psf', 'c1_gamma', 'c2_gamma']
+    bias_cols = ['c1_psf', 'c2_psf', 'c1', 'c2']
     other_required = ['g_noshear']
 
     all_required = response_cols + bias_cols + other_required
@@ -93,8 +93,8 @@ def calculate_shear_response(catalog, verbose=True):
         c_psf = np.array([c1_psf_avg, c2_psf_avg])
         
         # Gamma correction
-        c1_gamma_avg = np.mean(catalog['c1_gamma'])
-        c2_gamma_avg = np.mean(catalog['c2_gamma'])
+        c1_gamma_avg = np.mean(catalog['c1'])
+        c2_gamma_avg = np.mean(catalog['c2'])
         c_gamma = np.array([c1_gamma_avg, c2_gamma_avg])
         
         # Total correction
@@ -155,13 +155,33 @@ def calculate_shear_response(catalog, verbose=True):
         print(f"\nShear correction applied:")
         print(f"  g_biased = g_noshear - c_total")
         print(f"  g_corrected = R^(-1) @ g_biased")
-        print(f"  Addative bias is {c_total[0]} and {c_total[1]}")
-        print(f"  Sample values:")
-        print(f"    g1_noshear[0] = {g1_noshear[0]:.6f}")
-        print(f"    g2_noshear[0] = {g2_noshear[0]:.6f}")
-        print(f"    g1_Rinv_new[0] = {g1_Rinv_new[0]:.6f}")
-        print(f"    g2_Rinv_new[0] = {g2_Rinv_new[0]:.6f}")
-        print(f"  Added g1_Rinv_new and g2_Rinv_new columns")
+    
+        # Print all bias components
+        if all(col in catalog.colnames for col in bias_cols):
+            print(f"\nBias correction components:")
+            print(f"  PSF bias (c_psf):")
+            print(f"    c1_psf = {c1_psf_avg:.6f}")
+            print(f"    c2_psf = {c2_psf_avg:.6f}")
+            print(f"  Gamma correction (c_gamma):")
+            print(f"    c1_gamma = {c1_gamma_avg:.6f}")
+            print(f"    c2_gamma = {c2_gamma_avg:.6f}")
+            print(f"  Total additive bias (c_total):")
+            print(f"    c1_total = {c_total[0]:.6f}")
+            print(f"    c2_total = {c_total[1]:.6f}")
+        else:
+            print(f"\nNo bias corrections applied (c_total = [0, 0])")
+            print(f"\nSample values for first galaxy:")
+            print(f"  Original shear:")
+            print(f"    g1_noshear[0] = {g1_noshear[0]:.6f}")
+            print(f"    g2_noshear[0] = {g2_noshear[0]:.6f}")
+            print(f"  Bias-corrected shear:")
+            print(f"    g1_biased[0] = {g1_biased[0]:.6f}")
+            print(f"    g2_biased[0] = {g2_biased[0]:.6f}")
+            print(f"  Final corrected shear:")
+            print(f"    g1_Rinv_new[0] = {g1_Rinv_new[0]:.6f}")
+            print(f"    g2_Rinv_new[0] = {g2_Rinv_new[0]:.6f}")
+        
+    print(f"\nAdded g1_Rinv_new and g2_Rinv_new columns to catalog")
     
     return catalog
 
