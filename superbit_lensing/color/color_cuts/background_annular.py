@@ -14,17 +14,17 @@ import numpy as np
 from superbit_lensing.match import SkyCoordMatcher
 from superbit_lensing import utils
 
-
-## uses SkyCoordMatcher to match then filter out foreground
+## uses SkyCoordMatcher to match then filter out foreground objects
 
 def calculate_shear_response(catalog, verbose=True):
     """
-    Calculate shear response correction for the catalog.
+    Calculate shear response correction for the filtered catalog!!
     
     Parameters
     ----------
     catalog : astropy.table.Table
-        Catalog with r11, r22, and g_noshear columns
+        Catalog with response matrix columns (r11, r12, r21, r22), g_noshear,
+        and bias correction columns (c1_psf, c2_psf, c1_gamma, c2_gamma)
     verbose : bool
         Print progress information
         
@@ -34,44 +34,82 @@ def calculate_shear_response(catalog, verbose=True):
         Catalog with updated g1_rinv and g2_rinv columns
     """
     # Check for required columns
-    required_cols = ['r11', 'r22', 'g_noshear']
-    missing_cols = [col for col in required_cols if col not in catalog.colnames]
+    response_cols = ['r11', 'r12', 'r21', 'r22']
+    bias_cols = ['c1_psf', 'c2_psf', 'c1_gamma', 'c2_gamma']
+    other_required = ['g_noshear']
+
+    all_required = response_cols + bias_cols + other_required
+    missing_cols = [col for col in all_required if col not in catalog.colnames]
     
     if missing_cols:
-        raise ValueError(f"Missing required columns: {missing_cols}. "
-                       f"Available columns: {catalog.colnames}")
-    
-    if verbose:
-        print("\nCalculating shear response correction...")
-        print(f"  Found r11 column: Yes")
-        print(f"  Found r22 column: Yes")
-        print(f"  Found g_noshear column: Yes")
+        # If bias columns are missing, we can proceed without them
+        missing_bias = [col for col in bias_cols if col in missing_cols]
+        missing_critical = [col for col in missing_cols if col not in bias_cols]
         
-        # Check if g1_rinv and g2_rinv already exist
-        has_g1_rinv = 'g1_rinv' in catalog.colnames
-        has_g2_rinv = 'g2_rinv' in catalog.colnames
+        if missing_critical:
+            raise ValueError(f"Missing critical columns: {missing_critical}. "
+                           f"Available columns: {catalog.colnames}")
         
-        if has_g1_rinv:
-            print(f"  Found existing g1_rinv column - will update")
-        else:
-            print(f"  No g1_rinv column found - will create")
-            
-        if has_g2_rinv:
-            print(f"  Found existing g2_rinv column - will update")
-        else:
-            print(f"  No g2_rinv column found - will create")
+        if missing_bias and verbose:
+            print(f"Warning: Missing bias correction columns: {missing_bias}")
+            print("Proceeding without bias corrections...")
+
     
     # Calculate average response values
     r11_avg = np.mean(catalog['r11'])
     r22_avg = np.mean(catalog['r22'])
+    r21_avg = np.mean(catalog['r21'])
+    r12_avg = np.mean(catalog['r12'])
     
     if verbose:
         print(f"\nResponse matrix averages (from {len(catalog)} background objects):")
         print(f"  r11_avg = {r11_avg:.6f}")
+        print(f"  r12_avg = {r12_avg:.6f}")
+        print(f"  r21_avg = {r21_avg:.6f}")
         print(f"  r22_avg = {r22_avg:.6f}")
-        print(f"  Response matrix R = [[{r11_avg:.6f}, 0], [0, {r22_avg:.6f}]]")
+
+    # Step 2: Build average response matrix and invert it
+    R_avg = np.array([[r11_avg, r12_avg],
+                      [r21_avg, r22_avg]])
+    try:
+        R_inv = np.linalg.inv(R_avg)
+        if verbose:
+            print(f"\nAverage response matrix R:")
+            print(f"  [[{r11_avg:.6f}, {r12_avg:.6f}],")
+            print(f"   [{r21_avg:.6f}, {r22_avg:.6f}]]")
+            print(f"\nInverse response matrix R^(-1):")
+            print(f"  [[{R_inv[0,0]:.6f}, {R_inv[0,1]:.6f}],")
+            print(f"   [{R_inv[1,0]:.6f}, {R_inv[1,1]:.6f}]]")
+    except np.linalg.LinAlgError:
+        raise ValueError("Response matrix is singular and cannot be inverted!")
     
-    # Extract g_noshear components
+    # Step 3: Calculate bias corrections if available
+    c_total = np.zeros(2)
+    
+    if all(col in catalog.colnames for col in bias_cols):
+        # PSF additive bias
+        c1_psf_avg = np.mean(catalog['c1_psf'])
+        c2_psf_avg = np.mean(catalog['c2_psf'])
+        c_psf = np.array([c1_psf_avg, c2_psf_avg])
+        
+        # Gamma correction
+        c1_gamma_avg = np.mean(catalog['c1_gamma'])
+        c2_gamma_avg = np.mean(catalog['c2_gamma'])
+        c_gamma = np.array([c1_gamma_avg, c2_gamma_avg])
+        
+        # Total correction
+        c_total = c_psf + c_gamma
+        
+        if verbose:
+            print(f"\nBias corrections:")
+            print(f"  c_psf = [{c1_psf_avg:.6f}, {c2_psf_avg:.6f}]")
+            print(f"  c_gamma = [{c1_gamma_avg:.6f}, {c2_gamma_avg:.6f}]")
+            print(f"  c_total = [{c_total[0]:.6f}, {c_total[1]:.6f}]")
+    else:
+        if verbose:
+            print(f"\nNo bias corrections applied (columns not found)")
+    
+    # Step 4: Extract g_noshear components 
     # Handle different possible formats for g_noshear
     g_noshear = catalog['g_noshear']
     
@@ -92,32 +130,44 @@ def calculate_shear_response(catalog, verbose=True):
         # Already a 2D array
         g1_noshear = g_noshear[:, 0]
         g2_noshear = g_noshear[:, 1]
+
+    # Step 5: Apply bias correction
+    g1_biased = g1_noshear - c_total[0]
+    g2_biased = g2_noshear - c_total[1]
+
+    # Step 6: Apply response correction using matrix multiplication
+    # g_corrected = R_inv @ g_biased for each galaxy
+    g_biased = np.column_stack((g1_biased, g2_biased))
     
-    # Calculate g_rinv = R * g_noshear
-    # For diagonal matrix: g1_rinv = r11_avg * g1, g2_rinv = r22_avg * g2
-    g1_rinv_new = r11_avg * g1_noshear
-    g2_rinv_new = r22_avg * g2_noshear
+    # Using einsum for efficient matrix multiplication
+    # 'ij,nj->ni' means: R_inv[i,j] * g_biased[n,j] -> g_corrected[n,i]
+    g_corrected = np.einsum('ij,nj->ni', R_inv, g_biased)
     
-    # Update or add g1_rinv and g2_rinv columns
-    catalog['g1_rinv'] = g1_rinv_new
-    catalog['g2_rinv'] = g2_rinv_new
+    # Step 7: Extract corrected shear components
+    g1_Rinv_new = g_corrected[:, 0]
+    g2_Rinv_new = g_corrected[:, 1]
+    
+    # ADD g1_rinv and g2_rinv columns
+    catalog['g1_Rinv_new'] = g1_Rinv_new
+    catalog['g2_Rinv_new'] = g2_Rinv_new
     
     if verbose:
         print(f"\nShear correction applied:")
-        print(f"  g1_rinv = r11_avg * g1_noshear")
-        print(f"  g2_rinv = r22_avg * g2_noshear")
+        print(f"  g_biased = g_noshear - c_total")
+        print(f"  g_corrected = R^(-1) @ g_biased")
+        print(f"  Addative bias is {c_total[0]} and {c_total[1]}")
         print(f"  Sample values:")
-        print(f"    g1_rinv[0] = {g1_rinv_new[0]:.6f}")
-        print(f"    g2_rinv[0] = {g2_rinv_new[0]:.6f}")
-        print(f"  Updated g1_rinv and g2_rinv columns")
+        print(f"    g1_noshear[0] = {g1_noshear[0]:.6f}")
+        print(f"    g2_noshear[0] = {g2_noshear[0]:.6f}")
+        print(f"    g1_Rinv_new[0] = {g1_Rinv_new[0]:.6f}")
+        print(f"    g2_Rinv_new[0] = {g2_Rinv_new[0]:.6f}")
+        print(f"  Added g1_Rinv_new and g2_Rinv_new columns")
     
     return catalog
 
-
-
 def remove_foreground_objects(annular_fits, foreground_fits, 
-                             annular_ra_col='RA', annular_dec_col='DEC',
-                             foreground_ra_col='RA', foreground_dec_col='DEC',
+                             annular_ra_col='ra', annular_dec_col='dec',
+                             foreground_ra_col='ra', foreground_dec_col='dec',
                              tolerance_degree=0.0001, calculate_response=True, verbose=True):
     """
     Filter background objects by removing foreground matches.
@@ -231,7 +281,6 @@ def remove_foreground_objects(annular_fits, foreground_fits,
                 print(f"\nWarning: Could not calculate shear response: {e}")
                 print("Continuing without g_rinv calculation...")    
     return background_catalog
-
 
 def main():
     """Main function to run the script from command line."""
