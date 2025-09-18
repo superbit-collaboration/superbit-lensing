@@ -2,12 +2,15 @@
 #SBATCH -t 13:59:59
 #SBATCH -N 1
 #SBATCH -n 18
-#SBATCH --mem-per-cpu=10g
+#SBATCH --mem=180G
 #SBATCH --partition=short
 #SBATCH -J ngmix1
 #SBATCH -v
 #SBATCH -o logs/ngmixout.log
 #SBATCH -e logs/ngmixerr.log
+
+# Print Job ID
+echo "Submitted job with ID: $SLURM_JOB_ID"
 
 # Load configuration file
 source "$SLURM_SUBMIT_DIR/config.sh"
@@ -23,7 +26,7 @@ mkdir -p $ARRAROUTDIR
 
 python $CODEDIR/superbit_lensing/metacalibration/ngmix_fit.py \
 -outdir=$ARRAROUTDIR \
--n 48 \
+-n 18 \
 -seed=701428541 \
 -psf_model=$PSF_MODEL \
 -gal_model=$GAL_MODEL \

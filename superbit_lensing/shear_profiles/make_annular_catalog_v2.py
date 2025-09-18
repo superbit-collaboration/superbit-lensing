@@ -543,24 +543,41 @@ class AnnularCatalog():
         weight = 1. / tot_covar
 
         try:
+            # Shear response terms
             r11 = ( noshear_selection['g_1p'][:,0] - noshear_selection['g_1m'][:,0] ) / (2.*mcal_shear)
             r12 = ( noshear_selection['g_2p'][:,0] - noshear_selection['g_2m'][:,0] ) / (2.*mcal_shear)
             r21 = ( noshear_selection['g_1p'][:,1] - noshear_selection['g_1m'][:,1] ) / (2.*mcal_shear)
             r22 = ( noshear_selection['g_2p'][:,1] - noshear_selection['g_2m'][:,1] ) / (2.*mcal_shear)
+
+            # PSF shear response terms
+            r11_psf = (noshear_selection['g_1p_psf'][:, 0] - noshear_selection['g_1m_psf'][:, 0]) / (2. * mcal_shear)
+            r12_psf = (noshear_selection['g_2p_psf'][:, 0] - noshear_selection['g_2m_psf'][:, 0]) / (2. * mcal_shear)
+            r21_psf = (noshear_selection['g_1p_psf'][:, 1] - noshear_selection['g_1m_psf'][:, 1]) / (2. * mcal_shear)
+            r22_psf = (noshear_selection['g_2p_psf'][:, 1] - noshear_selection['g_2m_psf'][:, 1]) / (2. * mcal_shear)
+
+            # Additive biases
             c1_psf = ( (noshear_selection['g_1p_psf'][:,0] + noshear_selection['g_1m_psf'][:,0])/2 - noshear_selection['g_noshear'][:,0])
             c2_psf = ((noshear_selection['g_2p_psf'][:, 1] + noshear_selection['g_2m_psf'][:, 1])/2 - noshear_selection['g_noshear'][:, 1])
             c1_gamma = ((noshear_selection['g_1p'][:, 0] + noshear_selection['g_1m'][:, 0])/2 - noshear_selection['g_noshear'][:, 0])
             c2_gamma = ((noshear_selection['g_2p'][:, 1] + noshear_selection['g_2m'][:, 1])/2 - noshear_selection['g_noshear'][:, 1])
+
+            # Size response
             rT_1 = ( noshear_selection['T_1p'] - noshear_selection['T_1m'] ) / (2.*mcal_shear)
             rT_2 = ( noshear_selection['T_2p'] - noshear_selection['T_2m'] ) / (2.*mcal_shear)
 
             #---------------------------------
             # Now add value-adds to table
             self.selected.add_columns(
-                [r11, r12, r21, r22, c1_gamma, c2_gamma, c1_psf, c2_psf, rT_1, rT_2],
-                names=['r11', 'r12', 'r21', 'r22', 'c1', 'c2', 'c1_psf', 'c2_psf', 'rT_1', 'rT_2']
-                )
-
+                [r11, r12, r21, r22,
+                r11_psf, r12_psf, r21_psf, r22_psf,
+                c1_gamma, c2_gamma, c1_psf, c2_psf,
+                rT_1, rT_2],
+                names=['r11', 'r12', 'r21', 'r22',
+                    'r11_psf', 'r12_psf', 'r21_psf', 'r22_psf',
+                    'c1', 'c2', 'c1_psf', 'c2_psf',
+                    'rT_1', 'rT_2']
+            )
+            
         except ValueError as e:
             # In some cases, these cols are already computed
             print('WARNING: mcal r{ij} value-added cols not added; ' +\

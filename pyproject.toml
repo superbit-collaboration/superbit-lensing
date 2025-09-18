@@ -51,6 +51,7 @@ dependencies = [
     "ipdb",
     "statsmodels",
     "reproject",
+    "treecorr",
 ]
 
 [project.optional-dependencies]

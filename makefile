@@ -99,7 +99,8 @@ git-deps: pip-deps
 	conda activate $(ENV_NAME) && \
 	$(PIP) install git+https://github.com/esheldon/ngmix.git && \
 	$(PIP) install git+https://github.com/esheldon/meds.git && \
-	$(PIP) install git+https://github.com/esheldon/psfex.git
+	$(PIP) install git+https://github.com/esheldon/psfex.git && \
+	$(PIP) install git+https://github.com/rmjarvis/TreeCorr.git
 
 # Install the package
 install: git-deps

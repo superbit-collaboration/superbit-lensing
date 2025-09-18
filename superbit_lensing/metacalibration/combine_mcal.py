@@ -121,6 +121,7 @@ def main(args):
         matcher = SkyCoordMatcher(mcal_combined_table, starcat, cat1_ratag='ra', cat1_dectag='dec',
                 cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', match_radius=5 * tolerance_deg)
         mcal_discard, matched_stars = matcher.get_matched_pairs()
+        mcal_discard['MAG_AUTO'] = matched_stars["MAG_AUTO"]
         total_mcal = len(mcal_combined_table)
         total_discard = len(mcal_discard)
 

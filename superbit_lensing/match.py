@@ -217,7 +217,7 @@ class SkyCoordMatcher:
     def __init__(self, cat1, cat2,
                  cat1_ratag='ALPHAWIN_J2000', cat1_dectag='DELTAWIN_J2000',
                  cat2_ratag=None, cat2_dectag=None, return_idx=False,
-                 match_radius=1.0/3600):
+                 match_radius=1.0/3600, verbose=True):
         """
         Initialize the SkyCoordMatcher with catalogs and matching parameters.
 
@@ -237,6 +237,7 @@ class SkyCoordMatcher:
 
         self.match_radius = match_radius  # in degrees
         self.return_idx = return_idx
+        self.verbose = verbose
 
         self.matched_cat1 = None
         self.matched_cat2 = None
@@ -286,8 +287,8 @@ class SkyCoordMatcher:
         angular_dists = 2 * np.arcsin(dists / 2)
         distances = np.full(len(vec1), np.inf)
         distances[valid] = angular_dists[valid]
-
-        print(f"Number of matches after initial pass: {np.sum(valid)}")
+        if self.verbose:
+            print(f"Number of matches after initial pass: {np.sum(valid)}")
 
         # Enforce one-to-one matching (closest wins)
         best_match_for_2 = {}
@@ -298,8 +299,8 @@ class SkyCoordMatcher:
 
         final_matches1 = list(best_match_for_2.values())
         final_matches2 = list(best_match_for_2.keys())
-
-        print(f"Number of matches after reassignment: {len(final_matches1)}")
+        if self.verbose:
+            print(f"Number of matches after reassignment: {len(final_matches1)}")
 
         self.matched_cat1 = self.cat1[final_matches1]
         self.matched_cat2 = self.cat2[final_matches2]

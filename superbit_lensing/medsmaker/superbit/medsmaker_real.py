@@ -12,6 +12,7 @@ import esutil as eu
 from astropy.table import Table
 import astropy.units as u
 import superbit_lensing.utils as utils
+from superbit_lensing.match import SkyCoordMatcher
 from superbit_lensing.medsmaker.superbit.psf_extender import psf_extender
 import glob
 import pdb
@@ -48,7 +49,7 @@ class BITMeasurement():
         self.detect_cat_path = None
         self.detection_cat = None
         self.psf_models = None
-
+        self.tolerance_deg = 1e-4
         # Set up logger
         if log is None:
             logfile = 'medsmaker.log'
@@ -62,6 +63,29 @@ class BITMeasurement():
 
         project_root = filepath.parents[3]  # This points to superbit-lensing/
         self.exposure_mask_fname = str(project_root / "data" / "masks" / "mask_dark_55percent_300.npy")
+        self.star_file = os.path.join(self.data_dir, "catalogs", "stars", f"{self.target_name}_gaia_dr3.fits")
+
+        try:
+            self.gaia_stars = Table.read(self.star_file, hdu=1)
+        except Exception as e:
+            print(f"[WARNING] Could not open star file: {e}. Trying GAIA query...")
+            try:
+                # Try querying GAIA directly
+                self.gaia_stars = utils.gaia_query(self.target_name)
+                print("[INFO] GAIA query successful.")
+
+                # Try saving the query result for reuse
+                try:
+                    self.gaia_stars.write(self.star_file, format="fits", overwrite=True)
+                    print(f"[INFO] Saved queried GAIA stars to {self.star_file}")
+                except Exception as e_save:
+                    print(f"[WARNING] Could not save GAIA stars to file: {e_save}")
+
+            except Exception as e_query:
+                raise RuntimeError(
+                    f"Failed to obtain GAIA stars for {self.target_name}: "
+                    f"could not read {self.star_file} and GAIA query also failed ({e_query})."
+                )
 
         # If desired, set a tmp output directory
         self._set_work_dir(work_dir)
@@ -69,6 +93,123 @@ class BITMeasurement():
         # Cluster/bandpass directory containing all the cal/, cat/, etc. folders
         self.cluster_band_dir = os.path.join(self.data_dir,
                                     self.target_name, self.band)
+
+    def check_cat_image_order(self, verbose=True):
+        """
+        Check that for every catalog file in self.image_cats there is a
+        corresponding image file in self.image_files, preserving order.
+        
+        Catalog example:
+            /scratch/.../b/cat/Abell3411_1_300_1683033980_clean_cat.fits
+        Expected image:
+            /scratch/.../b/cal/Abell3411_1_300_1683033980_clean.fits
+        
+        Parameters
+        ----------
+        verbose : bool, optional
+            If True, print quick stats about matches/mismatches.
+        
+        Returns
+        -------
+        bool
+            True if all catalogs match their images in order, else False
+        """
+        n_cats, n_imgs = len(self.image_cats), len(self.image_files)
+        if n_cats != n_imgs:
+            if verbose:
+                print(f"[Mismatch] Counts differ: {n_cats} cats, {n_imgs} images")
+                self.logprint(f"[Mismatch] Counts differ: {n_cats} cats, {n_imgs} images")
+            return False
+
+        n_match = 0
+        n_fail = 0
+        mismatches = []
+
+        for idx, (cat, img) in enumerate(zip(self.image_cats, self.image_files)):
+            # Expected image path: swap directory and drop "_cat"
+            expected_img = cat.replace("/cat/", "/cal/").replace("_cat.fits", ".fits")
+
+            if expected_img == img:
+                n_match += 1
+            else:
+                n_fail += 1
+                mismatches.append((idx, cat, img, expected_img))
+
+        if verbose:
+            print(f"[check_cat_image_order] Matches: {n_match}/{n_cats}, Fails: {n_fail}")
+            self.logprint(f"[check_cat_image_order] Matches: {n_match}/{n_cats}, Fails: {n_fail}")
+            if n_fail > 0:
+                for idx, cat, img, exp_img in mismatches:
+                    print(f"  -> Exposure {idx}:")
+                    self.logprint(f"  -> Exposure {idx}:")
+                    print(f"     Catalog: {cat}")
+                    self.logprint(f"     Catalog: {cat}")
+                    print(f"     Got image: {img}")
+                    self.logprint(f"     Got image: {img}")
+                    print(f"     Expected : {exp_img}")
+                    self.logprint(f"     Expected : {exp_img}")
+
+        return n_fail == 0
+
+    def check_psf_model_order(self, verbose=True):
+        """
+        Check that for every PSF model in self.psf_model_files there is a
+        corresponding image and catalog, preserving order.
+
+        Expected structure:
+            image: /.../b/cal/Abell3411_1_300_1683033980_clean.fits
+            catalog: /.../b/cat/Abell3411_1_300_1683033980_clean_cat.fits
+            psf model: /.../b/cat/psfex-output/Abell3411_1_300_1683033980_clean_starcat.psf
+
+        Parameters
+        ----------
+        verbose : bool, optional
+            If True, print quick stats about matches/mismatches.
+
+        Returns
+        -------
+        bool
+            True if all PSF models match their images and catalogs in order, else False.
+        """
+        n_images, n_cats, n_psfs = len(self.image_files), len(self.image_cats), len(self.psf_model_files[1:])
+        if not (n_images == n_cats == n_psfs):
+            if verbose:
+                print(f"[Mismatch] Counts differ: {n_images} images, {n_cats} cats, {n_psfs} psfs")
+                self.logprint(f"[Mismatch] Counts differ: {n_images} images, {n_cats} cats, {n_psfs} psfs")
+            return False
+
+        n_match = 0
+        n_fail = 0
+        mismatches = []
+
+        for idx, (psf, img, cat) in enumerate(zip(self.psf_model_files[1:], self.image_files, self.image_cats)):
+            # Expected catalog path from image
+            expected_cat = img.replace("/cal/", "/cat/").replace(".fits", "_cat.fits")
+
+            # Expected PSF file from catalog
+            expected_psf = expected_cat.replace("/cat/", "/cat/psfex-output/").replace("_cat.fits", "_starcat.psf")
+
+            if cat == expected_cat and psf == expected_psf:
+                n_match += 1
+            else:
+                n_fail += 1
+                mismatches.append((idx, img, cat, psf, expected_cat, expected_psf))
+
+        if verbose:
+            print(f"[check_psf_model_order] Matches: {n_match}/{n_images}, Fails: {n_fail}")
+            self.logprint(f"[check_psf_model_order] Matches: {n_match}/{n_images}, Fails: {n_fail}")
+            if n_fail > 0:
+                for idx, img, cat, psf, exp_cat, exp_psf in mismatches:
+                    print(f"  -> Exposure {idx}:")
+                    self.logprint(f"  -> Exposure {idx}:")
+                    if cat != exp_cat:
+                        print(f"     Catalog mismatch:\n       got {cat}\n       exp {exp_cat}")
+                        self.logprint(f"     Catalog mismatch:\n       got {cat}\n       exp {exp_cat}")
+                    if psf != exp_psf:
+                        print(f"     PSF mismatch:\n       got {psf}\n       exp {exp_psf}")
+                        self.logprint(f"     PSF mismatch:\n       got {psf}\n       exp {exp_psf}")
+
+        return n_fail == 0
 
     def _set_work_dir(self, work_dir):
         '''
@@ -115,68 +256,174 @@ class BITMeasurement():
         for image_file in self.image_files:
             sexcat = self._run_sextractor_on_exposure(image_file=image_file,
                                           config_dir=config_dir,
-                                          cat_dir=cat_dir)
+                                          cat_dir=cat_dir, admoms=True)
             self.image_cats.append(sexcat)
         self.cat_dir = cat_dir
 
+    def filter_files(self, std_threshold=0.2):
+        """
+        Filter out exposures with poor PSF FWHM stability based on matched stars.
+
+        For each exposure:
+        1. Read the star catalog (HDU=2).
+        2. Match stars to GAIA using `SkyCoordMatcher`.
+        3. Apply star quality cuts: MAG_AUTO > 16.5 and SNR_WIN > 20.
+        4. Compute star FWHM from T_ADMOM values.
+        5. Keep only finite, positive values and apply 1–99 percentile filtering.
+        6. Calculate the standard deviation of the filtered FWHM distribution.
+        7. Retain the exposure if the scatter is below `std_threshold`.
+
+        The function updates `self.image_files` and `self.image_cats` in place
+        to keep only the filtered set of exposures, and ensures catalogs and images
+        remain properly aligned.
+
+        Parameters
+        ----------
+        std_threshold : float, optional
+            Maximum allowed standard deviation of PSF FWHM (arcsec).
+            Exposures with higher scatter are discarded. Default is 0.2.
+
+        Returns
+        -------
+        int
+            Number of exposures retained after filtering.
+
+        Raises
+        ------
+        ValueError
+            If catalog and image lists are misaligned before or after filtering.
+        """
+        # Ensure catalog-image pairs are ordered correctly
+        if not self.check_cat_image_order():
+            raise ValueError("Catalogs and images are not aligned in order.")
+
+        # Work on deep copies (preserve originals until filtering is complete)
+        image_files = copy.deepcopy(self.image_files)
+        image_cats  = copy.deepcopy(self.image_cats)
+
+        total_exposures = len(image_files)
+        image_cats_filtered = []
+        image_files_filtered = []
+
+        for catfile, imfile in zip(image_cats, image_files):
+            # Read star catalog from HDU 2
+            exp_data = Table.read(catfile, hdu=2)
+
+            # Match to GAIA stars
+            matcher = SkyCoordMatcher(
+                exp_data, self.gaia_stars,
+                cat1_ratag='ALPHAWIN_J2000', cat1_dectag='DELTAWIN_J2000',
+                cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000',
+                return_idx=True,
+                match_radius=1 * self.tolerance_deg,
+                verbose=False
+            )
+            matched1, matched2, idx1, idx2 = matcher.get_matched_pairs()
+
+            # Apply star quality cuts
+            valid_stars = (matched1['MAG_AUTO'] > 16.5) & (matched1['SNR_WIN'] > 20)
+            matched1 = matched1[valid_stars]
+
+            # Compute FWHM from T_ADMOM
+            star_T_admom = matched1["T_ADMOM"]
+            star_fwhm = 2.355 * np.sqrt(star_T_admom / 2)
+
+            # Keep only valid finite positive values
+            valid_mask = np.isfinite(star_fwhm) & (star_fwhm > 0)
+            star_fwhm_valid = star_fwhm[valid_mask]
+
+            if len(star_fwhm_valid) == 0:
+                continue  # skip if no valid stars
+
+            # Apply 1–99 percentile filtering
+            p1, p99 = np.percentile(star_fwhm_valid, [1, 99])
+            percentile_mask = (star_fwhm_valid >= p1) & (star_fwhm_valid <= p99)
+            star_fwhm_filtered = star_fwhm_valid[percentile_mask]
+
+            # Compute scatter
+            std_fwhm = np.std(star_fwhm_filtered)
+
+            # Keep if scatter is below threshold
+            if std_fwhm < std_threshold:
+                image_cats_filtered.append(catfile)
+                image_files_filtered.append(imfile)
+
+        # Update object state
+        self.image_files = image_files_filtered
+        self.image_cats  = image_cats_filtered
+
+        # Verify order after filtering
+        if not self.check_cat_image_order():
+            raise ValueError("Catalogs and images became misaligned after filtering.")
+
+        kept_exposures = len(self.image_cats)
+        percent_kept = (kept_exposures / total_exposures * 100) if total_exposures > 0 else 0
+
+        print(f"Kept {kept_exposures} out of {total_exposures} exposures ({percent_kept:.1f}%)")
+        self.logprint(f"Kept {kept_exposures} out of {total_exposures} exposures ({percent_kept:.1f}%)")
+        return len(self.image_cats)
+
     def make_exposure_weights(self):
-        '''
-        Make inverse-variance weight maps because ngmix needs them and we 
-        don't have them for SuperBIT.
-        Use the SExtractor BACKGROUND_RMS check-image as a basis
-        '''
-        
+        """
+        Make inverse-variance weight maps for single exposures, taking into account
+        the exposure mask. Uses the SExtractor BACKGROUND_RMS check-image as a basis.
+        """
+
         img_names = self.image_files
         mask = np.load(self.exposure_mask_fname)
 
         for img_name in img_names:
             # Read in the BACKGROUND_RMS image
             rms_name = img_name.replace('.fits', '.bkg_rms.fits')
-            
+            wgt_file_name = img_name.replace('.fits', '.weight.fits')
+
             with fits.open(rms_name) as rms:
-                # Assuming the image data is in the primary HDU
-                background_rms_map = rms[0].data  
-                # Keep the original header to use for the weight map
-                header = rms[0].header  
+                background_rms_map = rms[0].data
+                header = rms[0].header.copy()
 
-                # Make a weight map
-                weight_map = 1 / (background_rms_map**2)
-                weight_map[mask] = 0
+            # Prevent division by zero or negative values
+            safe_rms = np.where(background_rms_map > 0, background_rms_map, np.nan)
+            weight_map = np.where(np.isfinite(safe_rms), 1.0 / (safe_rms**2), 0.0)
 
-                # Save the weight_map to a new file
-                wgt_file_name = img_name.replace('.fits', '.weight.fits')
-                hdu = fits.PrimaryHDU(weight_map, header=header)
-                hdu.writeto(wgt_file_name, overwrite=True)
+            # Apply exposure mask: mask==True → weight = 0
+            weight_map[mask] = 0.0
 
-            print(f'Weight map saved to {wgt_file_name}')
-
-    def make_coadd_weight(self):
-        '''
-        Make inverse-variance weight maps because ngmix needs them and we 
-        don't have them for SuperBIT.
-        Use the SExtractor BACKGROUND_RMS check-image as a basis
-        '''
-        
-        coadd_img_name = self.coadd_img_file
-
-        # Read in the BACKGROUND_RMS image
-        rms_name = coadd_img_name.replace('.fits', '.bkg_rms.fits')
-        
-        with fits.open(rms_name) as rms:
-            # Assuming the image data is in the primary HDU
-            background_rms_map = rms[0].data  
-            # Keep the original header to use for the weight map
-            header = rms[0].header  
-
-            # Make a weight map
-            weight_map = 1 / (background_rms_map**2)
-
-            # Save the weight_map to a new file
-            wgt_file_name = coadd_img_name.replace('.fits', '.weight.fits')
+            # Save the weight map
             hdu = fits.PrimaryHDU(weight_map, header=header)
             hdu.writeto(wgt_file_name, overwrite=True)
 
-        print(f'Weight map saved to {wgt_file_name}')        
+            msg = f"[make_exposure_weights] Weight map saved to {wgt_file_name}"
+            print(msg)
+            self.logprint(msg)
+
+    def make_coadd_weight(self):
+        """
+        Make inverse-variance weight maps because ngmix needs them and we 
+        don't have them for SuperBIT.
+        Use the SExtractor BACKGROUND_RMS check-image as a basis.
+        """
+
+        coadd_img_name = self.coadd_img_file
+
+        # Read in the BACKGROUND_RMS image
+        rms_name = coadd_img_name.replace(".fits", ".bkg_rms.fits")
+        wgt_file_name = coadd_img_name.replace(".fits", ".weight.fits")
+
+        with fits.open(rms_name) as rms:
+            background_rms_map = rms[0].data
+            header = rms[0].header.copy()
+
+        # Prevent division by zero or negative values
+        safe_rms = np.where(background_rms_map > 0, background_rms_map, np.nan)
+        weight_map = np.where(np.isfinite(safe_rms), 1.0 / (safe_rms**2), 0.0)
+
+        # Save the weight map
+        hdu = fits.PrimaryHDU(weight_map, header=header)
+        hdu.writeto(wgt_file_name, overwrite=True)
+
+        msg = f"[make_coadd_weight] Weight map saved to {wgt_file_name}"
+        print(msg)
+        self.logprint(msg)      
         
     def _run_sextractor(self, image_file, cat_dir, config_dir,
                         weight_file=None, back_type='AUTO'):
@@ -281,7 +528,7 @@ class BITMeasurement():
             print(f'bmask map saved to {bmask_file_name}')                               
 
     def _run_sextractor_on_exposure(self, image_file, cat_dir, config_dir,
-                        weight_file=None, back_type='AUTO'):
+                        weight_file=None, back_type='AUTO', admoms=False):
         '''
         Utility method to invoke Source Extractor on supplied detection file
         Returns: file path of catalog
@@ -317,7 +564,10 @@ class BITMeasurement():
         self.logprint("sex cmd is " + cmd)
         os.system(cmd)
 
-        print(f'cat_name is {cat_file} \n')
+        print(f'saved catalog with {len(Table.read(cat_file, hdu=2))} objects to {cat_file} \n')
+        if admoms:
+            print(f"adding admoms columns to {cat_file}")
+            cat = utils.add_admom_columns(cat_file, mode="galsim")
         return cat_file
 
     def make_coadd_image(self, config_dir=None):
@@ -550,12 +800,13 @@ class BITMeasurement():
         externally-supplied star catalog before PSF fitting.
         '''
         self.psf_models = []
+        self.psf_model_files = []
         image_files = copy.deepcopy(self.image_files)
         image_cats  = copy.deepcopy(self.image_cats)
 
         if star_config is None:
             star_config = {'MIN_MAG': 27,
-                           'MAX_MAG': 16,
+                           'MAX_MAG': 16.5,
                            'MIN_SIZE': 1.,
                            'MAX_SIZE': 3.5,
                            'MIN_SNR': 20,
@@ -605,11 +856,12 @@ class BITMeasurement():
                 self.psf_models.append(piff_model)
 
             elif psf_mode == 'psfex':
-                psfex_model = self._make_psfex_model(
+                psfex_model, psfex_model_file = self._make_psfex_model(
                     image_cat, config_path=config_path,
                     star_config=star_config
                     )
                 self.psf_models.append(psfex_model)
+                self.psf_model_files.append(psfex_model_file)
 
             elif psf_mode == 'true':
                 true_model = self._make_true_psf_model()
@@ -729,8 +981,9 @@ class BITMeasurement():
             model = psfex.PSFEx(psfex_model_file)
         except:
             model = None
+            psfex_model_file = None
             print(f'WARNING:\n Could not find PSFEx model file {psfex_model_file}\n')
-        return model
+        return model, psfex_model_file
 
 
     def _make_piff_model(self, im_file, im_cat, config_path, psf_seed,
@@ -829,8 +1082,44 @@ class BITMeasurement():
 
         return true_extended
 
+    def _select_stars_for_psf(self, sscat, star_config, truthfile=None):
+        '''
+        Method to obtain stars from SExtractor catalog using the truth catalog
+        Inputs
+            sscat: input catalog from which to select stars
+            truthcat: a pre-vetted catalog of stars
+        '''
+        self.gaia_query_happened = True
+        ss_fits = fits.open(sscat)
+        if len(ss_fits) == 3:
+            # It is an ldac
+            ext = 2
+        else:
+            ext = 1
+        ss = ss_fits[ext].data
 
-    def _select_stars_for_psf(self, sscat, truthfile, star_config):
+        matcher = SkyCoordMatcher(ss, self.gaia_stars,
+                                  cat1_ratag='ALPHAWIN_J2000', cat1_dectag='DELTAWIN_J2000',
+                                  cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000',
+                                  return_idx=True, match_radius=1 * self.tolerance_deg)
+
+        ss, matched2, idx1, idx2 = matcher.get_matched_pairs()    
+
+        wg_stars = (ss['MAG_AUTO'] > 16.5) & (ss['SNR_WIN'] > 20)
+        # Save output star catalog to file
+        ss_fits[ext].data = ss[wg_stars]
+        
+        outname = sscat.replace('_cat.fits','_starcat.fits')
+        ss_fits.writeto(outname, overwrite=True)
+
+        ss_fits_union = fits.HDUList([hdu.copy() for hdu in ss_fits])
+        ss_fits_union[ext].data = ss
+        union_outname = sscat.replace('_cat.fits','_starcat_union.fits')
+        ss_fits_union.writeto(union_outname, overwrite=True)
+
+        return outname
+
+    def _select_stars_for_psf_v2(self, sscat, truthfile, star_config):
         '''
         Method to obtain stars from SExtractor catalog using the truth catalog
         Inputs
@@ -969,7 +1258,7 @@ class BITMeasurement():
         image_files = []; weight_files = []
         bmask_files = []
         
-        coadd_image  = self.detect_img_file
+        coadd_image  = self.detect_img_file.replace('.fits','.sub.fits')
         coadd_weight = self.detect_img_file.replace('.fits', '.weight.fits') 
         coadd_segmap = self.detect_img_file.replace('.fits', '.sgm.fits') 
         coadd_bmask = self.detect_img_file.replace('.fits', '.bmask.fits') 
@@ -1003,8 +1292,7 @@ class BITMeasurement():
         Nim = len(image_files)
         image_info = meds.util.get_image_info_struct(Nim, max_len_of_filepath)
 
-        i=0
-        for image_file in range(Nim):
+        for i in range(Nim):
             image_info[i]['image_path']  =  image_files[i]
             image_info[i]['image_ext']   =  0
             image_info[i]['weight_path'] =  weight_files[i]
@@ -1019,8 +1307,6 @@ class BITMeasurement():
             # In principle we could probably set this automatically by checking
             # the images
             image_info[i]['position_offset'] = 1
-
-            i+=1
 
         return image_info
 
@@ -1062,7 +1348,7 @@ class BITMeasurement():
         return meta
 
     def _calculate_box_size(self, angular_size, size_multiplier = 2.5,
-                            min_size = 16, max_size= 64):
+                            min_size = 16, max_size= 256):
         '''
         Calculate the cutout size for this survey.
 

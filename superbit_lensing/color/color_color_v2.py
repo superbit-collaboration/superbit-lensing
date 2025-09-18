@@ -376,6 +376,7 @@ def main(args):
         final_table['id'] = matched_data_b[valid_flux]["NUMBER"]
         final_table['ra'] = ra_dec_table['ra'][valid_flux]
         final_table['dec'] = ra_dec_table['dec'][valid_flux]
+        final_table['FLAGS'] = matched_data_b['FLAGS'][valid_flux]
         final_table['m_b'] = m_b
         final_table['m_b_err'] = matched_data_b[valid_flux]["MAGERR_AUTO"]
         final_table['m_g'] = m_g

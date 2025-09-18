@@ -175,7 +175,8 @@ def main(args):
         bm.make_coadd_weight()
         
         # Set image catalogs attribute
-        bm.set_image_cats()
+        #bm.set_image_cats()
+        kept_exp = bm.filter_files(std_threshold=0.1)
 
         # Build  a PSF model for each image.
         logprint('Making PSF models... \n')
@@ -187,6 +188,9 @@ def main(args):
         )
 
         logprint('Making MEDS... \n')
+        
+        if not bm.check_psf_model_order():
+            raise ValueError("Catalogs, images and PSF files are not aligned in order.")
 
         logprint('Making image_info struct... \n')
         # Make the image_info struct.

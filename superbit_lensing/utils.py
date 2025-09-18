@@ -11,15 +11,25 @@ from astropy.wcs import WCS
 from astropy import units as u
 import pandas as pd
 from numpy.random import SeedSequence, default_rng
+import matplotlib.pyplot as plt
 import time
 import numpy as np
 import subprocess
 from astropy.io import fits
+from astropy.io.fits import Column
 import astropy.wcs as wcs
 from esutil import htm
 import pdb
 import ipdb
 import pyregion
+import psfex
+import galsim
+import ngmix
+from ngmix.shape import e1e2_to_g1g2
+from colossus.cosmology import cosmology
+from colossus.halo import concentration, mass_defs
+import treecorr
+from scipy.interpolate import UnivariateSpline
 from shapely.geometry import Point, Polygon
 
 # Get the path to the root of the project (2 levels up from utils.py)
@@ -1089,7 +1099,7 @@ def radec_to_xy(header, ra, dec):
         # Use TPV if it's specified and has polynomials
         #wcs_manual.wcs.ctype = [ctype1, ctype2]
         wcs_manual = WCS(header)
-        print("Using TPV projection with PV terms")
+        #print("Using TPV projection with PV terms")
     elif is_tpv and not has_pv_terms:
         # Fall back to TAN-SIP if TPV is specified but no PV terms
         wcs_manual.wcs.ctype = ["RA---TAN-SIP", "DEC--TAN-SIP"]
@@ -1528,6 +1538,779 @@ def update_hdu2(mega_catalog, output_file):
     except FileNotFoundError:
         # If file doesn't exist, create it with HDU=2
         write_to_hdu2(mega_catalog, output_file)
+
+def calculate_box_size(angular_size, pixel_scale, size_multiplier = 2.5,
+                        min_size = 16, max_size= 128):
+    '''
+    Calculate the cutout size for this survey.
+
+    :angular_size: angular size of a source, with some kind of angular units.
+    :size_multiplier: Amount to multiply angular size by to choose boxsize.
+    :deconvolved:
+    :min_size:
+    :max_size:
+    '''
+
+    box_size_float = np.ceil(angular_size * size_multiplier /pixel_scale)
+
+    # Available box sizes to choose from -> 16 to 256 in increments of 2
+    available_sizes = min_size * 2**(np.arange(np.ceil(np.log2(max_size)-np.log2(min_size)+1)).astype(int))
+
+    def get_box_size(val):
+        larger = available_sizes[available_sizes > val]
+        return np.min(larger) if larger.size > 0 else np.max(available_sizes)
+
+    if isinstance(box_size_float, np.ndarray):
+        return np.array([get_box_size(val) for val in box_size_float])
+    else:
+        return get_box_size(box_size_float)
+
+def make_psfex_model(psfcat_name, config_path, psf_seed=None, overwrite=True,  verbose=True):
+
+    # Where to store PSFEx output
+    psfex_outdir = os.path.join(os.path.dirname(psfcat_name), 'psfex-output')
+    make_dir(psfex_outdir)
+    if verbose:
+        print(f"[INFO] Output directory: {psfex_outdir}")
+    # Define output names
+    outcat_name = os.path.join(
+        psfex_outdir,
+        psfcat_name.replace('_starcat.fits','.psfex_starcat.fits')
+    )
+    psfex_model_file = os.path.join(
+        psfex_outdir,
+        os.path.basename(
+            psfcat_name.replace('.fits','.psf')
+        )
+    )
+
+    autoselect_arg = '-SAMPLE_AUTOSELECT N'
+    # Now run PSFEx on that image and accompanying catalog
+    psfex_config_arg = '-c '+ os.path.join(config_path, 'psfex.config')
+    psfdir_arg = f'-PSF_DIR {psfex_outdir}'
+
+    cmd = ' '.join(
+        ['psfex', psfcat_name, psfdir_arg, psfex_config_arg, \
+            '-OUTCAT_NAME', outcat_name, autoselect_arg]
+    )
+    if overwrite:
+        run_cmd = True
+        reason = "overwrite=True"
+    elif not os.path.exists(psfex_model_file):
+        run_cmd = True
+        reason = "PSF model file does not exist"
+    else:
+        run_cmd = False
+        reason = "PSF model already exists and overwrite=False"
+
+    if verbose:
+        print(f"[INFO] PSFEx model file: {psfex_model_file}")
+        print(f"[INFO] Decision to run PSFEx: {run_cmd} ({reason})")
+
+    if run_cmd:
+        if verbose:
+            print(f"[CMD] Running: {cmd}")
+        os.system(cmd)
+        if not os.path.exists(psfex_model_file):
+            print(f"[WARNING] PSFEx did not produce expected output: {psfex_model_file}")
+        cleanup_cmd = ' '.join(
+            ['mv chi* resi* samp* snap* proto* *.xml', psfex_outdir]
+            )
+        os.system(cleanup_cmd)
+
+    try:
+        model = psfex.PSFEx(psfex_model_file)
+    except:
+        model = None
+        print(f'WARNING:\n Could not find PSFEx model file {psfex_model_file}\n')
+    return model
+
+def add_admom_columns(catfilename, imagefilename=None, mode="ngmix", outfile=None, overwrite=True):
+    """
+    Add adaptive moments columns (E1_ADMOM, E2_ADMOM, T_ADMOM, BOX_SIZE) to a FITS catalog.
+
+    Parameters
+    ----------
+    catfilename : str
+        Path to input catalog file.
+    imagefilename : str, optional
+        Path to corresponding image. If None, inferred from catfilename.
+    mode : {"ngmix", "galsim"}, default="ngmix"
+        Which library to use for adaptive moments measurement.
+    outfile : str, optional
+        Path to output catalog. If None, derived from catfilename.
+    overwrite : bool, default=True
+        If True, overwrite existing columns with the same names.
+        If False, keep existing values and skip recomputation.
+    """
+    # --- Infer imagefilename if not provided ---
+    if imagefilename is None:
+        dirname, fname = os.path.split(catfilename)
+        if "_clean_cat.fits" in fname:
+            dirname = dirname.replace("/cat", "/cal")
+            imagefilename = os.path.join(
+                dirname, fname.replace("_clean_cat.fits", "_clean.sub.fits")
+            )
+        elif "_coadd_" in fname and fname.endswith("_cat.fits"):
+            imagefilename = os.path.join(
+                dirname, fname.replace("_cat.fits", ".sub.fits")
+            )
+        else:
+            raise ValueError(f"Cannot infer imagefilename from {catfilename}")
+
+    print(f"Using Image File: {imagefilename}")
+
+    # --- Load image ---
+    with fits.open(imagefilename) as hdul:
+        data = hdul[0].data
+        header = hdul[0].header
+
+    pixel_scale = get_pixel_scale(imagefilename)
+
+    # --- Load catalog ---
+    ss_fits = fits.open(catfilename)
+    ext = 2 if len(ss_fits) == 3 else 1
+    cat = ss_fits[ext].data
+
+    # If not overwriting and columns already exist, just write out directly
+    existing_cols = {c.name for c in cat.columns}
+    target_cols = {"E1_ADMOM", "E2_ADMOM", "T_ADMOM", "BOX_SIZE", "ADMOM_FLAGS"}
+    if not overwrite and target_cols.issubset(existing_cols):
+        print("Adaptive moment columns already exist — keeping them (overwrite=False).")
+        if outfile is None:
+            outfile = catfilename.replace("_cat.fits", "_admom_cat.fits")
+        ss_fits.writeto(outfile, overwrite=True)
+        print(f"Written catalog (unchanged) to {outfile}")
+        return
+
+    # --- Prepare arrays ---
+    ra, dec = cat["ALPHAWIN_J2000"], cat["DELTAWIN_J2000"]
+    ang_sizes = cat['KRON_RADIUS'] * cat['A_IMAGE'] * pixel_scale
+
+    nobj = len(cat)
+    e1_arr   = np.full(nobj, np.nan)
+    e2_arr   = np.full(nobj, np.nan)
+    T_arr    = np.full(nobj, np.nan)
+    box_arr  = np.full(nobj, np.nan)
+    flag_arr = np.zeros(nobj, dtype=int)  # 0 = good, 1 = bad
+    
+    # --- Loop over objects ---
+    for i in range(nobj):
+        try:
+            ximage, yimage = radec_to_xy(header, ra[i], dec[i])
+            boxsize = calculate_box_size(ang_sizes[i], pixel_scale)
+            box_arr[i] = boxsize
+
+            ext_vig, meta = extract_vignette(data, header, ximage, yimage, size=boxsize)
+            image = ext_vig
+            # --- ADMOM measurement ---
+            res = get_admoms(image, scale=pixel_scale, mode=mode, reduced=False)
+
+            e1_arr[i]  = res["e1"]
+            e2_arr[i]  = res["e2"]
+            T_arr[i]   = res["T"]
+            flag_arr[i] = res["flags"]
+
+        except Exception as e:
+            flag_arr[i] = 1
+
+    # --- Add or overwrite scalar columns in-place ---
+    new_data_cols = {
+        'E1_ADMOM': e1_arr,
+        'E2_ADMOM': e2_arr,
+        'T_ADMOM': T_arr,
+        'BOX_SIZE': box_arr,
+        'ADMOM_FLAGS': flag_arr
+    }
+
+    for name, arr in new_data_cols.items():
+        if name in cat.names:
+            if overwrite:
+                cat[name][:] = arr   # overwrite scalar column
+        else:
+            # add new scalar column
+            col = Column(name=name, format='E' if name!='ADMOM_FLAGS' else 'I', array=arr)
+            ss_fits[ext].columns.add_col(col)
+
+    # --- Write out ---
+    if outfile is None:
+        print(f"[Warning] outfile was None — defaulting to catfilename: {catfilename}")
+        outfile = catfilename
+
+    ss_fits.writeto(outfile, overwrite=True)
+    print(f"Written catalog with admom columns to {outfile}")
+
+    return Table(ss_fits[ext].data)
+
+def get_admoms(image: np.ndarray, scale: float, mode: str = "ngmix", reduced: bool = False) -> dict:
+    """
+    Measure adaptive moments (ADMOM) of an image using either ngmix or GalSim.
+
+    Parameters
+    ----------
+    image : ndarray
+        Input 2D image array.
+    scale : float
+        Pixel scale in arcsec/pixel.
+    mode : {"ngmix", "galsim"}, optional
+        Which backend to use for measuring moments.
+    reduced : bool, optional
+        If True, return reduced shear (g1, g2) instead of ellipticity (e1, e2).
+
+    Returns
+    -------
+    result : dict
+        Dictionary containing:
+            - "e1" / "g1": ellipticity or reduced shear component 1
+            - "e2" / "g2": ellipticity or reduced shear component 2
+            - "T": size measure (2 * sigma^2)
+            - "flag": int (0 = success, nonzero = failure)
+    """
+    # image center
+    cx, cy = image.shape[1] / 2, image.shape[0] / 2
+    jac = ngmix.jacobian.DiagonalJacobian(scale=scale, row=cy, col=cx)
+
+    # --- Normalize positive flux ---
+    norm = np.sum(image[image > 0])
+    if norm <= 0:
+        key1, key2 = ("g1", "g2") if reduced else ("e1", "e2")
+        return {key1: np.nan, key2: np.nan, "T": np.nan, "flag": 1}
+
+    # --- Moment measurement ---
+    if mode == "ngmix":
+        obs_im = ngmix.Observation(image=image / norm, jacobian=jac)
+        am = ngmix.admom.AdmomFitter()
+        res = am.go(obs_im, guess=0.5)
+        e1, e2, T, flag = res["e1"], res["e2"], res["T"], res["flags"]
+
+    elif mode == "galsim":
+        gal_image = galsim.Image(image / norm, scale=scale)
+        admoms = galsim.hsm.FindAdaptiveMom(gal_image)
+        e1, e2 = admoms.observed_e1, admoms.observed_e2
+        sigma = admoms.moments_sigma * scale
+        T = 2 * sigma**2
+        flag = 0 if admoms.moments_status == 0 else 1
+
+    else:
+        raise ValueError(f"Unknown mode '{mode}', must be 'ngmix' or 'galsim'")
+
+    # --- Convert if reduced shear requested ---
+    if reduced:
+        g1, g2 = e1e2_to_g1g2(e1, e2)
+        return {"g1": g1, "g2": g2, "T": T, "flags": flag}
+
+    return {"e1": e1, "e2": e2, "T": T, "flags": flag}
+
+def get_admoms_ngmix_fit(obs: "ngmix.Observation", reduced: bool = False) -> dict:
+    """
+    Measure adaptive moments (ADMOM) of an image using ngmix and GalSim.
+
+    Parameters
+    ----------
+    obs : ngmix.Observation
+        The observation containing the image and jacobian.
+    reduced : bool, optional
+        If True, return reduced shear (g1, g2) instead of ellipticity (e1, e2).
+
+    Returns
+    -------
+    result : dict
+        Dictionary containing:
+            - "e1" / "g1": ellipticity or reduced shear component 1
+            - "e2" / "g2": ellipticity or reduced shear component 2
+            - "T": size measure (2 * sigma^2)
+            - "flag": int (0 = success, 1 = failure)
+    """
+    jac = obs._jacobian
+    scale = jac.get_scale()
+    image = obs.image
+
+    # --- Normalize positive flux ---
+    norm = np.sum(image[image > 0])
+    if norm <= 0:
+        key1, key2 = ("g1", "g2") if reduced else ("e1", "e2")
+        return {key1: np.nan, key2: np.nan, "T": np.nan, "flag": 1}
+
+    # --- Measure moments with ngmix ---
+    obs_norm = ngmix.Observation(image=image / norm, jacobian=jac)
+    am = ngmix.admom.AdmomFitter()
+    res = am.go(obs_norm, guess=0.5)
+    e1, e2, T_ngmix = res["e1"], res["e2"], res["T"]
+
+    # --- Measure size using GalSim ---
+    gal_image = galsim.Image(image / norm, scale=scale)
+    admoms = galsim.hsm.FindAdaptiveMom(gal_image)
+    sigma = admoms.moments_sigma * scale
+    T_galsim = 2 * sigma**2
+
+    # --- Set flag based on both results ---
+    flag = 0 if (admoms.moments_status == 0 and res["flags"] == 0) else 1
+
+    # --- Convert to reduced shear if requested ---
+    if reduced:
+        g1, g2 = e1e2_to_g1g2(e1, e2)
+        return {"g1": g1, "g2": g2, "T": T_galsim, "flag": flag}
+
+    return {"e1": e1, "e2": e2, "T": T_galsim, "flag": flag}
+
+class RhoStats:
+    def __init__(self, catalog, column_config, pixel_scale=0.1408,
+                 min_sep=0.3, max_sep=15, bin_size=0.3,
+                 sep_units='arcmin'):
+
+        # Positions: convert from pixels -> arcsec
+        x = catalog[column_config['x_column']] * pixel_scale
+        y = catalog[column_config['y_column']] * pixel_scale
+
+        # Ellipticities
+        e1_obs = catalog[column_config['e1_obs']]
+        e2_obs = catalog[column_config['e2_obs']]
+        e1_model = catalog[column_config['e1_model']]
+        e2_model = catalog[column_config['e2_model']]
+
+        # converting to g1, g2
+        e1_obs, e2_obs = e1e2_to_g1g2(e1_obs, e2_obs)
+        e1_model, e2_model = e1e2_to_g1g2(e1_model, e2_model)
+
+        # Size (trace of second-moment matrix, or whatever T is in your pipeline)
+        T_obs = catalog[column_config['T_obs']]
+        T_model = catalog[column_config['T_model']]
+
+        # Residuals
+        e1_res = e1_obs - e1_model
+        e2_res = e2_obs - e2_model
+        dT = T_obs - T_model
+
+        # Fractional residual (guard against divide-by-zero)
+        frac_dT = np.where(T_obs > 0, dT / T_obs, 0.0)
+
+        # ---- Build a mask to drop NaN/Inf values ----
+        mask = np.isfinite(x) & np.isfinite(y) \
+             & np.isfinite(e1_obs) & np.isfinite(e2_obs) \
+             & np.isfinite(e1_model) & np.isfinite(e2_model) \
+             & np.isfinite(T_obs) & np.isfinite(T_model) \
+             & np.isfinite(e1_res) & np.isfinite(e2_res) \
+             & np.isfinite(frac_dT)
+
+        if not np.any(mask):
+            raise ValueError("No finite entries found in catalog for RhoStats")
+        self.skip = False 
+        # Apply mask
+        x, y = x[mask], y[mask]
+        e1_obs, e2_obs = e1_obs[mask], e2_obs[mask]
+        e1_res, e2_res = e1_res[mask], e2_res[mask]
+        frac_dT = frac_dT[mask]
+
+        # --- Build catalogs ---
+        self.cat_g = treecorr.Catalog(x=x, y=y, x_units='arcsec', y_units='arcsec',
+                                      g1=e1_obs, g2=e2_obs)
+
+        self.cat_dg = treecorr.Catalog(x=x, y=y, x_units='arcsec', y_units='arcsec',
+                                       g1=e1_res, g2=e2_res)
+
+        self.cat_gdTT = treecorr.Catalog(x=x, y=y, x_units='arcsec', y_units='arcsec',
+                                         g1=e1_obs * frac_dT, g2=e2_obs * frac_dT)
+
+        # --- Correlation kwargs ---
+        self.tckwargs = dict(min_sep=min_sep, max_sep=max_sep,
+                           bin_size=bin_size, sep_units=sep_units)
+
+        # --- Run rho statistics ---
+        self.rho1 = treecorr.GGCorrelation(self.tckwargs)
+        self.rho1.process(self.cat_dg)
+
+        self.rho2 = treecorr.GGCorrelation(self.tckwargs)
+        self.rho2.process(self.cat_g, self.cat_dg)
+
+        self.rho3 = treecorr.GGCorrelation(self.tckwargs)
+        self.rho3.process(self.cat_gdTT)
+
+        self.rho4 = treecorr.GGCorrelation(self.tckwargs)
+        self.rho4.process(self.cat_dg, self.cat_gdTT)
+
+        self.rho5 = treecorr.GGCorrelation(self.tckwargs)
+        self.rho5.process(self.cat_g, self.cat_gdTT)
+
+    def write(self, basename):
+        """Write rho stats to files like rho1.out, rho2.out, etc."""
+        self.rho1.write(f"{basename}_rho1.out")
+        self.rho2.write(f"{basename}_rho2.out")
+        self.rho3.write(f"{basename}_rho3.out")
+        self.rho4.write(f"{basename}_rho4.out")
+        self.rho5.write(f"{basename}_rho5.out")
+
+    def _plot_single(self, ax, rho, color, marker, offset=0.):
+        meanr = rho.meanr * (1. + rho.bin_size * offset)
+        xip = rho.xip
+        sig = np.sqrt(rho.varxip)
+
+        ax.plot(meanr, xip, color=color)
+        ax.plot(meanr, -xip, color=color, ls=':')
+        ax.errorbar(meanr[xip > 0], xip[xip > 0], yerr=sig[xip > 0],
+                    color=color, ls='', marker=marker)
+        ax.errorbar(meanr[xip < 0], -xip[xip < 0], yerr=sig[xip < 0],
+                    color=color, ls='', marker=marker,
+                    fillstyle='none', mfc='white')
+
+        return ax.errorbar(-meanr, xip, yerr=sig, color=color, marker=marker)
+
+    def plot(self, safezone_corr, fraction):
+        
+        from matplotlib.figure import Figure
+        fig = Figure(figsize = (12,5))
+        # In matplotlib 2.0, this will be
+        # axs = fig.subplots(ncols=2)
+        axs = [ fig.add_subplot(1,2,1),
+                fig.add_subplot(1,2,2) ]
+        axs = np.array(axs, dtype=object)
+        fig.subplots_adjust(wspace=0.25) 
+        for ax in axs:
+            ax.set_xlim(self.tckwargs['min_sep'], self.tckwargs['max_sep'])
+            ax.set_xlabel(r'$\theta$ (arcmin)', fontsize=12)
+            ax.set_ylabel(r'$\rho(\theta)$', fontsize=12)
+            ax.set_xscale('log')
+            ax.set_yscale('log', nonpositive='clip')
+
+        if self.skip:
+            axs[0].set_ylim(1.e-9, 1.e-4)
+            axs[1].set_ylim(1.e-9, 1.e-4)
+            return fig, axs
+
+        # Left panel: rho1, rho3, rho4
+        rho1 = self._plot_single(axs[0], self.rho1, '#2E86AB', 'o')  # Steel blue
+        rho3 = self._plot_single(axs[0], self.rho3, '#A23B72', 's', 0.1)  # Rose
+        rho4 = self._plot_single(axs[0], self.rho4, '#F18F01', '^', 0.2)  # Amber
+        
+        # Collect all rho values for left panel to determine ylim
+        all_rho_left = []
+        for rho in [self.rho1, self.rho3, self.rho4]:
+            all_rho_left.extend(np.abs(rho.xip[rho.xip != 0]))
+        min_rho_left = np.min(all_rho_left) if all_rho_left else 1e-9
+        
+        # Add shaded safezone region for left panel
+        meanr_safe = safezone_corr.meanr
+        xip_safe = safezone_corr.xip * fraction
+        mask_pos = xip_safe > 0
+        if np.any(mask_pos):
+            # Get positive values
+            x_pos = meanr_safe[mask_pos]
+            y_pos = xip_safe[mask_pos]
+            
+            # Create a smooth spline in log space
+            log_x = np.log(x_pos)
+            log_y = np.log(y_pos)
+            
+            # Use spline with some smoothing
+            spline = UnivariateSpline(log_x, log_y, s=0.1, k=2)  # k=2 for quadratic, s for smoothing
+            
+            # Create dense x array for smooth curve
+            x_fill = np.logspace(np.log10(self.tckwargs['min_sep']), 
+                                np.log10(self.tckwargs['max_sep']), 200)
+            y_fill = np.exp(spline(np.log(x_fill)))
+            
+            axs[0].fill_between(x_fill, y_fill, min_rho_left * 0.1,
+                            alpha=0.8, color='#E6E6E6')
+        
+        axs[0].legend([rho1, rho3, rho4],
+                    [r'$\rho_1(\theta)$', r'$\rho_3(\theta)$', r'$\rho_4(\theta)$'],
+                    loc='lower left', fontsize=12, 
+                    labelspacing=0.8)  # Increase vertical space between entries
+
+        # Right panel: rho2, rho5
+        rho2 = self._plot_single(axs[1], self.rho2, '#2E86AB', 'o')  # Steel blue
+        rho5 = self._plot_single(axs[1], self.rho5, '#C73E1D', 's', 0.1)  # Burnt orange
+        
+        # Collect all rho values for right panel to determine ylim
+        all_rho_right = []
+        for rho in [self.rho2, self.rho5]:
+            all_rho_right.extend(np.abs(rho.xip[rho.xip != 0]))
+        min_rho_right = np.min(all_rho_right) if all_rho_right else 1e-9
+        
+        # Add shaded safezone region for right panel (scaled by 10)
+        xip_safe_scaled = safezone_corr.xip * fraction * 10
+        mask_pos = xip_safe_scaled > 0
+        if np.any(mask_pos):
+            # Get positive values
+            x_pos = meanr_safe[mask_pos]
+            y_pos = xip_safe_scaled[mask_pos]
+            
+            # Extrapolate in log space
+            log_x = np.log(x_pos)
+            log_y = np.log(y_pos)
+            
+            # Use spline with some smoothing
+            spline = UnivariateSpline(log_x, log_y, s=0.1, k=2)  # k=2 for quadratic, s for smoothing
+            
+            # Create dense x array for smooth curve
+            x_fill = np.logspace(np.log10(self.tckwargs['min_sep']), 
+                                np.log10(self.tckwargs['max_sep']), 200)
+            y_fill = np.exp(spline(np.log(x_fill)))
+            
+            axs[1].fill_between(x_fill, y_fill, min_rho_right * 0.1,
+                            alpha=0.8, color='#E6E6E6')        
+        axs[1].legend([rho2, rho5],
+                    [r'$\rho_2(\theta)$', r'$\rho_5(\theta)$'],
+                    loc='lower left', fontsize=12,
+                    labelspacing=0.8)
+        
+        # Set ylim based on the actual rho data
+        axs[0].set_ylim(min_rho_left * 0.5, None)
+        axs[1].set_ylim(min_rho_right * 0.5, 5e-4)
+
+        for ax in axs:
+            ax.tick_params(axis='both', which='major', labelsize=12)  # change 10 to your preferred size
+            #ax.tick_params(axis='both', which='minor', labelsize=8)
+        return fig, axs
+
+class ClusterShearCorrelation:
+    """
+    Class to compute two-point correlation functions for cluster weak lensing
+    
+    Parameters:
+    -----------
+    catalog_file : str
+        Path to FITS catalog containing galaxy positions and redshifts
+    M500 : float
+        Cluster mass M500c in Msun/h
+    z_cluster : float
+        Cluster redshift
+    cosmology_name : str, optional
+        Cosmology to use (default: 'planck18')
+    """
+    
+    def __init__(self, catalog_file, M500, z_cluster, cosmology_name='planck18'):
+        self.catalog_file = catalog_file
+        self.M500 = M500
+        self.z_cluster = z_cluster
+        
+        # Set cosmology
+        self.cosmo = cosmology.setCosmology(cosmology_name)
+        self.omega_m = self.cosmo.Om0
+        self.omega_lam = self.cosmo.Ode0
+        
+        # Load catalog
+        self.catalog = Table.read(catalog_file)
+        
+        # Image properties (could be made configurable)
+        self.image_xsize = 9600
+        self.image_ysize = 6422
+        self.pixel_scale = 0.1408
+        
+        # TreeCorr parameters
+        self.tckwargs = dict(min_sep=0.3, max_sep=15, bin_size=0.3, sep_units='arcmin')
+        
+        # Initialize results
+        self.corr = None
+        self.nfw = None
+        self.M200 = None
+        self.c200 = None
+        
+    def convert_mass_definition(self):
+        """Convert M500c to M200c and get concentration"""
+        # Get concentration at 500c
+        self.c500 = concentration.concentration(self.M500, '500c', self.z_cluster, model='duffy08')
+        
+        # Convert M500c -> M200c 
+        self.M200, self.R200, self.c200 = mass_defs.changeMassDefinition(
+            self.M500, self.c500, self.z_cluster, '500c', '200c'
+        )
+        
+        print(f"M500c = {self.M500:.2e} Msun/h, c500 = {self.c500:.2f}")
+        print(f"M200c = {self.M200:.2e} Msun/h, c200 = {self.c200:.2f}")
+        
+    def create_nfw_halo(self):
+        """Create NFW halo model"""
+        if self.M200 is None:
+            self.convert_mass_definition()
+            
+        self.nfw = galsim.NFWHalo(
+            mass=self.M200, 
+            conc=self.c200, 
+            redshift=self.z_cluster,
+            omega_m=self.omega_m, 
+            omega_lam=self.omega_lam
+        )
+        
+    def compute_shears(self, z_min_offset=0.05):
+        """
+        Compute shears for background galaxies
+        
+        Parameters:
+        -----------
+        z_min_offset : float
+            Minimum redshift offset from cluster for background selection
+        """
+        if self.nfw is None:
+            self.create_nfw_halo()
+            
+        # Get data from catalog
+        x_im = self.catalog['x_image']
+        y_im = self.catalog['y_image']
+        nobject = len(x_im)
+        redshifts = self.catalog['redshift_truth']
+        
+        # Set up coordinate transformation
+        fiducial_full_image = galsim.ImageF(self.image_xsize, self.image_ysize)
+        theta = 0.0 * galsim.degrees
+        dudx = np.cos(theta) * self.pixel_scale
+        dudy = -np.sin(theta) * self.pixel_scale
+        dvdx = np.sin(theta) * self.pixel_scale
+        dvdy = np.cos(theta) * self.pixel_scale
+        
+        affine = galsim.AffineTransform(
+            dudx, dudy, dvdx, dvdy, 
+            origin=fiducial_full_image.true_center
+        )
+        
+        # Initialize arrays with NaN
+        u_pos = np.full(nobject, np.nan)
+        v_pos = np.full(nobject, np.nan)
+        g1_truth = np.full(nobject, np.nan)
+        g2_truth = np.full(nobject, np.nan)
+        
+        # Compute shears for background galaxies
+        n_background = 0
+        for i in range(nobject):
+            image_pos = galsim.PositionD(x=x_im[i], y=y_im[i])
+            uv_pos = affine.toWorld(image_pos)
+            
+            # Only use galaxies behind the cluster
+            if redshifts[i] > self.z_cluster + z_min_offset:
+                try:
+                    g1, g2 = self.nfw.getShear(uv_pos, redshifts[i])
+                    u_pos[i] = uv_pos.x
+                    v_pos[i] = uv_pos.y
+                    g1_truth[i] = g1
+                    g2_truth[i] = g2
+                    n_background += 1
+                except:
+                    pass
+                    
+        print(f"Selected {n_background} background galaxies out of {nobject} total")
+        
+        # Store results
+        self.u_pos = u_pos
+        self.v_pos = v_pos
+        self.g1_truth = g1_truth
+        self.g2_truth = g2_truth
+        
+    def compute_correlation(self):
+        """Compute two-point correlation functions"""
+        # Filter out NaN values
+        mask = ~np.isnan(self.u_pos) & ~np.isnan(self.v_pos) & \
+               ~np.isnan(self.g1_truth) & ~np.isnan(self.g2_truth)
+        
+        # Create catalog with only valid values
+        cat_g = treecorr.Catalog(
+            x=self.u_pos[mask], 
+            y=self.v_pos[mask], 
+            x_units='arcsec', 
+            y_units='arcsec',
+            g1=self.g1_truth[mask], 
+            g2=self.g2_truth[mask]
+        )
+        
+        # Create and process correlation
+        self.corr = treecorr.GGCorrelation(**self.tckwargs)
+        self.corr.process(cat_g)
+        
+        print(f"Computed correlation for {np.sum(mask)} galaxies")
+        
+    def plot_correlation(self, figsize=(8, 6)):
+        """
+        Plot the two-point correlation functions
+        
+        Parameters:
+        -----------
+        figsize : tuple
+            Figure size
+        """
+        if self.corr is None:
+            raise ValueError("Must compute correlation first")
+            
+        fig, ax = plt.subplots(figsize=figsize)
+        
+        # Get the correlation data
+        meanr = self.corr.meanr
+        xip = self.corr.xip
+        xim = self.corr.xim
+        sig_xip = np.sqrt(self.corr.varxip)
+        sig_xim = np.sqrt(self.corr.varxim)
+        
+        # Plot xi_plus - positive values
+        mask_pos = xip > 0
+        ax.errorbar(meanr[mask_pos], xip[mask_pos], yerr=sig_xip[mask_pos], 
+                    color='blue', marker='o', label=r'$\xi_+(\theta)$', capsize=3)
+        
+        # Plot xi_plus - negative values (as absolute value with open markers)
+        mask_neg = xip < 0
+        ax.errorbar(meanr[mask_neg], -xip[mask_neg], yerr=sig_xip[mask_neg], 
+                    color='blue', marker='o', fillstyle='none', mfc='white', capsize=3)
+        
+        # Plot xi_minus - positive values
+        mask_pos = xim > 0
+        ax.errorbar(meanr[mask_pos], xim[mask_pos], yerr=sig_xim[mask_pos], 
+                    color='red', marker='s', label=r'$\xi_-(\theta)$', capsize=3)
+        
+        # Plot xi_minus - negative values (as absolute value with open markers)
+        mask_neg = xim < 0
+        ax.errorbar(meanr[mask_neg], -xim[mask_neg], yerr=sig_xim[mask_neg], 
+                    color='red', marker='s', fillstyle='none', mfc='white', capsize=3)
+        
+        # Add lines to connect the points
+        ax.plot(meanr, xip, color='blue', alpha=0.5)
+        ax.plot(meanr, xim, color='red', alpha=0.5)
+        
+        # Set scales and labels
+        ax.set_xscale('log')
+        ax.set_yscale('log', nonpositive='clip')
+        ax.set_xlabel(r'$\theta$ (arcmin)', fontsize=12)
+        ax.set_ylabel(r'$|\xi(\theta)|$', fontsize=12)
+        ax.legend(fontsize=12, loc='upper right')
+        
+        # Set x-axis limits
+        ax.set_xlim(self.tckwargs['min_sep'], self.tckwargs['max_sep'])
+        
+        # Add grid
+        ax.grid(True, alpha=0.3)
+        
+        # Add title with cluster info
+        ax.set_title(f'M500 = {self.M500:.2e} Msun/h, z = {self.z_cluster}', fontsize=12)
+        
+        plt.tight_layout()
+        return fig, ax
+        
+    def run_analysis(self, z_min_offset=0.05, plot=False):
+        """
+        Run the complete analysis pipeline
+        
+        Parameters:
+        -----------
+        z_min_offset : float
+            Minimum redshift offset from cluster for background selection
+        plot : bool
+            Whether to plot the results
+            
+        Returns:
+        --------
+        corr : TreeCorr correlation object
+            The computed correlation
+        """
+        print(f"Running analysis for cluster at z={self.z_cluster}")
+        print("-" * 50)
+        
+        self.convert_mass_definition()
+        self.create_nfw_halo()
+        self.compute_shears(z_min_offset=z_min_offset)
+        self.compute_correlation()
+        
+        if plot:
+            self.plot_correlation()
+            plt.show()
+            
+        return self.corr
+
+
 
 BASE_DIR = get_base_dir()
 MODULE_DIR = get_module_dir()

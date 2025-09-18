@@ -2,12 +2,15 @@
 #SBATCH -t 13:59:59
 #SBATCH -N 1
 #SBATCH -n 18
-#SBATCH --mem-per-cpu=10g
+#SBATCH --mem=180G
 #SBATCH --partition=short
 #SBATCH -J meds
 #SBATCH -v
 #SBATCH -o logs/medout.log
 #SBATCH -e logs/mederr.log
+
+# Print Job ID
+echo "Submitted job with ID: $SLURM_JOB_ID"
 
 # Load configuration file
 source "$SLURM_SUBMIT_DIR/config.sh"

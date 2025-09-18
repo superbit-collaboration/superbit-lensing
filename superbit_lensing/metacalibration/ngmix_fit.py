@@ -1,5 +1,6 @@
 import ngmix
 from ngmix.medsreaders import NGMixMEDS
+from ngmix.shape import e1e2_to_g1g2
 import numpy as np
 from astropy.table import Table, Row, vstack, hstack
 import os, sys, time, traceback
@@ -244,17 +245,21 @@ def mcal_dict2tab(mcal, obsdict, ident):
 
         for i in range(len(obs)):
             try:
-                resdict = obs[i].psf.meta['result']
-                gm = resdict.get_gmix()
-                g1psf, g2psf, Tpsf = gm.get_g1g2T()
-                gpsf = np.array([g1psf, g2psf])
-                tpsf_list.append(Tpsf)
-                gpsf_list.append(gpsf)
-            except:
-                pass
+                admom_dict = utils.get_admoms_ngmix_fit(obs[i].psf, reduced=True)
+                if admom_dict['flag'] == 0:
+                    g1psf, g2psf, Tpsf = admom_dict['g1'], admom_dict['g2'], admom_dict['T']
+                else:
+                    g1psf, g2psf, Tpsf = np.nan, np.nan, np.nan
 
-        tab['Tpsf'] = np.array([np.mean(tpsf_list)]) if tpsf_list else np.array([np.nan])
-        tab['gpsf'] = np.array([np.mean(gpsf_list, axis=0)]) if gpsf_list else np.array([np.nan, np.nan])
+                gpsf_list.append(np.array([g1psf, g2psf]))
+                tpsf_list.append(Tpsf)
+
+            except Exception as e:
+                print(f"[WARNING] Failed to get ADMOM for epoch {i}: {e}")
+                continue
+
+        tab['Tpsf'] = np.array([np.nanmean(tpsf_list)]) if tpsf_list else np.array([np.nan])
+        tab['gpsf'] = np.array([np.nanmean(gpsf_list, axis=0)]) if gpsf_list else np.array([np.nan, np.nan])
 
         mcal[name] = tab
 

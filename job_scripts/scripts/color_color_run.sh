@@ -9,6 +9,9 @@
 #SBATCH -o colorout.log
 #SBATCH -e colorerr.log
 
+# Print Job ID
+echo "Submitted job with ID: $SLURM_JOB_ID"
+
 # Load configuration file
 source "$SLURM_SUBMIT_DIR/config.sh"
 date

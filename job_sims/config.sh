@@ -14,7 +14,7 @@ export LOGDIR="${DATADIR}/${cluster_name}/${band_name}/logs"
 
 # Define ngmix parameters
 export ngmix_nruns=1 
-export PSF_MODEL="coellip5"
+export PSF_MODEL="em5"
 export GAL_MODEL="gauss"
 export EXP='forecast' # 'forecast' or 'backcast'
 # Seeds
