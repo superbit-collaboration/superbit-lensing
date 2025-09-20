@@ -84,7 +84,7 @@ def add_bit_download_alias(current_dir, datadir, username=None):
     except Exception as e:
         print(f"\nError adding alias to {rc_file}: {e}")
 
-def update_config_sh(config_file, datadir, codedir):
+def update_config_sh(config_file, datadir, codedir, env_name=None):
     """Update the DATADIR and CODEDIR in the config.sh file."""
     if not os.path.exists(config_file):
         print(f"Config file {config_file} not found.")
@@ -108,8 +108,18 @@ def update_config_sh(config_file, datadir, codedir):
                 file.write(f'export CODEDIR="{codedir}"\n')
                 print(f"Updated CODEDIR to: {codedir}")
                 updated_codedir = True
+            # Update CONDA_ENV line (if env_name provided)
+            elif env_name is not None and line.strip().startswith('export CONDA_ENV='):
+                file.write(f'export CONDA_ENV="{env_name}"\n')
+                print(f"Updated CONDA_ENV to: {env_name}")
+                updated_env = True
             else:
                 file.write(line)
+
+        # If env_name provided but no line existed, append it
+        if env_name is not None and not updated_env:
+            file.write(f'export CONDA_ENV="{env_name}"\n')
+            print(f"Added CONDA_ENV: {env_name}")
     
     if not updated_datadir:
         print("Warning: DATADIR line not found in config.sh")
@@ -203,7 +213,7 @@ def download_catalogs(datadir):
     
     return username  # Return username even if download failed
 
-def main():
+def main(env_name=None):
     # Resolve the absolute path of the current directory
     current_dir = os.getcwd()
     default_path = os.path.join(current_dir, 'data')
@@ -252,7 +262,7 @@ def main():
     # Update config.sh file
     print("\nUpdating config.sh file...")
     config_sh_path = os.path.join(current_dir, 'job_scripts', 'config.sh')
-    update_config_sh(config_sh_path, save_path, current_dir)
+    update_config_sh(config_sh_path, save_path, current_dir, env_name=env_name)
     
     # Show completion message
     print("\n" + "="*60)
@@ -268,5 +278,14 @@ def main():
     print("="*60)
     add_bit_download_alias(current_dir, save_path, username)
 
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Setup script for SuperBIT lensing configs.")
+    parser.add_argument(
+        "--env_name",
+        type=str,
+        default=None,
+        help="Optional conda environment name to add to config.sh"
+    )
+    args = parser.parse_args()
+    main(env_name=args.env_name)

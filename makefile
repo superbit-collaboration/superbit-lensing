@@ -113,7 +113,7 @@ install: git-deps
 	@printf "\n$(GREEN)Running post-installation configuration...$(NC)\n"
 	@eval "$$(conda shell.bash hook)" && \
 	conda activate $(ENV_NAME) && \
-	$(PYTHON) post_installation.py
+	$(PYTHON) post_installation.py --env_name $(ENV_NAME)
 
 # Development install (editable)
 dev-install: git-deps
