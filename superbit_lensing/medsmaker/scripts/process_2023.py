@@ -176,7 +176,7 @@ def main(args):
         
         # Set image catalogs attribute
         #bm.set_image_cats()
-        kept_exp = bm.filter_files(std_threshold=0.1)
+        kept_exp = bm.filter_files(std_threshold=0.1, ellip_threshold=0.5)
 
         # Build  a PSF model for each image.
         logprint('Making PSF models... \n')

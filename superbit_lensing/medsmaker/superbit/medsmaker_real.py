@@ -10,6 +10,7 @@ from astropy import wcs
 import fitsio
 import esutil as eu
 from astropy.table import Table
+import matplotlib.pyplot as plt
 import astropy.units as u
 import superbit_lensing.utils as utils
 from superbit_lensing.match import SkyCoordMatcher
@@ -260,13 +261,13 @@ class BITMeasurement():
             self.image_cats.append(sexcat)
         self.cat_dir = cat_dir
 
-    def filter_files(self, std_threshold=0.2):
+    def filter_files(self, std_threshold=0.5, ellip_threshold=0.9999):
         """
         Filter out exposures with poor PSF FWHM stability based on matched stars.
 
         For each exposure:
         1. Read the star catalog (HDU=2).
-        2. Match stars to GAIA using `SkyCoordMatcher`.
+        2. Match stars to GAIA.
         3. Apply star quality cuts: MAG_AUTO > 16.5 and SNR_WIN > 20.
         4. Compute star FWHM from T_ADMOM values.
         5. Keep only finite, positive values and apply 1–99 percentile filtering.
@@ -297,6 +298,8 @@ class BITMeasurement():
         if not self.check_cat_image_order():
             raise ValueError("Catalogs and images are not aligned in order.")
 
+        plot_file = os.path.join(self.outdir, f"{self.target_name}_{self.band}_exposure_selection.pdf")
+
         # Work on deep copies (preserve originals until filtering is complete)
         image_files = copy.deepcopy(self.image_files)
         image_cats  = copy.deepcopy(self.image_cats)
@@ -304,11 +307,33 @@ class BITMeasurement():
         total_exposures = len(image_files)
         image_cats_filtered = []
         image_files_filtered = []
-
+        exp_std_fwhm = []
+        exp_ellip = []
+        fail_criteria_exp = []
         for catfile, imfile in zip(image_cats, image_files):
             # Read star catalog from HDU 2
             exp_data = Table.read(catfile, hdu=2)
-
+            # Extract image coordinates
+            xim = exp_data["XWIN_IMAGE"]
+            yim = exp_data["YWIN_IMAGE"]
+            
+            # Define central 50% region (25% area)
+            xmin, xmax = np.min(xim), np.max(xim)
+            ymin, ymax = np.min(yim), np.max(yim)
+            
+            width = xmax - xmin
+            height = ymax - ymin
+            
+            # Scale factor for central 50% area
+            scale = np.sqrt(0.25)  # ≈ 0.7071
+            
+            # Trim margins
+            x_margin = (1 - scale) / 2 * width
+            y_margin = (1 - scale) / 2 * height
+            
+            x_low, x_high = xmin + x_margin, xmax - x_margin
+            y_low, y_high = ymin + y_margin, ymax - y_margin
+            
             # Match to GAIA stars
             matcher = SkyCoordMatcher(
                 exp_data, self.gaia_stars,
@@ -341,10 +366,39 @@ class BITMeasurement():
             star_fwhm_filtered = star_fwhm_valid[percentile_mask]
 
             # Compute scatter
-            std_fwhm = np.std(star_fwhm_filtered)
+            if len(star_fwhm_filtered) > 0:
+                std_fwhm = np.std(star_fwhm_filtered)
+            else:
+                std_fwhm = np.nan
 
+            xim, yim = matched1["XWIN_IMAGE"], matched1["YWIN_IMAGE"]
+            inner_region = (xim >= x_low) & (xim <= x_high) & (yim >= y_low) & (yim <= y_high)
+            stars_ourskirts = matched1[~inner_region]
+
+            e1_stars_ot, e2_stars_ot = stars_ourskirts['E1_ADMOM'], stars_ourskirts['E2_ADMOM']
+            ellip_mag = np.sqrt(e1_stars_ot**2 + e2_stars_ot**2)
+
+            valid_ellip = np.isfinite(ellip_mag) & (ellip_mag >= 0)
+            ellip_mag_valid = ellip_mag[valid_ellip]
+            if len(ellip_mag_valid) > 0:
+                # Apply percentile filtering for outliers
+                p1_e, p99_e = np.percentile(ellip_mag_valid, [1, 99])
+                ellip_filtered = ellip_mag_valid[(ellip_mag_valid >= p1_e) & (ellip_mag_valid <= p99_e)]
+                median_e = np.median(ellip_filtered)
+            else:
+                median_e = np.nan
             # Keep if scatter is below threshold
-            if std_fwhm < std_threshold:
+            fail_criteria = (
+                (std_fwhm >= std_threshold) or 
+                (median_e >= ellip_threshold) or 
+                (not np.isfinite(std_fwhm)) or 
+                (not np.isfinite(median_e))
+            )
+            exp_std_fwhm.append(std_fwhm)
+            exp_ellip.append(median_e)
+            fail_criteria_exp.append(fail_criteria)
+            
+            if not fail_criteria:
                 image_cats_filtered.append(catfile)
                 image_files_filtered.append(imfile)
 
@@ -359,8 +413,53 @@ class BITMeasurement():
         kept_exposures = len(self.image_cats)
         percent_kept = (kept_exposures / total_exposures * 100) if total_exposures > 0 else 0
 
-        print(f"Kept {kept_exposures} out of {total_exposures} exposures ({percent_kept:.1f}%)")
-        self.logprint(f"Kept {kept_exposures} out of {total_exposures} exposures ({percent_kept:.1f}%)")
+        summary_text = f"Kept {kept_exposures} out of {total_exposures} exposures ({percent_kept:.1f}%)"
+        print(summary_text)
+        self.logprint(summary_text)
+
+        # --- Plotting diagnostics ---
+        exposures = np.arange(total_exposures)
+        exp_std_fwhm = np.array(exp_std_fwhm)
+        exp_ellip = np.array(exp_ellip)
+        fail_criteria_exp = np.array(fail_criteria_exp)
+
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 12), sharex=True)
+
+        # Plot 1: FWHM scatter
+        valid_fwhm = ~np.isnan(exp_std_fwhm)
+        ax1.plot(exposures[valid_fwhm], exp_std_fwhm[valid_fwhm], 'o-', color='orange', linewidth=2,
+                 markersize=6, markerfacecolor='orange', markeredgecolor='darkorange')
+        ax1.axhline(y=std_threshold, color='red', linestyle='--', linewidth=1.5, alpha=0.7,
+                    label=f"Threshold = {std_threshold}")
+        ax1.plot(exposures[fail_criteria_exp & valid_fwhm], exp_std_fwhm[fail_criteria_exp & valid_fwhm],
+                 'x', color='black', markersize=8, label='discarded')
+        ax1.set_ylabel('PSF FWHM Std Dev', fontsize=11)
+        ax1.set_title(summary_text, fontsize=13)
+        ax1.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+        ax1.legend(loc='upper right', framealpha=0.9)
+
+        # Plot 2: Ellipticity
+        valid_ellip = ~np.isnan(exp_ellip)
+        ax2.plot(exposures[valid_ellip], exp_ellip[valid_ellip], 's-', color='darkblue',
+                 linewidth=1.5, markersize=5, alpha=0.7,
+                 markerfacecolor='blue', markeredgecolor='darkblue')
+        ax2.axhline(y=ellip_threshold, color='red', linestyle='--', linewidth=1.5, alpha=0.7,
+                    label=f"Threshold = {ellip_threshold}")
+        ax2.plot(exposures[fail_criteria_exp & valid_ellip], exp_ellip[fail_criteria_exp & valid_ellip],
+                 'x', color='black', markersize=8, label='discarded')
+        ax2.set_ylabel('Ellipticity |e|', fontsize=11)
+        ax2.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+        ax2.legend(loc='upper right', framealpha=0.9)
+
+        # Shared x-axis
+        ax2.set_xticks(exposures)
+        ax2.set_xticklabels(exposures, rotation=90, ha='center', fontsize=8)
+        ax2.set_xlabel('Exposure Number', fontsize=11)
+
+        plt.tight_layout()
+        plt.savefig(plot_file)
+        plt.close(fig)
+
         return len(self.image_cats)
 
     def make_exposure_weights(self):

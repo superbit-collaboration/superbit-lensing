@@ -95,7 +95,7 @@ def process_cluster(cluster):
 
     print(f"Found {len(cat_files)} exposure files")
     print(f"Looking stars for {cluster}...")
-    star_file = f"/scratch/sa.saha/data/gaia_query/{cluster}_gaia_dr3.fits"
+    star_file = os.path.join(base_dir, "stars" ,f"{cluster}_gaia_dr3.fits")
     try:
         gaia_stars = Table.read(star_file)
     except Exception as e:
@@ -446,8 +446,8 @@ def main():
     #timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Add timestamp to your filenames
-    output_path = f"/scratch/sa.saha/data/all_clusters_star_catalog_withem_{timestamp}.fits"
-    output_path_2 = f"/scratch/sa.saha/data/all_clusters_star_catalog_withem_{timestamp}_temp.fits"
+    output_path = os.path.join(DATA_DIR, f"all_clusters_star_catalog_withem_{timestamp}.fits")
+    output_path_2 = os.path.join(DATA_DIR, f"all_clusters_star_catalog_withem_{timestamp}_temp.fits")
     
     temp_path = output_path_2 + ".tmp"
     

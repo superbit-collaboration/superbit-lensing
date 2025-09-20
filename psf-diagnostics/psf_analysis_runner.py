@@ -30,10 +30,10 @@ if not os.path.exists(OUTPUT_FOLDER):
 
 # ----------------------------- CATALOG PATH ---------------------------------
 #catalog_path = "/scratch/sa.saha/data/all_clusters_star_catalog_withem.fits" # order 3 (old)
-#catalog_path = "/scratch/sa.saha/data/all_clusters_star_catalog_withem_20250815_115222.fits" # order 3 (new)
+catalog_path = "/scratch/sa.saha/data/all_clusters_star_catalog_withem_20250815_115222.fits" # order 3 (new)
 #catalog_path = "/scratch/sa.saha/data/all_clusters_star_catalog_withem_20250813_165650.fits" # order 2 (new)
 #catalog_path = "/scratch/sa.saha/data/all_clusters_star_catalog_withem_20250817_110445_temp.fits" # order 4 (new)
-catalog_path = "/scratch/sa.saha/data/all_clusters_star_catalog_withem_20250819_182300.fits" # order 5 (new)
+#catalog_path = "/scratch/sa.saha/data/all_clusters_star_catalog_withem_20250819_182300.fits" # order 5 (new)
 #catalog_path = "/scratch/sa.saha/data/all_clusters_star_catalog_withem_20250820_180134.fits" # order 6 (new)
 #catalog_path = "/scratch/sa.saha/data/all_clusters_star_catalog_withem_20250911_190003.fits" # order 5 (with better star selection)
 

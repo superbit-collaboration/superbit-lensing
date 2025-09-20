@@ -1954,7 +1954,7 @@ class RhoStats:
 
         return ax.errorbar(-meanr, xip, yerr=sig, color=color, marker=marker)
 
-    def plot(self, safezone_corr, fraction):
+    def plot(self, safezone_corr, fraction, plot_safe_zone_error=False):
         
         from matplotlib.figure import Figure
         fig = Figure(figsize = (12,5))
@@ -1990,11 +1990,13 @@ class RhoStats:
         # Add shaded safezone region for left panel
         meanr_safe = safezone_corr.meanr
         xip_safe = safezone_corr.xip * fraction
+        xip_safe_errors = np.sqrt(safezone_corr.varxip) * fraction
         mask_pos = xip_safe > 0
         if np.any(mask_pos):
             # Get positive values
             x_pos = meanr_safe[mask_pos]
             y_pos = xip_safe[mask_pos]
+            y_err = xip_safe_errors[mask_pos]
             
             # Create a smooth spline in log space
             log_x = np.log(x_pos)
@@ -2010,7 +2012,13 @@ class RhoStats:
             
             axs[0].fill_between(x_fill, y_fill, min_rho_left * 0.1,
                             alpha=0.8, color='#E6E6E6')
-        
+            # Optional faint error bars
+            if plot_safe_zone_error:
+                # Interpolate errors onto same x grid
+                err_interp = np.interp(x_fill, x_pos, y_err, left=np.nan, right=np.nan)
+                
+                axs[0].errorbar(x_fill, y_fill, yerr=10*err_interp, fmt='none',
+                                ecolor='gray', alpha=0.3, elinewidth=0.7, capsize=0)     
         axs[0].legend([rho1, rho3, rho4],
                     [r'$\rho_1(\theta)$', r'$\rho_3(\theta)$', r'$\rho_4(\theta)$'],
                     loc='lower left', fontsize=12, 
@@ -2028,11 +2036,13 @@ class RhoStats:
         
         # Add shaded safezone region for right panel (scaled by 10)
         xip_safe_scaled = safezone_corr.xip * fraction * 10
+        xip_safe_errors = np.sqrt(safezone_corr.varxip) * fraction * 10
         mask_pos = xip_safe_scaled > 0
         if np.any(mask_pos):
             # Get positive values
             x_pos = meanr_safe[mask_pos]
             y_pos = xip_safe_scaled[mask_pos]
+            y_err = xip_safe_errors[mask_pos]
             
             # Extrapolate in log space
             log_x = np.log(x_pos)
@@ -2047,7 +2057,14 @@ class RhoStats:
             y_fill = np.exp(spline(np.log(x_fill)))
             
             axs[1].fill_between(x_fill, y_fill, min_rho_right * 0.1,
-                            alpha=0.8, color='#E6E6E6')        
+                            alpha=0.8, color='#E6E6E6')   
+            # Optional faint error bars
+            if plot_safe_zone_error:
+                # Interpolate errors onto same x grid
+                err_interp = np.interp(x_fill, x_pos, y_err, left=np.nan, right=np.nan)
+                
+                axs[1].errorbar(x_fill, y_fill, yerr=10*err_interp, fmt='none',
+                                ecolor='gray', alpha=0.3, elinewidth=0.7, capsize=0)       
         axs[1].legend([rho2, rho5],
                     [r'$\rho_2(\theta)$', r'$\rho_5(\theta)$'],
                     loc='lower left', fontsize=12,
