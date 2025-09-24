@@ -730,6 +730,8 @@ class SuperBITParameters:
                 self.bp_file = str(value)
             elif option == "outdir":
                 self.outdir = str(value)
+            elif option == "emp_psf_path":
+                self.emp_psf_path = str(value)
             elif option == "data_dir":
                 self.data_dir = str(value)
             elif option == "master_seed":
@@ -1295,7 +1297,7 @@ def main(args):
         truth_catalog = galsim.OutputCatalog(names, types)
 
     all_psf_files = []
-    search_path = os.path.join('/projects/mccleary_group/superbit/emp_psfs/psfex-output', '*.psf')
+    search_path = os.path.join(sbparams.emp_psf_path, 'psfex-output', '*.psf')
     all_psf_files.extend(glob(search_path))
 
     for i in np.arange(1, sbparams.nexp+1):

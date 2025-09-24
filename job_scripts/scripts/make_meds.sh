@@ -9,6 +9,10 @@
 #SBATCH -o logs/medout.log
 #SBATCH -e logs/mederr.log
 
+# Record start time
+start_time=$(date +%s)
+echo "Job started at: $(date)"
+
 # Print Job ID
 echo "Submitted job with ID: $SLURM_JOB_ID"
 
@@ -49,15 +53,12 @@ python $CODEDIR/superbit_lensing/medsmaker/scripts/process_2023.py \
 -star_config_dir $CODEDIR/superbit_lensing/medsmaker/configs \
 --meds_coadd ${cluster_name} ${band_name} $DATADIR
 
+# Record end time
+end=$(date +%s)
+echo "Job finished at: $(date)"
 
+# Compute elapsed time
+runtime=$((end - start_time))
 
-# Check if the Python script ran successfully
-: '
-if [ $? -eq 0 ]; then
-    echo "Python script executed successfully. Running multiple_ngmixrun.sh..."
-    bash "$SLURM_SUBMIT_DIR/multiple_ngmixrun.sh"
-else
-    echo "Python script failed. Exiting without running multiple_ngmixrun.sh."
-    exit 1
-fi
-'
+# Optionally, print in minutes/hours
+echo "Total runtime: $(awk -v t=$runtime 'BEGIN {printf "%.2f minutes (%.2f hours)\n", t/60, t/3600}')"

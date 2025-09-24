@@ -41,6 +41,7 @@ desi_table = [
     'TARGETID', 'SURVEY', 'PROGRAM', 'OBJTYPE', 'SPECTYPE', 
     'TARGET_RA', 'TARGET_DEC', 'Z', 'ZERR', 'ZWARN', 'ZCAT_NSPEC', 'ZCAT_PRIMARY'
 ]
+DEFAULT_CONFIG_DIR = os.path.join(PROJECT_ROOT, 'superbit_lensing', 'medsmaker', 'superbit', 'astro_config')
 
 class AttrDict(dict):
     '''
@@ -760,7 +761,7 @@ def get_cluster_info(cluster_name):
 
     return float(ra_center), float(dec_center), float(redshift)
 
-def gaia_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None, catalog_id = "I/355/gaiadr3", pure=True):
+def gaia_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None, catalog_id = "I/355/gaiadr3", pure=True, silent=True):
     """
     Query Gaia DR3 data around a given cluster name or specified RA/Dec.
 
@@ -789,7 +790,11 @@ def gaia_query(cluster_name=None, rad_deg=0.5, ra_center=None, dec_center=None, 
         cluster_data = pd.read_csv(CLUSTERS_CSV)
         idx = cluster_data['Name'] == cluster_name
         if not idx.any():
-            raise ValueError(f"Cluster name '{cluster_name}' not found in {CLUSTERS_CSV}")
+            if silent:
+                print(f"[WARNING] Cluster name '{cluster_name}' not found in {CLUSTERS_CSV}, creating an empty table...")
+                return Table()  # return empty table
+            else:                
+                raise ValueError(f"Cluster name '{cluster_name}' not found in {CLUSTERS_CSV}")
         ra_center = cluster_data.loc[idx, 'RA'].values[0]
         dec_center = cluster_data.loc[idx, 'Dec'].values[0]
         print(f"Using cluster coordinates: RA={ra_center}, Dec={dec_center}")
@@ -1103,7 +1108,7 @@ def radec_to_xy(header, ra, dec):
     elif is_tpv and not has_pv_terms:
         # Fall back to TAN-SIP if TPV is specified but no PV terms
         wcs_manual.wcs.ctype = ["RA---TAN-SIP", "DEC--TAN-SIP"]
-        print("TPV specified but no PV terms found, falling back to TAN-SIP")
+        #print("TPV specified but no PV terms found, falling back to TAN-SIP")
         
         # Check for SIP coefficients (should be present for TAN-SIP)
         has_sip = False
@@ -1117,12 +1122,12 @@ def radec_to_xy(header, ra, dec):
         if not has_sip:
             # If no SIP coefficients, fall back to plain TAN
             wcs_manual.wcs.ctype = ["RA---TAN", "DEC--TAN"]
-            print("No SIP coefficients found, falling back to plain TAN")
+            #print("No SIP coefficients found, falling back to plain TAN")
     else:
         # Use what's in the header or default to TAN
         if 'CTYPE1' in header and 'CTYPE2' in header:
             wcs_manual.wcs.ctype = [ctype1, ctype2]
-            print(f"Using projection from header: {ctype1}, {ctype2}")
+            #print(f"Using projection from header: {ctype1}, {ctype2}")
         else:
             wcs_manual.wcs.ctype = ["RA---TAN", "DEC--TAN"]
             print("No projection specified in header, using TAN")
@@ -1565,7 +1570,7 @@ def calculate_box_size(angular_size, pixel_scale, size_multiplier = 2.5,
     else:
         return get_box_size(box_size_float)
 
-def make_psfex_model(psfcat_name, config_path, psf_seed=None, overwrite=True,  verbose=True):
+def make_psfex_model(psfcat_name, config_path=DEFAULT_CONFIG_DIR, psf_seed=None, overwrite=True,  verbose=True):
 
     # Where to store PSFEx output
     psfex_outdir = os.path.join(os.path.dirname(psfcat_name), 'psfex-output')
@@ -1651,6 +1656,11 @@ def add_admom_columns(catfilename, imagefilename=None, mode="ngmix", outfile=Non
             imagefilename = os.path.join(
                 dirname, fname.replace("_clean_cat.fits", "_clean.sub.fits")
             )
+        elif "_sim_cat.fits" in fname:
+            dirname = dirname.replace("/cat", "/cal")
+            imagefilename = os.path.join(
+                dirname, fname.replace("_sim_cat.fits", "_sim.sub.fits")
+            )        
         elif "_coadd_" in fname and fname.endswith("_cat.fits"):
             imagefilename = os.path.join(
                 dirname, fname.replace("_cat.fits", ".sub.fits")
@@ -2327,7 +2337,179 @@ class ClusterShearCorrelation:
             
         return self.corr
 
+def run_sextractor_coadd(image_file, config_dir=DEFAULT_CONFIG_DIR, cat_dir=None, 
+                         weight_file=None, back_type='AUTO'):
+    """
+    Run Source Extractor on a coadd image.
 
+    Parameters
+    ----------
+    image_file : str
+        Path to input FITS image.
+    config_dir : str
+        Directory containing SExtractor config files.
+    cat_dir : str, optional
+        Directory where catalog will be saved. Defaults to input image directory.
+    weight_file : str, optional
+        External weight file. If not given, defaults to extension [1] of image.
+    back_type : str, optional
+        Background type ('AUTO' or 'MANUAL').
+
+    Returns
+    -------
+    str
+        Path to the generated catalog file.
+    """
+    dirname, fname = os.path.split(image_file)
+    if cat_dir is None:
+        cat_dir = dirname
+
+    # --- Catalog name ---
+    cat_name = os.path.basename(image_file).replace('.fits', '_cat.fits')
+    cat_file = os.path.join(cat_dir, cat_name)
+
+    # --- Arguments for SExtractor ---
+    image_arg  = f'"{image_file}[0]"'
+    name_arg   = f"-CATALOG_NAME {cat_file}"
+    config_arg = f"-c {os.path.join(config_dir, 'sextractor.real.config')}"
+    param_arg  = f"-PARAMETERS_NAME {os.path.join(config_dir, 'sextractor.param')}"
+    nnw_arg    = f"-STARNNW_NAME {os.path.join(config_dir, 'default.nnw')}"
+    filter_arg = f"-FILTER_NAME {os.path.join(config_dir, 'gauss_2.0_3x3.conv')}"
+    bg_sub_arg = f"-BACK_TYPE {back_type}"
+
+    # --- Check images ---
+    bkg_name   = image_file.replace('.fits', '.sub.fits')
+    seg_name   = image_file.replace('.fits', '.sgm.fits')
+    rms_name   = image_file.replace('.fits', '.bkg_rms.fits')
+    checkname_arg = f"-CHECKIMAGE_NAME {bkg_name},{seg_name},{rms_name}"
+
+    # --- Weight image logic ---
+    if weight_file is not None:
+        weight_arg = f'-WEIGHT_IMAGE "{weight_file}" -WEIGHT_TYPE MAP_WEIGHT'
+    elif len(fits.open(image_file)) > 1: 
+        # default case: use [1] if no external weight file
+        weight_arg = f'-WEIGHT_IMAGE "{image_file}[1]" -WEIGHT_TYPE MAP_WEIGHT'
+    else:
+        # fallback when image_file already has an extension like [SCI]
+        base_image = image_file.split('[')[0]  # strip extension
+        weight_arg = f'-WEIGHT_IMAGE "{base_image}[1]" -WEIGHT_TYPE MAP_WEIGHT'
+
+    # --- Build command ---
+    cmd = ' '.join([
+        'sex', image_arg, weight_arg, name_arg, checkname_arg,
+        param_arg, nnw_arg, filter_arg, bg_sub_arg, config_arg
+    ])
+
+    print(f"[CMD] Running: {cmd}")
+    os.system(cmd)
+
+    print(f"[INFO] Catalog created: {cat_file}")
+    return cat_file
+
+
+def update_astromatic_solution(image_path, config_dir=DEFAULT_CONFIG_DIR,
+                               catalog_path=None, output_path=None):
+    """
+    Run SCAMP on an input FITS image and update its WCS solution.
+
+    Workflow:
+      1. Determine or validate the input catalog path.
+      2. Run SCAMP with the provided configuration file.
+      3. Load the resulting `.head` file.
+      4. Copy only *new* header keywords into the science (HDU 0) 
+         and optional weight (HDU 1) extensions of the FITS.
+      5. Save the updated FITS to `output_path` if provided, else
+         overwrite the input file.
+
+    Parameters
+    ----------
+    image_path : str
+        Path to the input FITS image file.
+    config_dir : str, optional
+        Directory containing `scamp.conf`. Defaults to DEFAULT_CONFIG_DIR.
+    catalog_path : str, optional
+        Path to the SExtractor catalog. If None, will infer from 
+        `image_path` (requires `_coadd_*.fits` convention).
+    output_path : str, optional
+        Path to write the updated FITS file. If None, overwrites `image_path`.
+
+    Raises
+    ------
+    ValueError
+        If `catalog_path` is not provided and cannot be inferred.
+    FileNotFoundError
+        If catalog, config, or SCAMP `.head` file is missing.
+    RuntimeError
+        If SCAMP execution fails.
+    """
+    dirname, fname = os.path.split(image_path)
+
+    # --- Infer catalog path if not given ---
+    if catalog_path is None:
+        if "_coadd_" in fname and fname.endswith(".fits"):
+            catalog_path = os.path.join(dirname, fname.replace(".fits", "_cat.fits"))
+        else:
+            raise ValueError("catalog_path not provided and could not infer from filename.")
+
+    # --- Validate or generate catalog ---
+    if not os.path.exists(catalog_path):
+        print(f"[INFO] Catalog not found: {catalog_path}. Running SExtractor to generate it...")
+        cat_dir = os.path.dirname(catalog_path)
+        weight_file = None  # adjust if you want to provide a weight
+        catalog_path = run_sextractor_coadd(
+                            image_file=image_path,
+                            config_dir=config_dir,
+                            cat_dir=cat_dir,
+                            weight_file=weight_file
+                        )
+
+        if not os.path.exists(catalog_path):
+            raise FileNotFoundError(
+                f"Catalog file still does not exist after running SExtractor: {catalog_path}"
+            )
+
+    # --- Validate config existence ---
+    config_file = os.path.join(config_dir, "scamp.conf")
+    if not os.path.exists(config_file):
+        raise FileNotFoundError(f"{config_file} does not exist")
+
+    # --- Run SCAMP ---
+    scamp_cmd = f"scamp {catalog_path} -c {config_file}"
+    print(f"[CMD] Running: {scamp_cmd}")
+    ret = os.system(scamp_cmd)
+    if ret != 0:
+        raise RuntimeError(f"SCAMP command failed with exit code {ret}")
+
+    # --- Locate produced .head file ---
+    head_file = catalog_path.replace(".fits", ".head")
+    if not os.path.exists(head_file):
+        raise FileNotFoundError(f"Expected SCAMP output .head file not found: {head_file}")
+
+    # --- Parse SCAMP header (.head file) ---
+    with open(head_file, "r") as f:
+        head_cards = f.readlines()
+    scamp_header = fits.Header.fromstring("".join(head_cards), sep="\n")
+
+    # --- Load input FITS ---
+    with fits.open(image_path, mode="readonly") as hdul:
+        updated_hdul = fits.HDUList([hdu.copy() for hdu in hdul])
+
+    # --- Update science (HDU 0) and optional weight (HDU 1) ---
+    for hdu_idx in [0, 1]:
+        if hdu_idx < len(updated_hdul):
+            for card in scamp_header.cards:
+                key, value, comment = card
+                if key in ("", "END"):
+                    continue
+                if key not in updated_hdul[hdu_idx].header:
+                    updated_hdul[hdu_idx].header[key] = (value, comment)
+
+    # --- Write updated FITS ---
+    if output_path is None:
+        output_path = image_path
+    updated_hdul.writeto(output_path, overwrite=True)
+
+    print(f"[INFO] WCS solution updated and written to {output_path}")
 
 BASE_DIR = get_base_dir()
 MODULE_DIR = get_module_dir()

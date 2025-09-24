@@ -58,7 +58,7 @@ def process_fits(run_name, band, datadir, codedir):
     # Create config file
     config_data = {
         "MIN_MAG": 27,
-        "MAX_MAG": 21,
+        "MAX_MAG": 16.5,
         "MIN_SIZE": 2,
         "MAX_SIZE": 3.5,
         "MIN_SNR": 20,

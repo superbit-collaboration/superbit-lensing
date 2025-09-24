@@ -17,7 +17,7 @@
 # -----------------
 mcal_cuts:
   # Minimum ratio of galaxy size relative to PSF size
-  min_Tpsf: 0.6
+  min_Tpsf: 1.0
   # Maximum galaxy SNR
   max_sn: 1000
   # Minimum galaxy SNR

@@ -1,13 +1,19 @@
 #!/bin/sh
-#SBATCH -t 13:59:59
+#SBATCH -t 23:59:59
 #SBATCH -N 1
-#SBATCH -n 18
-#SBATCH --mem-per-cpu=10g
+#SBATCH -n 2
+#SBATCH --mem=180G
 #SBATCH --partition=short
 #SBATCH -J meds
 #SBATCH -v
 #SBATCH -o logs/medsout.log
 #SBATCH -e logs/medserr.log
+
+# Record start time
+start_time=$(date +%s)
+echo "Job started at: $(date)"
+# Print Job ID
+echo "Submitted job with ID: $SLURM_JOB_ID"
 
 # Load configuration file
 source "$SLURM_SUBMIT_DIR/config.sh"
@@ -34,3 +40,13 @@ python $CODEDIR/superbit_lensing/medsmaker/scripts/process_2023.py \
 -detection_bandpass=${detection_band} \
 -star_config_dir $CODEDIR/superbit_lensing/medsmaker/configs \
 --meds_coadd ${cluster_name} ${band_name} $DATADIR
+
+# Record end time
+end=$(date +%s)
+echo "Job finished at: $(date)"
+
+# Compute elapsed time
+runtime=$((end - start_time))
+
+# Optionally, print in minutes/hours
+echo "Total runtime: $(awk -v t=$runtime 'BEGIN {printf "%.2f minutes (%.2f hours)\n", t/60, t/3600}')"

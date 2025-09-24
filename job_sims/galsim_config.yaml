@@ -35,11 +35,11 @@ run_name:         'pipe_test'   # Root for exposure name creation           []
 # Simulated cluster parameters
 # ----------------------------
 lam:                475         # Fiducial wavelength for abberations       [nm]
-mass:               7e14      # Cluster mass                              [Msol / h]
-nfw_z_halo:         0.44         # redshift of the halo                      []
-nfw_conc:           4           # Concentration parameter = virial radius / NFW scale radius
-omega_m:            0.3         # Omega matter for the background cosmology []
-omega_lam:          0.7         # Omega lambda for the background cosmology []
+mass:               9.56e14      # Cluster mass                              [Msol / h]
+nfw_z_halo:         0.245         # redshift of the halo                      []
+nfw_conc:           3.07           # Concentration parameter = virial radius / NFW scale radius
+omega_m:            0.3111         # Omega matter for the background cosmology []
+omega_lam:          0.6888        # Omega lambda for the background cosmology []
 
 # Run parameters
 # --------------
@@ -50,6 +50,7 @@ cat_file_name:     'cosmos15_superbit2023_phot_shapes_with_sigma.csv' #'cosmos20
 cluster_cat_name:  'real_galaxy_catalog_23.5_example.fits' # path to cluster catalog
 star_cat_name:      'APRA_cluster_GAIA_starcats/GAIAstars_1E0657.csv' #'master_gaiastar_cat.fits' # File containing GAIA star fluxes
 outdir:            './forecasting/sim_test' # directory where output images and truth catalogs are saved
+emp_psf_path:      '/projects/mccleary_group/superbit/emp_psfs'
 
 
 # Misc parameters

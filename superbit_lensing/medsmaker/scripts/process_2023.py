@@ -98,13 +98,24 @@ def main(args):
             )
             star_config = None
 
-        # Load in the science frames
         endings = ["cal", "clean", "sim"]
         science = []
+        found_endings = []
 
         for ending in endings:
-            search_path = os.path.join(data_dir, target_name, band, 'cal', f'*{ending}.fits')
-            science.extend(glob(search_path))
+            search_path = os.path.join(data_dir, target_name, band, "cal", f"*{ending}.fits")
+            files = glob(search_path)
+            if files:  # if matches found
+                found_endings.append(ending)
+                science.extend(files)
+
+        if len(found_endings) == 0:
+            raise FileNotFoundError(f"No science files found with endings {endings} in {data_dir}")
+        elif len(found_endings) > 1:
+            raise ValueError(f"Multiple endings found: {found_endings}. Only one ending type is allowed.")
+
+        # define the single ending for later use
+        science_ending = found_endings[0]
             
         #science = science[0:2]
         
@@ -130,7 +141,8 @@ def main(args):
              band_outdir,
              log=log,
              vb=vb,
-             ext_header=ext_header
+             ext_header=ext_header,
+             science_ending=science_ending
         )
 
         # TODO: Make this less hard-coded

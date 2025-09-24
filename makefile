@@ -61,6 +61,7 @@ conda-deps: env
 		"astromatic-psfex=3.24.2" \
 		"astromatic-source-extractor=2.28.0" \
 		"astromatic-swarp=2.38.0" \
+		"astromatic-scamp=2.14.0" \
 		-y
 
 # Install pip dependencies
@@ -69,45 +70,41 @@ pip-deps: conda-deps
 	@eval "$$(conda shell.bash hook)" && \
 	conda activate $(ENV_NAME) && \
 	$(PIP) install --upgrade pip setuptools wheel && \
-	$(PIP) install --upgrade \
-		"pyyaml>=5.4" \
-		astropy \
-		fitsio \
-		piff \
-		shapely \
-		Rtree \
-		"galsim>=2.3" \
-		lenspack \
-		pyregion \
-		"numba>=0.57.0" \
-		"pympler>=1.0" \
-		"numpy>=1.20" \
-		"scipy>=1.7" \
-		"matplotlib>=3.5" \
-		"tqdm>=4.60" \
-		"seaborn>=0.11" \
-		esutil \
-		astroquery \
-		ipdb \
-		statsmodels \
-		reproject
+	bash -c '$(PIP) install esutil TreeCorr || \
+		(conda install -c conda-forge TreeCorr -y && \
+		 conda install -c conda-forge esutil -y)' && \
+	bash -c '$(PIP) install --upgrade \
+		pyyaml>=5.4 astropy fitsio piff shapely Rtree \
+		galsim>=2.3 lenspack pyregion numba>=0.57.0 pympler>=1.0 \
+		numpy>=1.20 scipy>=1.7 matplotlib>=3.5 tqdm>=4.60 \
+		seaborn>=0.11 astroquery ipdb statsmodels reproject colossus healpy || \
+		CC=gcc CXX=c++ FC=gfortran $(PIP) install --no-cache-dir \
+		pyyaml>=5.4 astropy fitsio piff shapely Rtree \
+		galsim>=2.3 lenspack pyregion numba>=0.57.0 pympler>=1.0 \
+		numpy>=1.20 scipy>=1.7 matplotlib>=3.5 tqdm>=4.60 \
+		seaborn>=0.11 astroquery ipdb statsmodels reproject colossus healpy'
 
 # Install git dependencies
 git-deps: pip-deps
 	@printf "$(GREEN)Installing git dependencies...$(NC)\n"
 	@eval "$$(conda shell.bash hook)" && \
 	conda activate $(ENV_NAME) && \
-	$(PIP) install git+https://github.com/esheldon/ngmix.git && \
-	$(PIP) install git+https://github.com/esheldon/meds.git && \
-	$(PIP) install git+https://github.com/esheldon/psfex.git && \
-	$(PIP) install git+https://github.com/rmjarvis/TreeCorr.git
+	( $(PIP) install git+https://github.com/esheldon/ngmix.git \
+	&& $(PIP) install git+https://github.com/esheldon/meds.git \
+	&& $(PIP) install git+https://github.com/esheldon/psfex.git \
+	|| CC=gcc CXX=c++ FC=gfortran $(PIP) install --no-cache-dir \
+		git+https://github.com/esheldon/ngmix.git \
+		git+https://github.com/esheldon/meds.git \
+		git+https://github.com/esheldon/psfex.git )
 
 # Install the package
 install: git-deps
 	@printf "$(GREEN)Installing superbit-lensing...$(NC)\n"
 	@eval "$$(conda shell.bash hook)" && \
 	conda activate $(ENV_NAME) && \
-	$(PIP) install -e .
+	$(PIP) install -e . || \
+	CC=gcc CXX=c++ FC=gfortran $(PIP) install -e .
+	@rm -f =*
 	@printf "$(GREEN)Installation complete!$(NC)\n"
 	@printf "$(YELLOW)To use the environment, run: conda activate $(ENV_NAME)$(NC)\n"
 	@printf "\n$(GREEN)Running post-installation configuration...$(NC)\n"

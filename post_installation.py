@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import argparse
 
 def normalize_path(path):
     """Normalize a path by removing trailing slashes and handling edge cases."""
@@ -66,8 +67,12 @@ def add_bit_download_alias(current_dir, datadir, username=None):
         
         with open(rc_file, 'w') as f:
             for line in lines:
-                if not line.strip().startswith('alias bit-download='):
-                    f.write(line)
+                if line.strip().startswith('alias bit-download='):
+                    continue
+                if line.strip() == '# SuperBIT data download alias (added by post_installation.py)':
+                    continue
+                f.write(line)
+
     
     # Add the alias
     try:

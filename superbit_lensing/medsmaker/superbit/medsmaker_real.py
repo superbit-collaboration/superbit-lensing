@@ -30,7 +30,7 @@ Goals:
 class BITMeasurement():
     def __init__(self, image_files, data_dir, target_name, 
                 band, detection_bandpass, outdir, work_dir=None, 
-                log=None, vb=False, ext_header=False):
+                log=None, vb=False, ext_header=False, science_ending="clean"):
         '''
         data_path: path to the image data not including target name
         coadd: Set to true if the first image file is a coadd image (must be first)
@@ -51,6 +51,13 @@ class BITMeasurement():
         self.detection_cat = None
         self.psf_models = None
         self.tolerance_deg = 1e-4
+        if science_ending == "clean":
+            self.data_type = "real_data"
+        elif science_ending == "sim":
+            self.data_type = "simulation"
+        else:
+            raise ValueError(f"Unrecognized science ending: {science_ending}. "
+                            "Expected one of ['clean', 'sim'].")
         # Set up logger
         if log is None:
             logfile = 'medsmaker.log'
@@ -64,10 +71,27 @@ class BITMeasurement():
 
         project_root = filepath.parents[3]  # This points to superbit-lensing/
         self.exposure_mask_fname = str(project_root / "data" / "masks" / "mask_dark_55percent_300.npy")
-        self.star_file = os.path.join(self.data_dir, "catalogs", "stars", f"{self.target_name}_gaia_dr3.fits")
+        if self.data_type == 'real_data':
+            self.star_file = os.path.join(self.data_dir, "catalogs", "stars", f"{self.target_name}_gaia_dr3.fits")
+            self.star_hdu=1
+        else:
+            self.star_file = os.path.join(
+                self.data_dir, "catalogs", "stars",
+                f"{self.target_name}_gaia_starcat.fits"
+            )
+            if not os.path.exists(self.star_file):
+                raise FileNotFoundError(f"Star file does not exist: {self.star_file}")
+            if os.path.exists(self.star_file):
+                with fits.open(self.star_file) as hdul:
+                    if len(hdul[2].data) == 0:
+                        raise RuntimeError(
+                            f"Star file {self.star_file} exists but HDU 2 is empty!"
+                        )
+                    self.star_hdu=2
 
         try:
-            self.gaia_stars = Table.read(self.star_file, hdu=1)
+            self.gaia_stars = Table.read(self.star_file, hdu=self.star_hdu)
+
         except Exception as e:
             print(f"[WARNING] Could not open star file: {e}. Trying GAIA query...")
             try:
@@ -1181,7 +1205,13 @@ class BITMeasurement():
 
         return true_extended
 
-    def _select_stars_for_psf(self, sscat, star_config, truthfile=None):
+    def _select_stars_for_psf(self, *args, **kwargs):
+        if self.data_type == "real_data":
+            return self._select_stars_for_psf_rd(*args, **kwargs)
+        elif self.data_type == "simulation":
+            return self._select_stars_for_psf_sim(*args, **kwargs)
+
+    def _select_stars_for_psf_rd(self, sscat, star_config, truthfile=None):
         '''
         Method to obtain stars from SExtractor catalog using the truth catalog
         Inputs
@@ -1218,7 +1248,7 @@ class BITMeasurement():
 
         return outname
 
-    def _select_stars_for_psf_v2(self, sscat, truthfile, star_config):
+    def _select_stars_for_psf_sim(self, sscat, truthfile, star_config):
         '''
         Method to obtain stars from SExtractor catalog using the truth catalog
         Inputs
@@ -1266,24 +1296,17 @@ class BITMeasurement():
                         self.logprint(f"All catalog reading methods failed! Gaia query error: {e3}")
                         raise RuntimeError(f"Could not read truth catalog in any format and Gaia query failed")
             # match sscat against truth star catalog; 0.72" = 5 SuperBIT pixels
+            og_len = len(ss)
+            matcher = SkyCoordMatcher(ss, stars,
+                                    cat1_ratag='ALPHAWIN_J2000', cat1_dectag='DELTAWIN_J2000',
+                                    cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000',
+                                    return_idx=True, match_radius=1 * self.tolerance_deg)
 
-            star_matcher = eu.htm.Matcher(16,
-                                ra=stars[star_config['truth_ra_key']],
-                                dec=stars[star_config['truth_dec_key']]
-                                )
-            matches, starmatches, dist = \
-                                star_matcher.match(ra=ss['ALPHAWIN_J2000'],
-                                dec=ss['DELTAWIN_J2000'],
-                                radius=1/3600., maxmatch=1
-                                )
+            ss, matched2, idx1, idx2 = matcher.get_matched_pairs()   
 
-            og_len = len(ss); ss = ss[matches]
-            if self.gaia_query_happened:
-                wg_stars = (ss['SNR_WIN'] > star_config['MIN_SNR']) & (ss['MAG_AUTO'] > 16)
-            else:
-                wg_stars = (ss['SNR_WIN'] > star_config['MIN_SNR'])
+            wg_stars = (ss['SNR_WIN'] > star_config['MIN_SNR']) & (ss['MAG_AUTO'] > star_config['MAX_MAG'])
 
-            self.logprint(f'{len(dist)}/{og_len} objects ' +
+            self.logprint(f'{len(ss)}/{og_len} objects ' +
                           'matched to reference (truth) star catalog \n' +
                           f'{len(ss[wg_stars])} stars passed MIN_SNR threshold'
                           )
