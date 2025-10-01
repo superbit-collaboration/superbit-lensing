@@ -7,13 +7,13 @@ export cluster_redshift="0.296"
 export detection_band="b"
 
 # Define directories
-export DATADIR="/scratch/sa.saha/data"
+export DATADIR="/scratch/sa.saha/test_data"
 export CODEDIR="/projects/mccleary_group/saha/codes/superbit-lensing"
 export OUTDIR="${DATADIR}/${cluster_name}/${band_name}/out"
 
 # Define ngmix parameters
-export ngmix_nruns=50 
-export PSF_MODEL="coellip5"
+export ngmix_nruns=1 
+export PSF_MODEL="em5"
 export GAL_MODEL="gauss"
 
 # Seeds
