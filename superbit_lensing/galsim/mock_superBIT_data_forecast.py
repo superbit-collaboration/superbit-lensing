@@ -637,6 +637,8 @@ class SuperBITParameters:
                 self.bp_file = str(value)
             elif option == "outdir":
                 self.outdir = str(value)
+            elif option == "emp_psf_path":
+                self.emp_psf_path = str(value)
             elif option == "data_dir":
                 self.data_dir = str(value)
             elif option == "master_seed":
