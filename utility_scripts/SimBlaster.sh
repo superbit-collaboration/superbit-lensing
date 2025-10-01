@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Example Usage: bash SimBlaster.sh backcast_sep23 30 backcast 1 42
+
 # Define simulation parameters
 RUN_NAME=${1:-"default_run"}
 NUM_SIMS=${2:-5}  # Default to 5 simulations if not specified
@@ -8,7 +10,7 @@ START_SEED=${4:-42} # Default starting seed
 EXP_TYPE=${5:-"forecast"} # Default experiment type is 'forecast', can be 'backcast'
 
 # Define directories
-DATADIR="/projects/mccleary_group/saha/simulated_data"
+DATADIR="/scratch/sa.saha/test_simulated_data"
 CODEDIR="/projects/mccleary_group/saha/codes/superbit-lensing"
 
 echo "Starting simulation batch: $RUN_NAME"
