@@ -184,16 +184,16 @@ def download_catalogs(datadir):
         return None
     
     # Construct the scp command
-    source = f"{username}@hen.astro.utoronto.ca:/data/analysis/superbit_2023/shape_cats/catalogs"
+    source = f"{username}@hen.astro.utoronto.ca:/data/analysis/superbit_2023/shape_cats/catalogs {username}@hen.astro.utoronto.ca:/data/analysis/superbit_2023/shape_cats/star_masks"
     destination = datadir
-    
+
     print(f"\nWill download from: {source}")
     print(f"To: {destination}")
     print("\nNote: You will be prompted for your hen password.")
-    
+
     # Use rsync for better handling of directories and resume capability
-    cmd = ["rsync", "-avz", "--progress", source, destination]
-    
+    cmd = ["rsync", "-avz", "--progress"] + source.split() + [destination]
+
     try:
         print("\nStarting download...")
         result = subprocess.run(cmd, check=True)
@@ -205,18 +205,97 @@ def download_catalogs(datadir):
     except FileNotFoundError:
         print("\nError: rsync not found. Trying with scp instead...")
         # Fallback to scp if rsync is not available
-        cmd = ["scp", "-r", source, destination]
-        try:
-            result = subprocess.run(cmd, check=True)
-            print("\nCatalog download completed successfully!")
-            return username  # Return username for alias creation
-        except subprocess.CalledProcessError as e:
-            print(f"\nError during download: {e}")
-            print("Please check your username, password, and network connection.")
-        except FileNotFoundError:
-            print("\nError: Neither rsync nor scp found. Please install one of them.")
+        cmd = ["scp", "-r"] + source.split() + [destination]
     
     return username  # Return username even if download failed
+
+def update_galsim_config(sim_path, current_dir):
+    """
+    Update paths in the galsim_config.yaml file to point to the local simulation directory.
+    
+    Parameters:
+        sim_path (str): Path to the local simulation directory.
+        current_dir (str): Current working directory where the script is run.
+    """
+    config_file = os.path.join(current_dir, "job_sims", "galsim_config.yaml")
+    
+    if not os.path.exists(config_file):
+        print(f"galsim_config.yaml not found at {config_file}")
+        return
+    
+    new_lines = []
+    with open(config_file, "r") as f:
+        for line in f:
+            # Replace any path starting with /projects/mccleary_group/superbit/ 
+            if "/projects/mccleary_group/superbit/" in line:
+                line = line.replace("/projects/mccleary_group/superbit/", os.path.join(sim_path, "sim_utils") + "/")
+            new_lines.append(line)
+    
+    # Write back the updated file
+    with open(config_file, "w") as f:
+        f.writelines(new_lines)
+    
+    print(f"galsim_config.yaml updated with sim_path: {os.path.join(sim_path, 'sim_utils')}")
+
+
+def update_simblaster(sim_path, current_dir):
+    """
+    Update DATADIR and CODEDIR in the SimBlaster.sh script.
+    
+    Parameters:
+        sim_path (str): Path to the local simulation directory.
+        current_dir (str): Current working directory where the code resides.
+    """
+    simblaster_file = os.path.join(current_dir, "utility_scripts", "SimBlaster.sh")
+    
+    if not os.path.exists(simblaster_file):
+        print(f"SimBlaster.sh not found at {simblaster_file}")
+        return
+    
+    new_lines = []
+    with open(simblaster_file, "r") as f:
+        for line in f:
+            if line.strip().startswith("DATADIR="):
+                line = f'DATADIR="{sim_path}"\n'
+            elif line.strip().startswith("CODEDIR="):
+                line = f'CODEDIR="{current_dir}"\n'
+            new_lines.append(line)
+    
+    with open(simblaster_file, "w") as f:
+        f.writelines(new_lines)
+    
+    print(f"SimBlaster.sh updated with DATADIR={sim_path} and CODEDIR={current_dir}")
+
+def download_sim_data(username, sim_path):
+    """
+    Download the sim_utils directory from the remote server to the local simulation path.
+    
+    Parameters:
+        username (str): Your username on the remote server.
+        sim_path (str): Local path where the sim_utils directory should be saved.
+    """
+    source = f"{username}@hen.astro.utoronto.ca:/data/analysis/superbit_2023/shape_cats/sim_utils"
+    destination = sim_path
+
+    print(f"\nWill download sim_utils from: {source}")
+    print(f"To: {destination}")
+    print("\nNote: You will be prompted for your hen password.")
+
+    # Use rsync for directories and resume capability
+    cmd = ["rsync", "-avz", "--progress", source, destination]
+
+    try:
+        print("\nStarting download of sim_utils...")
+        subprocess.run(cmd, check=True)
+        print("\nsim_utils download completed successfully!")
+    except subprocess.CalledProcessError as e:
+        print(f"\nError during download: {e}")
+        print("Please check your username, password, and network connection.")
+    except FileNotFoundError:
+        print("\nError: rsync not found. Trying with scp instead...")
+        cmd = ["scp", "-r", source, destination]
+        subprocess.run(cmd, check=True)
+        print("\nsim_utils download completed successfully via scp!")
 
 def main(env_name=None):
     # Resolve the absolute path of the current directory
@@ -276,13 +355,39 @@ def main(env_name=None):
     
     # Ask about downloading catalogs
     username = download_catalogs(save_path)
-    
+
+    # Ask about setting up simulation branch
+    setup_sim = input("\nDo you want to set up a simulation branch? (y/n): ").strip().lower()
+    if setup_sim == 'y':
+        sim_default_path = os.path.join(current_dir, 'simulated_data')
+        sim_path_input = input(f"Enter the path for simulated data (default: {sim_default_path}): ").strip()
+        
+        if not sim_path_input:
+            sim_path = sim_default_path
+        else:
+            sim_path = normalize_path(sim_path_input)
+        
+        if not os.path.isabs(sim_path):
+            sim_path = os.path.abspath(sim_path)
+        
+        try:
+            os.makedirs(sim_path, exist_ok=True)
+            print(f"Simulation directory created/verified: {sim_path}")
+        except Exception as e:
+            print(f"Error creating simulation directory {sim_path}: {e}")
+            return
+
+        config_sim_sh_path = os.path.join(current_dir, 'job_sims', 'config.sh')
+        update_config_sh(config_sim_sh_path, sim_path, current_dir, env_name=env_name)
+        update_galsim_config(sim_path, current_dir)
+        update_simblaster(sim_path, current_dir)
+        download_sim_data(username, sim_path)
+
     # Add bit-download alias
     print("\n" + "="*60)
     print("SETTING UP BIT-DOWNLOAD ALIAS")
     print("="*60)
     add_bit_download_alias(current_dir, save_path, username)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Setup script for SuperBIT lensing configs.")
