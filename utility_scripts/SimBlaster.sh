@@ -5,12 +5,12 @@
 # Define simulation parameters
 RUN_NAME=${1:-"default_run"}
 NUM_SIMS=${2:-5}  # Default to 5 simulations if not specified
-START_SIM=${3:-1} # Default starting simulation number
-START_SEED=${4:-42} # Default starting seed
-EXP_TYPE=${5:-"forecast"} # Default experiment type is 'forecast', can be 'backcast'
+EXP_TYPE=${3:-"forecast"} # Default experiment type is 'forecast', can be 'backcast'
+START_SIM=${4:-1} # Default starting simulation number
+START_SEED=${5:-42} # Default starting seed
 
 # Define directories
-DATADIR="/scratch/sa.saha/test_simulated_data"
+DATADIR="/scratch/sa.saha/simulated_data"
 CODEDIR="/projects/mccleary_group/saha/codes/superbit-lensing"
 
 echo "Starting simulation batch: $RUN_NAME"
@@ -47,7 +47,7 @@ cd - > /dev/null
 # Process each simulation
 for (( i=START_SIM; i<START_SIM+NUM_SIMS; i++ )); do
     # Define directory for this simulation
-    SIM_DIR="job_sims_${RUN_NAME}_sim${i}"
+    SIM_DIR="sim${i}"
     
     echo "Processing simulation $i of $NUM_SIMS"
     
