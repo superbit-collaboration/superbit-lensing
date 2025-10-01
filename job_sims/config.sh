@@ -3,7 +3,7 @@
 # Define cluster-related variables
 export cluster_name="sim_test11"
 export band_name="b"
-export cluster_redshift="0.44"
+export cluster_redshift="0.245"
 export detection_band="b"
 
 # Define directories
