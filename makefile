@@ -107,10 +107,15 @@ install: git-deps
 	@rm -f =*
 	@printf "$(GREEN)Installation complete!$(NC)\n"
 	@printf "$(YELLOW)To use the environment, run: conda activate $(ENV_NAME)$(NC)\n"
-	@printf "\n$(GREEN)Running post-installation configuration...$(NC)\n"
-	@eval "$$(conda shell.bash hook)" && \
-	conda activate $(ENV_NAME) && \
-	$(PYTHON) post_installation.py --env_name $(ENV_NAME)
+	@read -p "Do you want to run post-installation configuration? (y/n): " yn && \
+	if [ "$$yn" = "y" ]; then \
+	    printf "\n$(GREEN)Running post-installation configuration...$(NC)\n"; \
+	    eval "$$(conda shell.bash hook)" && \
+	    conda activate $(ENV_NAME) && \
+	    $(PYTHON) post_installation.py --env_name $(ENV_NAME); \
+	else \
+	    printf "$(YELLOW)Skipping post-installation configuration.$(NC)\n"; \
+	fi
 
 # Development install (editable)
 dev-install: git-deps

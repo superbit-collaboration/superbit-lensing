@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import argparse
+import shutil
 
 def normalize_path(path):
     """Normalize a path by removing trailing slashes and handling edge cases."""
@@ -211,8 +212,9 @@ def download_catalogs(datadir):
 
 def update_galsim_config(sim_path, current_dir):
     """
-    Update paths in the galsim_config.yaml file to point to the local simulation directory.
-    
+    Update specific paths in the galsim_config.yaml file (cosmosdir, datadir, emp_psf_path)
+    to point to the local simulation directory.
+
     Parameters:
         sim_path (str): Path to the local simulation directory.
         current_dir (str): Current working directory where the script is run.
@@ -226,16 +228,19 @@ def update_galsim_config(sim_path, current_dir):
     new_lines = []
     with open(config_file, "r") as f:
         for line in f:
-            # Replace any path starting with /projects/mccleary_group/superbit/ 
-            if "/projects/mccleary_group/superbit/" in line:
-                line = line.replace("/projects/mccleary_group/superbit/", os.path.join(sim_path, "sim_utils") + "/")
+            stripped = line.strip()
+            if stripped.startswith("cosmosdir:"):
+                line = f"cosmosdir:         '{os.path.join(sim_path, 'sim_utils/galsim_data/galsim_cosmos_catalogs')}' # Path to COSMOS data directory\n"
+            elif stripped.startswith("datadir:"):
+                line = f"datadir:           '{os.path.join(sim_path, 'sim_utils/galsim_data')}' # Path to repo/galsim data directory\n"
+            elif stripped.startswith("emp_psf_path:"):
+                line = f"emp_psf_path:      '{os.path.join(sim_path, 'sim_utils/emp_psfs_order5')}'\n"
             new_lines.append(line)
     
-    # Write back the updated file
     with open(config_file, "w") as f:
         f.writelines(new_lines)
     
-    print(f"galsim_config.yaml updated with sim_path: {os.path.join(sim_path, 'sim_utils')}")
+    print(f"galsim_config.yaml updated with sim_path = {os.path.join(sim_path, 'sim_utils')}")
 
 
 def update_simblaster(sim_path, current_dir):
@@ -296,6 +301,115 @@ def download_sim_data(username, sim_path):
         cmd = ["scp", "-r", source, destination]
         subprocess.run(cmd, check=True)
         print("\nsim_utils download completed successfully via scp!")
+
+def update_slurm_partitions(current_dir):
+    """
+    Prompt user for SLURM partition preference and update submission scripts accordingly.
+    """
+    print("\n" + "="*60)
+    print("SLURM PARTITION SETUP")
+    print("="*60)
+
+    response = input("\nDo you want to specify a partition for your HPC jobs? (yes/no): ").strip().lower()
+
+    # Files to update
+    sims_dir = os.path.join(current_dir, "job_sims", "scripts")
+    jobs_dir = os.path.join(current_dir, "job_scripts", "scripts")
+    files_to_update = [
+        os.path.join(jobs_dir, "color_color_run.sh"),
+        os.path.join(jobs_dir, "make_meds.sh"),
+        os.path.join(jobs_dir, "ngmix_job_template.sh"),
+        os.path.join(sims_dir, "gen_mocks.sh"),
+        os.path.join(sims_dir, "make_meds_sims.sh"),
+        os.path.join(sims_dir, "ngmix_job_template.sh"),
+    ]
+
+    # Collect partition if needed
+    partition = None
+    if response in ["yes", "y"]:
+        partition = input("Enter the partition name you want to use: ").strip()
+        if not partition:
+            print("No partition name provided. Skipping partition update.")
+            return
+
+    # Process each file
+    for filepath in files_to_update:
+        if not os.path.exists(filepath):
+            continue
+
+        new_lines = []
+        with open(filepath, "r") as f:
+            for line in f:
+                if line.strip().startswith("#SBATCH --partition="):
+                    if partition:  # replace with new partition
+                        new_lines.append(f"#SBATCH --partition={partition}\n")
+                    else:  # remove the line
+                        continue
+                else:
+                    new_lines.append(line)
+
+        with open(filepath, "w") as f:
+            f.writelines(new_lines)
+
+        if partition:
+            print(f"Updated partition in {filepath} → {partition}")
+        else:
+            print(f"Removed partition line in {filepath}")
+
+def setup_job_submission_dir(current_dir):
+    """
+    Set up a job submission directory for real data jobs.
+    - Ask the user if they want to set it up.
+    - Default location: ../jobs
+    - Copy job_scripts → <chosen_dir>/base
+    """
+    print("\n" + "="*60)
+    print("JOB SUBMISSION DIRECTORY SETUP")
+    print("="*60)
+
+    response = input("\nDo you want to set up your job-submission directory? (yes/no): ").strip().lower()
+    if response not in ["yes", "y"]:
+        print("Skipping job-submission directory setup.")
+        return
+
+    # Default directory is ../jobs relative to current_dir
+    default_dir = os.path.abspath(os.path.join(current_dir, "..", "jobs"))
+    user_input = input(f"Enter the path for real data jobs (default: {default_dir}): ").strip()
+
+    if not user_input:
+        jobs_dir = default_dir
+    else:
+        jobs_dir = os.path.abspath(user_input)
+
+    # Create the directory if needed
+    try:
+        os.makedirs(jobs_dir, exist_ok=True)
+        print(f"Created/verified job-submission directory: {jobs_dir}")
+    except Exception as e:
+        print(f"Error creating directory {jobs_dir}: {e}")
+        return
+
+    # Source job_scripts
+    src = os.path.join(current_dir, "job_scripts")
+    dst = os.path.join(jobs_dir, "base")
+
+    if not os.path.exists(src):
+        print(f"Error: job_scripts folder not found in {current_dir}")
+        return
+
+    # If base already exists, ask user
+    if os.path.exists(dst):
+        overwrite = input(f"Directory {dst} already exists. Overwrite? (yes/no): ").strip().lower()
+        if overwrite not in ["yes", "y"]:
+            print("Skipping copy of job_scripts.")
+            return
+        shutil.rmtree(dst)
+
+    try:
+        shutil.copytree(src, dst)
+        print(f"Copied {src} → {dst}")
+    except Exception as e:
+        print(f"Error copying job_scripts: {e}")
 
 def main(env_name=None):
     # Resolve the absolute path of the current directory
@@ -383,6 +497,10 @@ def main(env_name=None):
         update_simblaster(sim_path, current_dir)
         download_sim_data(username, sim_path)
 
+    # Update SLURM partitions
+    update_slurm_partitions(current_dir)
+    # Set up job submission directory
+    setup_job_submission_dir(current_dir)
     # Add bit-download alias
     print("\n" + "="*60)
     print("SETTING UP BIT-DOWNLOAD ALIAS")
