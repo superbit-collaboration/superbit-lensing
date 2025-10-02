@@ -53,6 +53,7 @@ dependencies = [
     "reproject",
     "treecorr",
     "colossus",
+    "psutil"
 ]
 
 [project.optional-dependencies]

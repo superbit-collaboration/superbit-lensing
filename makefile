@@ -74,12 +74,12 @@ pip-deps: conda-deps
 		(conda install -c conda-forge TreeCorr -y && \
 		 conda install -c conda-forge esutil -y)' && \
 	bash -c '$(PIP) install --upgrade \
-		pyyaml>=5.4 astropy fitsio piff shapely Rtree \
+		pyyaml>=5.4 astropy fitsio piff shapely Rtree psutil \
 		galsim>=2.3 lenspack pyregion numba>=0.57.0 pympler>=1.0 \
 		numpy>=1.20 scipy>=1.7 matplotlib>=3.5 tqdm>=4.60 \
 		seaborn>=0.11 astroquery ipdb statsmodels reproject colossus healpy || \
 		CC=gcc CXX=c++ FC=gfortran $(PIP) install --no-cache-dir \
-		pyyaml>=5.4 astropy fitsio piff shapely Rtree \
+		pyyaml>=5.4 astropy fitsio piff shapely Rtree psutil \
 		galsim>=2.3 lenspack pyregion numba>=0.57.0 pympler>=1.0 \
 		numpy>=1.20 scipy>=1.7 matplotlib>=3.5 tqdm>=4.60 \
 		seaborn>=0.11 astroquery ipdb statsmodels reproject colossus healpy'
