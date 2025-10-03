@@ -33,7 +33,6 @@ python $CODEDIR/superbit_lensing/metacalibration/ngmix_fit.py \
 -psf_model=$PSF_MODEL \
 -gal_model=$GAL_MODEL \
 --overwrite \
---use_coadd \
 $OUTDIR/${cluster_name}_${band_name}_meds.fits \
 $ARRAROUTDIR/${cluster_name}_${band_name}_mcal.fits 
 
