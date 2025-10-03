@@ -19,6 +19,7 @@ import glob
 import pdb
 import copy
 import time
+import shutil
 
 '''
 Goals:
@@ -118,6 +119,21 @@ class BITMeasurement():
         # Cluster/bandpass directory containing all the cal/, cat/, etc. folders
         self.cluster_band_dir = os.path.join(self.data_dir,
                                     self.target_name, self.band)
+
+        if self.data_type == "simulation":
+            self.logprint("[Simulations] copying PSF files...")
+            source_psf_dir = os.path.join(self.cluster_band_dir, 'cal', 'psfex-output')
+            dest_psf_dir = os.path.join(self.cluster_band_dir, 'cat', 'psfex-output')
+
+            # Make sure destination exists
+            os.makedirs(dest_psf_dir, exist_ok=True)
+
+            # Copy all files from source to destination
+            for fname in os.listdir(source_psf_dir):
+                src_file = os.path.join(source_psf_dir, fname)
+                dst_file = os.path.join(dest_psf_dir, fname)
+                if os.path.isfile(src_file):
+                    shutil.copy(src_file, dst_file)  # overwrite if exists
 
     def check_cat_image_order(self, verbose=True):
         """
@@ -1089,23 +1105,36 @@ class BITMeasurement():
                 '-OUTCAT_NAME', outcat_name, autoselect_arg]
         )
         self.logprint("psfex cmd is " + cmd)
-        os.system(cmd)
+        if self.data_type == "real_data":
+            self.logprint("Running PSFEx for real data...")
+            os.system(cmd)
 
-        cleanup_cmd = ' '.join(
-            ['mv chi* resi* samp* snap* proto* *.xml', psfex_outdir]
-            )
-        cleanup_cmd2 = ' '.join(
-            ['mv count*pdf ellipticity*pdf fwhm*pdf', psfex_outdir]
-            )
-        os.system(cleanup_cmd)
-        os.system(cleanup_cmd2)
+        elif self.data_type == "simulation" and not os.path.exists(psfex_model_file):
+            self.logprint("Running PSFEx for simulation (no existing PSFEx model found)...")
+            os.system(cmd)
+
+        elif self.data_type == "simulation" and os.path.exists(psfex_model_file):
+            self.logprint(f"Skipping PSFEx for simulation — model already exists: {psfex_model_file}")
+
+        # Cleanup (only if PSFEx was run)
+        if (
+            self.data_type == "real_data"
+            or (self.data_type == "simulation" and not os.path.exists(psfex_model_file))
+        ):
+            cleanup_cmd1 = f"mv chi* resi* samp* snap* proto* *.xml {psfex_outdir}"
+            cleanup_cmd2 = f"mv count*pdf ellipticity*pdf fwhm*pdf {psfex_outdir}"
+
+            self.logprint("Moving PSFEx output files to psfex-output directory...")
+            os.system(cleanup_cmd1)
+            os.system(cleanup_cmd2)
+            self.logprint("Finished PSFEx cleanup.")         
 
         try:
             model = psfex.PSFEx(psfex_model_file)
-        except:
-            model = None
-            psfex_model_file = None
-            print(f'WARNING:\n Could not find PSFEx model file {psfex_model_file}\n')
+        except Exception as e:
+            raise FileNotFoundError(
+                f"ERROR: Could not load PSFEx model file: {psfex_model_file}"
+            ) from e
         return model, psfex_model_file
 
 
