@@ -26,6 +26,7 @@ import galsim.des
 import galsim.convolve
 import pdb
 from glob import glob
+import shutil
 import pickle
 import scipy
 import yaml
@@ -1316,13 +1317,24 @@ def main(args):
 
         ## Define X & Y dither offsets
         dither_offsets = rng.integers(-100, 100, size=2)
-        logprint(f'dithers are {dither_offsets}')
-        full_image.setOrigin(dither_offsets[0], dither_offsets[1])
+        #logprint(f'dithers are {dither_offsets}')
+        logprint(f'Dithering is not happening')
+        #full_image.setOrigin(dither_offsets[0], dither_offsets[1])
         full_image.wcs = wcs
 
         psf_file = all_psf_files[i-1]
         image_file = os.path.join(os.path.dirname(os.path.dirname(psf_file)), os.path.basename(psf_file).replace('_starcat.psf', '.fits'))
         psf = galsim.des.DES_PSFEx(psf_file, image_file)
+
+        # Ensure output directory exists
+        psf_output_dir = os.path.join(output_dir, "psfex-output")
+        os.makedirs(psf_output_dir, exist_ok=True)
+
+        # Destination path
+        psf_filename = os.path.join(psf_output_dir, outname.replace(".fits", "_starcat.psf"))
+
+        # Copy the PSF file
+        shutil.copy(psf_file, psf_filename)
         #####
         ## Loop over galaxy objects:
         #####
