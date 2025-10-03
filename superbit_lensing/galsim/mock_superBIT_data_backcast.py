@@ -1324,7 +1324,7 @@ def main(args):
 
         psf_file = all_psf_files[i-1]
         image_file = os.path.join(os.path.dirname(os.path.dirname(psf_file)), os.path.basename(psf_file).replace('_starcat.psf', '.fits'))
-        psf = galsim.des.DES_PSFEx(psf_file, image_file)
+        psf = galsim.des.DES_PSFEx(psf_file, wcs=wcs)
 
         # Ensure output directory exists
         psf_output_dir = os.path.join(output_dir, "psfex-output")
