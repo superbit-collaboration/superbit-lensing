@@ -1109,22 +1109,22 @@ class BITMeasurement():
                 '-OUTCAT_NAME', outcat_name, autoselect_arg]
         )
         self.logprint("psfex cmd is " + cmd)
+        psfex_ran = False  # Track if PSFEx was executed
         if self.data_type == "real_data":
             self.logprint("Running PSFEx for real data...")
             os.system(cmd)
+            psfex_ran = True
 
         elif self.data_type == "simulation" and not os.path.exists(psfex_model_file):
             self.logprint("Running PSFEx for simulation (no existing PSFEx model found)...")
             os.system(cmd)
+            psfex_ran = True
 
         elif self.data_type == "simulation" and os.path.exists(psfex_model_file):
             self.logprint(f"Skipping PSFEx for simulation — model already exists: {psfex_model_file}")
 
         # Cleanup (only if PSFEx was run)
-        if (
-            self.data_type == "real_data"
-            or (self.data_type == "simulation" and not os.path.exists(psfex_model_file))
-        ):
+        if psfex_ran:
             cleanup_cmd1 = f"mv chi* resi* samp* snap* proto* *.xml {psfex_outdir}"
             cleanup_cmd2 = f"mv count*pdf ellipticity*pdf fwhm*pdf {psfex_outdir}"
 
