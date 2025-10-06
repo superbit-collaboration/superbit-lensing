@@ -103,6 +103,16 @@ def main(args):
 
     # Convert to an Astropy table and save
     mcal_combined_table = Table(mcal_combined)
+
+    mask_file_path = os.path.join(data_dir, "star_masks")
+    mask_file = f"{mask_file_path}/{run_name}_{band}_starmask_physical.reg"
+    if os.path.exists(mask_file):
+        print(f"Using star mask file: {mask_file}")
+        junks_mcal, mcal_combined_table, reg_mask = separate_catalog_by_regions(mask_file, mcal_combined_table)
+        junks_mcal.write(f"{outdir}/{run_name}_{band}_mcal_junks.fits", format="fits", overwrite=True)
+    else:
+        print(f"WARNING: Star mask file '{mask_file}' not found, skipping the discarding process.")
+
     if args.isolate_stars:
         base_path = os.path.join(data_dir, run_name, band)
         file_stars_union = f"{base_path}/coadd/{run_name}_coadd_{band}_starcat_union.fits"
@@ -168,15 +178,6 @@ def main(args):
             print(f"Red Seq Galaxies Mcal saved to {outdir}/{run_name}_{band}_mcal_redseq.fits")            
         else:
             print(f"WARNING: Red Seq Galaxy catalog '{red_seq_file}' not found, skipping the discarding process.")
-
-    mask_file_path = os.path.join(data_dir, "star_masks")
-    mask_file = f"{mask_file_path}/{run_name}_{band}_starmask_physical.reg"
-    if os.path.exists(mask_file):
-        print(f"Using star mask file: {mask_file}")
-        junks_mcal, mcal_combined_table, reg_mask = separate_catalog_by_regions(mask_file, mcal_combined_table)
-        junks_mcal.write(f"{outdir}/{run_name}_{band}_mcal_junks.fits", format="fits", overwrite=True)
-    else:
-        print(f"WARNING: Star mask file '{mask_file}' not found, skipping the discarding process.")
 
     mcal_combined_table.write(f"{outdir}/{run_name}_{band}_mcal_combined.fits", format="fits", overwrite=True)
 

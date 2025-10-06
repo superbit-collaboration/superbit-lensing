@@ -125,15 +125,19 @@ class BITMeasurement():
             source_psf_dir = os.path.join(self.cluster_band_dir, 'cal', 'psfex-output')
             dest_psf_dir = os.path.join(self.cluster_band_dir, 'cat', 'psfex-output')
 
-            # Make sure destination exists
-            os.makedirs(dest_psf_dir, exist_ok=True)
-
-            # Copy all files from source to destination
-            for fname in os.listdir(source_psf_dir):
-                src_file = os.path.join(source_psf_dir, fname)
-                dst_file = os.path.join(dest_psf_dir, fname)
-                if os.path.isfile(src_file):
-                    shutil.copy(src_file, dst_file)  # overwrite if exists
+            if not os.path.exists(source_psf_dir):
+                self.logprint(f"[Warning] Source PSF directory not found: {source_psf_dir}")
+            else:
+                psf_files = [f for f in os.listdir(source_psf_dir) if os.path.isfile(os.path.join(source_psf_dir, f))]
+                if not psf_files:
+                    self.logprint(f"[Warning] No PSF files found in {source_psf_dir}, skipping copy.")
+                else:
+                    os.makedirs(dest_psf_dir, exist_ok=True)
+                    for fname in psf_files:
+                        src_file = os.path.join(source_psf_dir, fname)
+                        dst_file = os.path.join(dest_psf_dir, fname)
+                        shutil.copy(src_file, dst_file)
+                    self.logprint(f"[Simulations] Copied {len(psf_files)} PSF file(s) to {dest_psf_dir}.")
 
     def check_cat_image_order(self, verbose=True):
         """
@@ -288,7 +292,7 @@ class BITMeasurement():
         Make single-exposure catalogs
         '''
         if os.path.isdir(config_dir) is False:
-            raise f'{configdir} does not exist, exiting'
+            raise FileNotFoundError(f'{config_dir} does not exist, exiting')
 
         # Make catalog directory
         cat_dir = os.path.join(self.cluster_band_dir, 'cat')
