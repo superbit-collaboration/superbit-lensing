@@ -26,6 +26,7 @@ import galsim.des
 import galsim.convolve
 import pdb
 from glob import glob
+import shutil
 import pickle
 import scipy
 import yaml
@@ -41,11 +42,17 @@ from multiprocessing import Pool
 
 import superbit_lensing.utils as utils
 
+MARGIN = 150
+
 def parse_args():
     parser = ArgumentParser()
 
     parser.add_argument('config_file', action='store', type=str,
                         help='Configuration file for mock sims')
+    parser.add_argument('-shear_value', action='store', type=float, default=0.02,
+                        help='Constant shear value for multiplicative bias')
+    parser.add_argument('-which_shear', action='store', type=str, default='g1',
+                        help='which shear component to shear')
     parser.add_argument('-run_name', action='store', type=str, default='',
                         help='Name of mock simulation run')
     parser.add_argument('-outdir', action='store', type=str,
@@ -63,37 +70,6 @@ def parse_args():
     parser.add_argument('--master_seed', type=int, default=None,
                         help='Optional master seed for RNG initialization')
     return parser.parse_args()
-
-def timeout_handler(signum, frame):
-    raise TimeoutError("Function execution timed out")
-
-# Set up the try block with a timeout
-def calculate_admoms_with_timeout(gal, wcs, image_pos, galaxy_truth, sbparams, timeout_seconds=10):
-    # Set up the timeout
-    signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(timeout_seconds)
-    
-    try:
-        #print("Yay made a new change! Hiiiiiiiii")
-        admoms = galsim.hsm.FindAdaptiveMom(gal.drawImage(wcs=wcs.local(image_pos)))
-        galaxy_truth.admom_g1 = admoms.observed_shape.g1
-        galaxy_truth.admom_g2 = admoms.observed_shape.g2
-        galaxy_truth.admom_sigma = admoms.moments_sigma * sbparams.pixel_scale
-        galaxy_truth.admom_flag = 1
-        return True
-    except (galsim.errors.GalSimError, TimeoutError) as e:
-        if isinstance(e, TimeoutError):
-            print('sigma calculation timed out')
-        else:
-            print('sigma calculation failed')
-        galaxy_truth.admom_g1 = -9999.
-        galaxy_truth.admom_g2 = -9999.
-        galaxy_truth.admom_sigma = -9999.
-        galaxy_truth.admom_flag = 0
-        return False
-    finally:
-        # Cancel the alarm
-        signal.alarm(0)
 
 class truth():
 
@@ -117,9 +93,13 @@ class truth():
         self.kappa = 0.0
         self.cosmos_g1 =0.0
         self.cosmos_g2 = 0.0
+        self.theory_g1 = 0.0
+        self.theory_g2 = 0.0
         self.admom_g1 = 0.0
         self.admom_g2 = 0.0
         self.admom_sigma = 0.0
+        self.admom_r11 = 0.0
+        self.admom_r22 = 0.0
         self.admom_flag = 0.0
         self.mu = 1.0
         self.z = 0.0
@@ -129,6 +109,104 @@ class truth():
         self.hlr = 0.0
         self.scale_h_over_r = 0.0
         self.flux = 0.0
+        self.galsim_flux = 0.0
+
+def timeout_handler(signum, frame):
+    raise TimeoutError("Function execution timed out")
+
+# Set up the try block with a timeout
+def calculate_admoms_with_timeout(gal, wcs, image_pos, galaxy_truth, sbparams, timeout_seconds=10):
+    # Set up the timeout
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(timeout_seconds)
+    
+    try:
+        admoms = galsim.hsm.FindAdaptiveMom(gal.drawImage(wcs=wcs.local(image_pos)))
+        galaxy_truth.admom_g1 = admoms.observed_shape.g1
+        galaxy_truth.admom_g2 = admoms.observed_shape.g2
+        galaxy_truth.admom_sigma = admoms.moments_sigma * sbparams.pixel_scale
+        admom_r11, admom_r22 = utils.admom_response(gal, wcs, image_pos)
+        galaxy_truth.admom_r11 = admom_r11
+        galaxy_truth.admom_r22 = admom_r22
+        galaxy_truth.admom_flag = 1
+        return True
+    except (galsim.errors.GalSimError, TimeoutError) as e:
+        if isinstance(e, TimeoutError):
+            print('sigma calculation timed out')
+        else:
+            print('sigma calculation failed')
+        galaxy_truth.admom_g1 = -9999.
+        galaxy_truth.admom_g2 = -9999.
+        galaxy_truth.admom_sigma = -9999.
+        galaxy_truth.admom_flag = 0
+        return False
+    finally:
+        # Cancel the alarm
+        signal.alarm(0)
+
+def matter_power_spectrum(k_abs, h=0.7, ns=1.0, A=1.7e6):
+    """
+    Calculate the matter power spectrum using the BBKS transfer function.
+    
+    Parameters:
+    -----------
+    k_abs : array_like
+        Absolute wavenumber values in h Mpc^-1
+    h : float, optional
+        Dimensionless Hubble parameter (default: 0.7)
+    ns : float, optional
+        Scalar spectral index (default: 1.0)
+    A : float, optional
+        Normalization constant (default: 1.7e6)
+        
+    Returns:
+    --------
+    P_E : ndarray
+        E-mode power spectrum with the same shape as k_abs
+    """
+    # Convert input to numpy array if it's not already
+    k_abs = np.asarray(k_abs)
+    
+    # Calculate the BBKS transfer function
+    Gamma = 0.21  # shape parameter
+    q = k_abs / (Gamma * h)
+    
+    # Handle potential divide-by-zero for k=0
+    T = np.ones_like(k_abs)
+    nonzero = q > 0
+    
+    if np.any(nonzero):
+        x = np.log(1 + 2.34 * q[nonzero]) / (2.34 * q[nonzero])
+        T[nonzero] = x * (1 + 3.89*q[nonzero] + (16.1*q[nonzero])**2 + 
+                         (5.46*q[nonzero])**3 + (6.71*q[nonzero])**4)**(-0.25)
+    
+    # Calculate the power spectrum
+    P_E = A * T**2 * k_abs**ns
+    
+    return P_E
+
+def lss_lensing(nfw_halo, pos, nfw_z_source):
+    """
+    - For some much-needed tidiness in main(), place the function that shears each galaxy here
+    - Usage is borrowed from demo9.py
+    - nfw_halo is galsim.NFW() object created in main()
+    - pos is position of galaxy in image
+    - nfw_z_source is background galaxy redshift
+    """
+
+    g1,g2 = nfw_halo.getShear( pos)
+    nfw_shear = galsim.Shear(g1=g1,g2=g2)
+    nfw_mu = nfw_halo.getMagnification( pos)
+    nfw_kappa = nfw_halo.getConvergence(pos)
+
+    if nfw_mu < 0:
+        print("Warning: mu < 0 means strong lensing!  Using mu=25.")
+        nfw_mu = 25
+    elif nfw_mu > 25:
+        print("Warning: mu > 25 means strong lensing!  Using mu=25.")
+        nfw_mu = 25
+
+    return nfw_shear, nfw_mu, nfw_kappa
 
 def nfw_lensing(nfw_halo, pos, nfw_z_source):
     """
@@ -170,7 +248,7 @@ def make_obj(i, obj_type, *args, **kwargs):
     Particularly useful for multiprocessing wrappers
     '''
 
-    logprint = args[-1]
+    logprint = args[-2]
 
     func = None
 
@@ -228,9 +306,9 @@ def combine_objs(make_obj_outputs, full_image, truth_catalog, exp_num):
             row = [i, truth.cosmos_index, truth.x, truth.y,
                    truth.ra, truth.dec,
                    truth.g1, truth.g2,
-                   truth.mu, truth.kappa, truth.cosmos_g1, truth.cosmos_g2, 
-                   truth.admom_g1, truth.admom_g2, truth.admom_sigma, truth.admom_flag, truth.z,
-                   this_flux, truth.fwhm, truth.mom_size,
+                   truth.mu, truth.kappa, truth.cosmos_g1, truth.cosmos_g2, truth.theory_g1, truth.theory_g2,
+                   truth.admom_g1, truth.admom_g2, truth.admom_sigma, truth.admom_r11, truth.admom_r22, truth.admom_flag, truth.z,
+                   this_flux, truth.flux, truth.galsim_flux, truth.fwhm, truth.mom_size,
                    truth.n, truth.hlr, truth.scale_h_over_r,
                    truth.obj_class
                    ]
@@ -238,7 +316,7 @@ def combine_objs(make_obj_outputs, full_image, truth_catalog, exp_num):
 
     return full_image, truth_catalog
 
-def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj_index=None):
+def make_a_galaxy(ud, wcs, affine, cosmos_cat, psf, sbparams, logprint, gal_image_pos=None, obj_index=None):
     """
     Method to make a single galaxy object and return stamp for
     injecting into larger GalSim image
@@ -248,15 +326,19 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
     # Note that for this to come out close to a square shape, we need to account for the
     # cos(dec) part of the metric: ds^2 = dr^2 + r^2 d(dec)^2 + r^2 cos^2(dec) d(ra)^2
     # So need to calculate dec first.
-    dec = sbparams.center_dec + (ud()-0.5) * sbparams.image_ysize_arcsec * galsim.arcsec
-    ra = sbparams.center_ra + (ud()-0.5) * sbparams.image_xsize_arcsec / np.cos(dec) * galsim.arcsec
-    world_pos = galsim.CelestialCoord(ra,dec)
+    if gal_image_pos is None:
+        dec = sbparams.center_dec + (ud()-0.5) * sbparams.image_ysize_arcsec * galsim.arcsec
+        ra = sbparams.center_ra + (ud()-0.5) * sbparams.image_xsize_arcsec / np.cos(dec) * galsim.arcsec
+        world_pos = galsim.CelestialCoord(ra,dec)
 
-    # We will need the image position as well, so use the wcs to get that
-    image_pos = wcs.toImage(world_pos)
+        # We will need the image position as well, so use the wcs to get that
+        image_pos = wcs.toImage(world_pos)
+    else:
+        image_pos = gal_image_pos[obj_index]
+        world_pos = wcs.toWorld(image_pos)
+        dec = world_pos.dec
+        ra = world_pos.ra
 
-    # We also need this in the tangent plane, which we call "world coordinates" here.
-    # This is still an x/y corrdinate
     uv_pos = affine.toWorld(image_pos)
     logprint.debug('created galaxy position')
 
@@ -264,7 +346,8 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
     ## Note units of sbparams.gain is assumed to be be e-/ADU.
     index = int(np.floor(ud()*len(cosmos_cat)))
     gal_z = cosmos_cat[index]['ZPDF']
-    gal_flux = cosmos_cat[index][sbparams.bandpass] * sbparams.exp_time / sbparams.gain
+    #gal_flux = cosmos_cat[index][sbparams.bandpass] * sbparams.exp_time / sbparams.gain
+    gal_flux = 12258.97 # Equivalent to mag=20
     phi = cosmos_cat[index]['c10_sersic_fit_phi'] * galsim.radians
     q = cosmos_cat[index]['c10_sersic_fit_q']
     g1_cosmos = cosmos_cat[index]['c10_gaussian_g1']
@@ -280,13 +363,24 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
     if (n < 0.3):
         n = 0.3
 
-    gal = galsim.Sersic(n = n,
-                        flux = gal_flux,
-                        half_light_radius = half_light_radius)
+    # gal = galsim.Sersic(n = n,
+    #                     flux = gal_flux,
+    #                     half_light_radius = 0.5)
+    
+    #gal_flux = 12051.35 # Equivalent to mag=20
+    gal_flux = 1000 + (90000 - 1000) * ud()
+    half_light_radius = 0.5 # arcsec
+    # Randomly choose half-light radius between 0.2 and 0.8 arcsec
+    #half_light_radius = 0.2 + 0.6 * ud()
+    gal = galsim.Exponential(flux = gal_flux, half_light_radius=half_light_radius)
     #gal  = galsim.Gaussian(sigma=sigma, flux=gal_flux)
 
     gal = gal.shear(q = q, beta = phi)
     logprint.debug('created galaxy')
+    #gal  = galsim.Gaussian(sigma=sigma, flux=gal_flux)
+
+    #gal = gal.shear(g1 = g1_cosmos, g2 = g2_cosmos)
+    #logprint.debug('created galaxy')
 
     ## Apply a random rotation
     theta = ud()*2.0*np.pi*galsim.radians
@@ -297,19 +391,29 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
     gal = gal.rotate(theta)
 
     ## Get the reduced shears and magnification at this point
+    mu = 1.0
+    kappa = 0.0
     try:
-        nfw_shear, mu, kappa = nfw_lensing(nfw, uv_pos, gal_z)
-        g1=nfw_shear.g1; g2=nfw_shear.g2
-        gal = gal.lens(g1, g2, mu)
+        if sbparams.which_shear == 'g1':
+            g1=sbparams.shear_value; g2=0.0
+        elif sbparams.which_shear == 'g2':
+            g1=0.0; g2=sbparams.shear_value
+        else:
+            raise ValueError("Weird Shear type")
+        gal = gal.shear(g1=g1, g2=g2)
     except galsim.errors.GalSimError:
         logprint(f'could not lens galaxy at z = {gal_z}, setting default values...')
         g1 = 0.0; g2 = 0.0
-        mu = 1.0
-        kappa = 0.0
 
-    final = galsim.Convolve([psf, gal])
+    this_psf = psf.getPSF(image_pos)
+    logprint.debug("obtained PSF at image position")
 
-    logprint.debug('Convolved star and PSF at galaxy position')
+    gsp=galsim.GSParams(maximum_fft_size=32768)
+    final = galsim.Convolve([this_psf, gal],gsparams=gsp)
+    logprint.debug("Convolved galaxy and PSF at image position")
+    #final = galsim.Convolve([psf, gal])
+
+    #logprint.debug('Convolved star and PSF at galaxy position')
 
     stamp = final.drawImage(wcs=wcs.local(image_pos))
     stamp.setCenter(image_pos.x,image_pos.y)
@@ -323,11 +427,14 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
     galaxy_truth.cosmos_g1 = g1_cosmos; galaxy_truth.cosmos_g2 = g2_cosmos
     galaxy_truth.mu = mu; galaxy_truth.z = gal_z
     galaxy_truth.flux = stamp.added_flux
+    galaxy_truth.galsim_flux = gal_flux
     galaxy_truth.n = n; galaxy_truth.hlr = half_light_radius
     #galaxy_truth.inclination = inclination.deg # storing in degrees for human readability
     galaxy_truth.scale_h_over_r = q
     galaxy_truth.obj_class = 'gal'
-
+    g1_th, g2_th, mu_th, theta_th, flip_th = utils.g_from_gal_jac(gal)
+    galaxy_truth.theory_g1 = g1_th
+    galaxy_truth.theory_g2 = g2_th
     logprint.debug('created truth values')
 
     calculate_admoms_with_timeout(gal, wcs, image_pos, galaxy_truth, sbparams, timeout_seconds=10)
@@ -369,7 +476,22 @@ def make_cluster_galaxy(ud, wcs, affine, centerpix, cluster_cat, psf, sbparams, 
     g1 = 0.0; g2 = 0.0
     mu = 1.0
 
-    # Create galaxy
+    '''index = int(np.floor(ud()*len(cosmos_cat)))
+    gal_flux = cosmos_cat[index][sbparams.bandpass] * sbparams.exp_time / sbparams.gain
+    phi = cosmos_cat[index]['c10_sersic_fit_phi'] * galsim.radians
+    q = cosmos_cat[index]['c10_sersic_fit_q']    
+    half_light_radius=cosmos_cat[index]['c10_sersic_fit_hlr']*0.03*np.sqrt(q)
+    n = cosmos_cat[index]['c10_sersic_fit_n']  
+    # Sersic class requires index n >= 0.3
+    if (n < 0.3):
+        n = 0.3
+
+    gal = galsim.Sersic(n = n,
+                        flux = gal_flux,
+                        half_light_radius = half_light_radius)
+
+    gal = gal.shear(q = q, beta = phi)'''  
+    # Create galaxy    
     gal = cluster_cat.makeGalaxy(gal_type='parametric', rng=ud)
     logprint.debug('created cluster galaxy')
 
@@ -382,7 +504,11 @@ def make_cluster_galaxy(ud, wcs, affine, centerpix, cluster_cat, psf, sbparams, 
     gal.magnify(2)
     logprint.debug(f'rescaled galaxy with scaling factor {sbparams.flux_scaling}')
 
-    final = galsim.Convolve([psf, gal])
+    this_psf = psf.getPSF(image_pos)
+    logprint.debug("obtained PSF at image position")
+
+    gsp=galsim.GSParams(maximum_fft_size=32768)
+    final = galsim.Convolve([this_psf, gal],gsparams=gsp)
 
     logprint.debug('Convolved star and PSF at galaxy position')
 
@@ -412,21 +538,25 @@ def make_cluster_galaxy(ud, wcs, affine, centerpix, cluster_cat, psf, sbparams, 
     return cluster_stamp, cluster_galaxy_truth
 
 
-def make_a_star(ud, pud, k, wcs, affine, psf, sbparams, logprint, obj_index=None):
+def make_a_star(ud, pud, k, wcs, affine, psf, sbparams, logprint, star_image_pos=None, obj_index=None):
     """
     makes a star-like object for injection into larger image.
     """
 
-    # Choose a random RA, Dec around the sky_center.
-    dec = sbparams.center_dec + (ud()-0.5) * sbparams.image_ysize_arcsec * galsim.arcsec
-    ra = sbparams.center_ra + (ud()-0.5) * sbparams.image_xsize_arcsec / np.cos(dec) * galsim.arcsec
-    world_pos = galsim.CelestialCoord(ra,dec)
+    if star_image_pos is None:
+        # Choose a random RA, Dec around the sky_center.
+        dec = sbparams.center_dec + (ud()-0.5) * sbparams.image_ysize_arcsec * galsim.arcsec
+        ra = sbparams.center_ra + (ud()-0.5) * sbparams.image_xsize_arcsec / np.cos(dec) * galsim.arcsec
+        world_pos = galsim.CelestialCoord(ra,dec)
 
-    # We will need the image position as well, so use the wcs to get that
-    image_pos = wcs.toImage(world_pos)
+        # We will need the image position as well, so use the wcs to get that
+        image_pos = wcs.toImage(world_pos)
+    else:
+        image_pos = star_image_pos[obj_index]
+        world_pos = wcs.toWorld(image_pos)
+        dec = world_pos.dec
+        ra = world_pos.ra
 
-    # We also need this in the tangent plane, which we call "world coordinates" here,
-    # This is still an x/y corrdinate
     uv_pos = affine.toWorld(image_pos)
 
     # Draw star flux at random; based on either a semi-analytic distribution or GAIA stars
@@ -457,10 +587,17 @@ def make_a_star(ud, pud, k, wcs, affine, psf, sbparams, logprint, obj_index=None
             star_flux *= 0.8271672
         else:
             raise NotImplementedError('Star power law only implemented for crates_b!')
-
+    #star_flux = 1000 + (90000 - 1000) * ud()
+    star_flux = 44984.64
     # Generate PSF at location of star, convolve with optical model to make a star
     deltastar = galsim.DeltaFunction(flux=star_flux)
-    star = galsim.Convolve([psf, deltastar])
+    this_psf = psf.getPSF(image_pos)
+    logprint.debug("obtained PSF at image position")
+
+    gsp=galsim.GSParams(maximum_fft_size=32768)
+    star = galsim.Convolve([this_psf, deltastar],gsparams=gsp)
+    logprint.debug("Convolved galaxy and PSF at image position")
+    #star = galsim.Convolve([psf, deltastar])
 
     star_stamp = star.drawImage(wcs=wcs.local(image_pos)) # before it was scale = 0.206, and that was bad!
     star_stamp.setCenter(image_pos.x, image_pos.y)
@@ -468,6 +605,7 @@ def make_a_star(ud, pud, k, wcs, affine, psf, sbparams, logprint, obj_index=None
     star_truth = truth()
     star_truth.ra = ra.deg; star_truth.dec = dec.deg
     star_truth.x = image_pos.x; star_truth.y = image_pos.y
+    star_truth.galsim_flux = star_flux
     star_truth.obj_class = 'star'
 
     try:
@@ -646,8 +784,6 @@ class SuperBITParameters:
                     self.master_seed = None
                 else:
                     self.master_seed = int(value)
-            elif option == "noise_seed":
-                self.noise_seed = int(value)
             elif option == "dithering_seed":
                 self.dithering_seed = int(value)
             elif option == "nstruts":
@@ -666,6 +802,10 @@ class SuperBITParameters:
                 self.jitter_fwhm=float(value)
             elif option == "run_name":
                 self.run_name=str(value)
+            elif option == "shear_value":
+                self.shear_value=float(value)
+            elif option == "which_shear":
+                self.which_shear=str(value)
             elif option == "clobber":
                 self.clobber=bool(value)
             elif option == "mpi":
@@ -779,7 +919,7 @@ class SuperBITParameters:
                     seeds[seed_name] = getattr(self, seed_name)
                     needed_seeds -= 1
 
-        assert needed_seeds >= 0
+        assert needed_seeds >= 0, "needed_seeds should never be negative"
         if needed_seeds > 0:
             # Create safe, independent obj seeds given a master seed
             new_seeds = utils.generate_seeds(
@@ -1005,6 +1145,11 @@ def main(args):
         galaxy fluxes and redshifts to similar GalSim-COSMOS galaxies (see A. Gill+ 2023)
     """
 
+    print("Arguments received:")
+    for arg, value in vars(args).items():
+        print(f"  {arg}: {value}")
+    print("-" * 50)
+
     config_file = args.config_file
     run_name = args.run_name
     mpi = args.mpi
@@ -1060,10 +1205,14 @@ def main(args):
     cosmos_cat = cosmos_cat[size_wg]
 
     try:
-        cluster_cat = galsim.COSMOSCatalog(sbparams.cluster_cat_name,
-                                           dir=sbparams.cosmosdir)
+        cluster_cat = galsim.COSMOSCatalog()
+        print("Default galsim cosmos catalog worked")
     except:
-        cluster_cat = galsim.COSMOSCatalog(sbparams.cluster_cat_name)
+        try:
+            cluster_cat = galsim.COSMOSCatalog(sbparams.cluster_cat_name,
+                                               dir=sbparams.cosmosdir)
+        except:
+            cluster_cat = galsim.COSMOSCatalog(sbparams.cluster_cat_name)
 
     ### Now create PSF. First, define Zernicke polynomial component
     ### note: aberrations were definined for lam = 550, and close to the
@@ -1123,6 +1272,26 @@ def main(args):
     sky_center = galsim.CelestialCoord(ra=sbparams.center_ra, dec=sbparams.center_dec)
     wcs = galsim.TanWCS(affine, sky_center, units=galsim.arcsec)
 
+    # Defining grid
+    print(f"Number of galaxies : {sbparams.nobj}")
+    print(f"Number of stars Injected : {sbparams.nstars}")
+    # --- Galaxies ---
+    gals_x, gals_y, (g_cols, g_rows, g_dx, g_dy) = utils.grid_for_N(
+        sbparams.nobj, sbparams.image_xsize, sbparams.image_ysize, margin=MARGIN, phase=(0.5, 0.5)
+    )
+
+    # --- Stars (aligned and centered relative to galaxies) ---
+    stars_x, stars_y, (s_cols, s_rows, s_dx, s_dy) = utils.grid_stars_between_galaxies(
+        sbparams.nstars, g_cols, g_rows, g_dx, g_dy, MARGIN, sbparams.image_xsize, sbparams.image_ysize
+    )
+
+    # Convert (x, y) arrays → list of galsim.PositionD
+    star_image_pos = [galsim.PositionD(x, y) for x, y in zip(stars_x, stars_y)]
+    gal_image_pos  = [galsim.PositionD(x, y) for x, y in zip(gals_x, gals_y)]
+
+    # Convert to world coordinates using WCS
+    star_world_pos = [wcs.toWorld(p) for p in star_image_pos]
+    gal_world_pos  = [wcs.toWorld(p) for p in gal_image_pos]
     ##
     ## Define RNG for dither offsets
     ##
@@ -1192,14 +1361,20 @@ def main(args):
     # Initialize truth catalog during first run
     if mpi is False or M.is_mpi_root():
         names = ['gal_num', 'cosmos_index','x_image', 'y_image',
-                 'ra', 'dec', 'nfw_g1', 'nfw_g2', 'nfw_mu', 'nfw_kappa', 'cosmos_g1', 'cosmos_g2',
-                 'admom_g1', 'admom_g2', 'admom_sigma', 'admom_flag', 'redshift', 'flux',
+                 'ra', 'dec', 'nfw_g1', 'nfw_g2', 'nfw_mu', 'nfw_kappa', 'cosmos_g1', 'cosmos_g2', 'theory_g1', 'theory_g2',
+                 'admom_g1', 'admom_g2', 'admom_sigma', 'admom_r11', 'admom_r22', 'admom_flag', 'redshift', 'flux', 'added_flux', 'galsim_flux',
                  'truth_fwhm','truth_mom', 'n',
                  'hlr', 'scale_h_over_r', 'obj_class']
-        types = [int, int, float, float, float, float, float,
-                 float, float, float, float, float, float, float, float, int, float, float, float, float,
-                 float, float, float, str]
+        types = [int, int, float, float, 
+                 float, float, float, float, float, float, float, float, float, float,
+                 float, float, float, float, float, int, float, float, float, float,
+                 float, float, float, 
+                 float, float, str]
         truth_catalog = galsim.OutputCatalog(names, types)
+
+    all_psf_files = []
+    search_path = os.path.join(sbparams.emp_psf_path, 'psfex-output', '*.psf')
+    all_psf_files.extend(glob(search_path))
 
     for i in np.arange(1, sbparams.nexp+1):
         if mpi is True:
@@ -1221,6 +1396,19 @@ def main(args):
         full_image.setOrigin(dither_offsets[0], dither_offsets[1])
         full_image.wcs = wcs
 
+        psf_file = all_psf_files[0]
+        image_file = os.path.join(os.path.dirname(os.path.dirname(psf_file)), os.path.basename(psf_file).replace('_starcat.psf', '.fits'))
+        psf = galsim.des.DES_PSFEx(psf_file, wcs=wcs)
+
+        # Ensure output directory exists
+        psf_output_dir = os.path.join(output_dir, "psfex-output")
+        os.makedirs(psf_output_dir, exist_ok=True)
+
+        # Destination path
+        psf_filename = os.path.join(psf_output_dir, outname.replace(".fits", "_starcat.psf"))
+
+        # Copy the PSF file
+        shutil.copy(psf_file, psf_filename)
         #####
         ## Loop over galaxy objects:
         #####
@@ -1242,10 +1430,10 @@ def main(args):
                           wcs,
                           affine,
                           cosmos_cat,
-                          nfw,
                           psf,
                           sbparams,
-                          logprint
+                          logprint,
+                          gal_image_pos
                           ] for k in range(ncores))
                         ),
                     full_image,
@@ -1272,9 +1460,9 @@ def main(args):
                                                 affine=affine,
                                                 cosmos_cat=cosmos_cat,
                                                 psf=psf,
-                                                nfw=nfw,
                                                 sbparams=sbparams,
-                                                logprint=logprint
+                                                logprint=logprint,
+                                                gal_image_pos = gal_image_pos
                                                 )
                     # Find the overlapping bounds:
                     bounds = stamp.bounds & full_image.bounds
@@ -1396,7 +1584,8 @@ def main(args):
                           affine,
                           psf,
                           sbparams,
-                          logprint
+                          logprint,
+                          star_image_pos
                           ] for k in range(sbparams.ncores))
                         ),
                     full_image,
@@ -1421,7 +1610,8 @@ def main(args):
                                             affine=affine,
                                             psf=psf,
                                             sbparams=sbparams,
-                                            logprint=logprint
+                                            logprint=logprint,
+                                            star_image_pos=star_image_pos
                                             )
                 bounds = star_stamp.bounds & full_image.bounds
 

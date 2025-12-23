@@ -87,9 +87,13 @@ class truth():
         self.kappa = 0.0
         self.cosmos_g1 =0.0
         self.cosmos_g2 = 0.0
+        self.theory_g1 = 0.0
+        self.theory_g2 = 0.0
         self.admom_g1 = 0.0
         self.admom_g2 = 0.0
         self.admom_sigma = 0.0
+        self.admom_r11 = 0.0
+        self.admom_r22 = 0.0
         self.admom_flag = 0.0
         self.mu = 1.0
         self.z = 0.0
@@ -98,6 +102,8 @@ class truth():
         self.n = 0.0
         self.hlr = 0.0
         self.scale_h_over_r = 0.0
+        self.flux = 0.0
+        self.galsim_flux = 0.0
 
 def timeout_handler(signum, frame):
     raise TimeoutError("Function execution timed out")
@@ -113,6 +119,9 @@ def calculate_admoms_with_timeout(gal, wcs, image_pos, galaxy_truth, sbparams, t
         galaxy_truth.admom_g1 = admoms.observed_shape.g1
         galaxy_truth.admom_g2 = admoms.observed_shape.g2
         galaxy_truth.admom_sigma = admoms.moments_sigma * sbparams.pixel_scale
+        admom_r11, admom_r22 = utils.admom_response(gal, wcs, image_pos)
+        galaxy_truth.admom_r11 = admom_r11
+        galaxy_truth.admom_r22 = admom_r22
         galaxy_truth.admom_flag = 1
         return True
     except (galsim.errors.GalSimError, TimeoutError) as e:
@@ -291,9 +300,9 @@ def combine_objs(make_obj_outputs, full_image, truth_catalog, exp_num):
             row = [i, truth.cosmos_index, truth.x, truth.y,
                    truth.ra, truth.dec,
                    truth.g1, truth.g2,
-                   truth.mu, truth.kappa, truth.cosmos_g1, truth.cosmos_g2, 
-                   truth.admom_g1, truth.admom_g2, truth.admom_sigma, truth.admom_flag, truth.z,
-                   this_flux, truth.fwhm, truth.mom_size,
+                   truth.mu, truth.kappa, truth.cosmos_g1, truth.cosmos_g2, truth.theory_g1, truth.theory_g2,
+                   truth.admom_g1, truth.admom_g2, truth.admom_sigma, truth.admom_r11, truth.admom_r22, truth.admom_flag, truth.z,
+                   this_flux, truth.flux, truth.galsim_flux, truth.fwhm, truth.mom_size,
                    truth.n, truth.hlr, truth.scale_h_over_r,
                    truth.obj_class
                    ]
@@ -392,11 +401,14 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, obj
     galaxy_truth.cosmos_g1 = g1_cosmos; galaxy_truth.cosmos_g2 = g2_cosmos
     galaxy_truth.mu = mu; galaxy_truth.z = gal_z
     galaxy_truth.flux = stamp.added_flux
+    galaxy_truth.galsim_flux = gal_flux
     galaxy_truth.n = n; galaxy_truth.hlr = half_light_radius
     #galaxy_truth.inclination = inclination.deg # storing in degrees for human readability
     galaxy_truth.scale_h_over_r = q
     galaxy_truth.obj_class = 'gal'
-
+    g1_th, g2_th, mu_th, theta_th, flip_th = utils.g_from_gal_jac(gal)
+    galaxy_truth.theory_g1 = g1_th
+    galaxy_truth.theory_g2 = g2_th
     logprint.debug('created truth values')
 
     calculate_admoms_with_timeout(gal, wcs, image_pos, galaxy_truth, sbparams, timeout_seconds=10)
@@ -1288,13 +1300,15 @@ def main(args):
     # Initialize truth catalog during first run
     if mpi is False or M.is_mpi_root():
         names = ['gal_num', 'cosmos_index','x_image', 'y_image',
-                 'ra', 'dec', 'nfw_g1', 'nfw_g2', 'nfw_mu', 'nfw_kappa', 'cosmos_g1', 'cosmos_g2',
-                 'admom_g1', 'admom_g2', 'admom_sigma', 'admom_flag', 'redshift', 'flux',
+                 'ra', 'dec', 'nfw_g1', 'nfw_g2', 'nfw_mu', 'nfw_kappa', 'cosmos_g1', 'cosmos_g2', 'theory_g1', 'theory_g2',
+                 'admom_g1', 'admom_g2', 'admom_sigma', 'admom_r11', 'admom_r22', 'admom_flag', 'redshift', 'flux', 'added_flux', 'galsim_flux',
                  'truth_fwhm','truth_mom', 'n',
                  'hlr', 'scale_h_over_r', 'obj_class']
-        types = [int, int, float, float, float, float, float,
-                 float, float, float, float, float, float, float, float, int, float, float, float, float,
-                 float, float, float, str]
+        types = [int, int, float, float, 
+                 float, float, float, float, float, float, float, float, float, float,
+                 float, float, float, float, float, int, float, float, float, float,
+                 float, float, float, 
+                 float, float, str]
         truth_catalog = galsim.OutputCatalog(names, types)
 
     all_psf_files = []
@@ -1317,9 +1331,8 @@ def main(args):
 
         ## Define X & Y dither offsets
         dither_offsets = rng.integers(-100, 100, size=2)
-        #logprint(f'dithers are {dither_offsets}')
-        logprint(f'Dithering is not happening')
-        #full_image.setOrigin(dither_offsets[0], dither_offsets[1])
+        logprint(f'dithers are {dither_offsets}')
+        full_image.setOrigin(dither_offsets[0], dither_offsets[1])
         full_image.wcs = wcs
 
         psf_file = all_psf_files[i-1]
@@ -1403,7 +1416,8 @@ def main(args):
 
                     if i == 1:
                         row = [ k, truth.cosmos_index, truth.x, truth.y, truth.ra, truth.dec, truth.g1,
-                                truth.g2, truth.mu, truth.kappa, truth.cosmos_g1, truth.cosmos_g2, truth.admom_g1, truth.admom_g2, truth.admom_sigma, truth.admom_flag,  truth.z,
+                                truth.g2, truth.mu, truth.kappa, truth.cosmos_g1, truth.cosmos_g2, truth.theory_g1, truth.theory_g2, 
+                                truth.admom_g1, truth.admom_g2, truth.admom_sigma, truth.admom_r11, truth.admom_r22, truth.admom_flag,  truth.z,
                                 this_flux, truth.fwhm, truth.mom_size,
                                 truth.n, truth.hlr, truth.scale_h_over_r, truth.obj_class]
                         truth_catalog.addRow(row)
@@ -1550,8 +1564,9 @@ def main(args):
                     this_flux=np.sum(star_stamp.array)
 
                     if i == 1:
-                        row = [ k, truth.cosmos_index, truth.x, truth.y, truth.ra, truth.dec,
-                                truth.g1, truth.g2, truth.mu, truth.admom_g1, truth.admom_g2, truth.admom_sigma, truth.admom_flag,
+                        row = [ k, truth.cosmos_index, truth.x, truth.y, truth.ra, truth.dec, truth.g1,
+                                truth.g2, truth.mu, truth.kappa, truth.cosmos_g1, truth.cosmos_g2, truth.theory_g1, truth.theory_g2, 
+                                truth.admom_g1, truth.admom_g2, truth.admom_sigma, truth.admom_r11, truth.admom_r22, truth.admom_flag,  
                                 truth.z, this_flux, truth.fwhm,truth.mom_size,
                                 truth.n, truth.hlr, truth.scale_h_over_r, truth.obj_class]
                         truth_catalog.addRow(row)

@@ -48,8 +48,9 @@ class ShearProfilePlotter(object):
 
         alpha = self.cat.meta['alpha']
         sig_alpha = self.cat.meta['sig_alpha']
+        r_at_gtan_max = self.cat.meta['r_gtan_max']
 
-        return alpha, sig_alpha
+        return alpha, sig_alpha, r_at_gtan_max
 
     def plot_tan_profile(self, title=None, label='Lensing sample galaxies',
                          rbounds=(5, 750), show=False, outfile=None,
@@ -108,7 +109,7 @@ class ShearProfilePlotter(object):
 
         if plot_truth is True:
             n_panels = 3
-            size = (9, 12)
+            size = (12.8, 9.6)
         else:
             n_panels = 2
             size=(9, 8)
@@ -132,7 +133,10 @@ class ShearProfilePlotter(object):
             true_label = 'Reference NFW'
             axs[0].plot(true_radius, true_gtan, '-r', label=true_label)
 
-            alpha, sig_alpha = self.get_alpha()
+            alpha, sig_alpha, r_at_gtan_max = self.get_alpha()
+            if r_at_gtan_max is not None:
+                arcmin_gtan_max = self.get_angular_radius(r_at_gtan_max, arcmin=True)
+                axs[0].axvspan(0, arcmin_gtan_max, color='grey', alpha=0.3, zorder=0, label=f'r ≤ {arcmin_gtan_max:.2f} arcmin')
 
             txt = str(r'$\hat{\alpha}=%.4f~\sigma_{\hat{\alpha}}=%.4f$' % (alpha, sig_alpha))
             ann = axs[0].annotate(

@@ -569,7 +569,7 @@ class BITMeasurement():
         self.logprint(msg)      
         
     def _run_sextractor(self, image_file, cat_dir, config_dir,
-                        weight_file=None, back_type='AUTO'):
+                        weight_file=None, back_type='AUTO', admoms=False):
         '''
         Utility method to invoke Source Extractor on supplied detection file
         Returns: file path of catalog
@@ -603,7 +603,10 @@ class BITMeasurement():
         self.logprint("sex cmd is " + cmd)
         os.system(cmd)
 
-        print(f'cat_name is {cat_file} \n')
+        print(f'saved catalog with {len(Table.read(cat_file, hdu=2))} objects to {cat_file} \n')
+        if admoms:
+            print(f"adding admoms columns to {cat_file}")
+            cat = utils.add_admom_columns(cat_file, mode="galsim")
         return cat_file
 
     def make_sextractor_weight(self):
@@ -877,8 +880,7 @@ class BITMeasurement():
             weight_file=self.coadd_img_file,
             cat_dir=coadd_dir,
             config_dir=config_dir, 
-            back_type='MANUAL'
-        )
+            back_type='MANUAL', admoms=True)
 
         try:
             le_cat = fits.open(cat_name)
@@ -1085,6 +1087,7 @@ class BITMeasurement():
                 self.logprint("Yay! Gaia Query was successful")
             autoselect_arg = '-SAMPLE_AUTOSELECT N'
         else:
+            raise RuntimeError("Things are bad psfex is autoselecting objects")            
             self.logprint('Things are bad psfex is autoselecting objects')
             autoselect_arg = '-SAMPLE_AUTOSELECT Y'
 
@@ -1306,28 +1309,14 @@ class BITMeasurement():
                 self.logprint(f"Trying FITS format with HDU={star_config['cat_hdu']}")
                 stars = Table.read(truthfile, format='fits', hdu=star_config['cat_hdu'])
                 self.logprint(f"Successfully read truth catalog in FITS format with {len(stars)} entries")
-            
+
             except Exception as e1:
-                # Second attempt: Try reading as ASCII
-                self.logprint(f"FITS reading failed: {e1}. Trying ASCII format...")
+                # Raise an explicit error instead of logging and continuing
+                raise RuntimeError(
+                    f"Failed to read truth catalog '{truthfile}' as FITS "
+                    f"(HDU={star_config['cat_hdu']}). Error: {e1}"
+                )
                 
-                try:
-                    stars = Table.read(truthfile, format='ascii')
-                    self.logprint(f"Successfully read truth catalog in ASCII format with {len(stars)} entries")
-                
-                except Exception as e2:
-                    # Third attempt: Fall back to Gaia query
-                    self.logprint(f"ASCII reading failed: {e2}. Falling back to Gaia query...")
-                    
-                    try:
-                        stars = utils.gaia_query(cluster_name=self.target_name)
-                        self.logprint(f"Successfully queried Gaia with {len(stars)} entries")
-                        self.gaia_query_happened = True
-                    
-                    except Exception as e3:
-                        # All attempts failed - log and re-raise the error
-                        self.logprint(f"All catalog reading methods failed! Gaia query error: {e3}")
-                        raise RuntimeError(f"Could not read truth catalog in any format and Gaia query failed")
             # match sscat against truth star catalog; 0.72" = 5 SuperBIT pixels
             og_len = len(ss)
             matcher = SkyCoordMatcher(ss, stars,
@@ -1345,53 +1334,10 @@ class BITMeasurement():
                           )
 
         else:
-            retry_attempts = 3  # Number of attempts to make
-            
-            for attempt in range(retry_attempts):
-                try:
-                    self.logprint(f"Attempting Gaia query (attempt {attempt+1}/{retry_attempts})...")
-                    stars = utils.gaia_query(cluster_name=self.target_name)
-                    
-                    # match sscat against truth star catalog; 0.72" = 5 SuperBIT pixels
-                    self.logprint(f"Selecting stars using Gaia Query with {len(stars)} stars")
-
-                    star_matcher = eu.htm.Matcher(16,
-                                        ra=stars[star_config['truth_ra_key']],
-                                        dec=stars[star_config['truth_dec_key']]
-                                        )
-                    matches, starmatches, dist = \
-                                        star_matcher.match(ra=ss['ALPHAWIN_J2000'],
-                                        dec=ss['DELTAWIN_J2000'],
-                                        radius=1/3600., maxmatch=1
-                                        )
-
-                    og_len = len(ss); ss = ss[matches]
-                    wg_stars = (ss['SNR_WIN'] > star_config['MIN_SNR']) & (ss['MAG_AUTO'] > star_config['MAX_MAG'])
-
-                    self.logprint(f'{len(dist)}/{og_len} objects ' +
-                                'matched to reference (truth) star catalog \n' +
-                                f'{len(ss[wg_stars])} stars passed MIN_SNR threshold'
-                                )
-                    self.gaia_query_happened = True
-                    break  # Exit the retry loop if successful
-                    
-                except Exception as e:
-                    self.logprint(f"Gaia Query attempt {attempt+1} failed: {e}")
-                    if attempt < retry_attempts - 1:
-                        self.logprint("Retrying Gaia query...")
-                        time.sleep(3)  # Add a short delay before retrying
-                    else:
-                        self.logprint("All Gaia query attempts failed.")
-            
-            # If all Gaia query attempts failed, fall back to standard stellar locus matching
-            if not self.gaia_query_happened:
-                self.logprint("Selecting stars on CLASS_STAR, SIZE and MAG...")
-                wg_stars = \
-                    (ss['CLASS_STAR'] > star_config['CLASS_STAR']) & \
-                    (ss[star_config['SIZE_KEY']] > star_config['MIN_SIZE']) & \
-                    (ss[star_config['SIZE_KEY']] < star_config['MAX_SIZE']) & \
-                    (ss[star_config['MAG_KEY']] < star_config['MIN_MAG']) & \
-                    (ss[star_config['MAG_KEY']] > star_config['MAX_MAG'])
+            raise RuntimeError(
+                "No truth catalog provided (truthfile=None). "
+                "Cannot proceed without a valid reference star catalog."
+            )
 
         # Save output star catalog to file
         ss_fits[ext].data = ss[wg_stars]

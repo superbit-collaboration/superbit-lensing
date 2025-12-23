@@ -31,6 +31,7 @@ from colossus.halo import concentration, mass_defs
 import treecorr
 from scipy.interpolate import UnivariateSpline
 from shapely.geometry import Point, Polygon
+from math import ceil, sqrt
 
 # Get the path to the root of the project (2 levels up from utils.py)
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -1130,7 +1131,7 @@ def radec_to_xy(header, ra, dec):
             #print(f"Using projection from header: {ctype1}, {ctype2}")
         else:
             wcs_manual.wcs.ctype = ["RA---TAN", "DEC--TAN"]
-            print("No projection specified in header, using TAN")
+            # print("No projection specified in header, using TAN")
     
     # Convert coordinates using the manual WCS
     coords = SkyCoord(ra*u.deg, dec*u.deg, frame='icrs')
@@ -1630,7 +1631,7 @@ def make_psfex_model(psfcat_name, config_path=DEFAULT_CONFIG_DIR, psf_seed=None,
         print(f'WARNING:\n Could not find PSFEx model file {psfex_model_file}\n')
     return model
 
-def add_admom_columns(catfilename, imagefilename=None, mode="ngmix", outfile=None, overwrite=True):
+def add_admom_columns(catfilename, imagefilename=None, mode="ngmix", outfile=None, reduced=True, overwrite=True):
     """
     Add adaptive moments columns (E1_ADMOM, E2_ADMOM, T_ADMOM, BOX_SIZE) to a FITS catalog.
 
@@ -1693,8 +1694,14 @@ def add_admom_columns(catfilename, imagefilename=None, mode="ngmix", outfile=Non
         print(f"Written catalog (unchanged) to {outfile}")
         return
 
-    # --- Prepare arrays ---
-    ra, dec = cat["ALPHAWIN_J2000"], cat["DELTAWIN_J2000"]
+    def pick_column(cat, options):
+        for col in options:
+            if col in cat.dtype.names:
+                return cat[col]
+        raise KeyError(f"None of the columns {options} found in catalog!")
+
+    ra  = pick_column(cat, ["ALPHAWIN_J2000", "ra"])
+    dec = pick_column(cat, ["DELTAWIN_J2000", "dec"])
     ang_sizes = cat['KRON_RADIUS'] * cat['A_IMAGE'] * pixel_scale
 
     nobj = len(cat)
@@ -1714,7 +1721,7 @@ def add_admom_columns(catfilename, imagefilename=None, mode="ngmix", outfile=Non
             ext_vig, meta = extract_vignette(data, header, ximage, yimage, size=boxsize)
             image = ext_vig
             # --- ADMOM measurement ---
-            res = get_admoms(image, scale=pixel_scale, mode=mode, reduced=False)
+            res = get_admoms(image, scale=pixel_scale, mode=mode, reduced=reduced)
 
             e1_arr[i]  = res["e1"]
             e2_arr[i]  = res["e2"]
@@ -1752,7 +1759,7 @@ def add_admom_columns(catfilename, imagefilename=None, mode="ngmix", outfile=Non
 
     return Table(ss_fits[ext].data)
 
-def get_admoms(image: np.ndarray, scale: float, mode: str = "ngmix", reduced: bool = False) -> dict:
+def get_admoms(image: np.ndarray, scale: float, mode: str = "ngmix", reduced: bool = True) -> dict:
     """
     Measure adaptive moments (ADMOM) of an image using either ngmix or GalSim.
 
@@ -1811,7 +1818,7 @@ def get_admoms(image: np.ndarray, scale: float, mode: str = "ngmix", reduced: bo
 
     return {"e1": e1, "e2": e2, "T": T, "flags": flag}
 
-def get_admoms_ngmix_fit(obs: "ngmix.Observation", reduced: bool = False) -> dict:
+def get_admoms_ngmix_fit(obs: "ngmix.Observation", reduced: bool = True) -> dict:
     """
     Measure adaptive moments (ADMOM) of an image using ngmix and GalSim.
 
@@ -1879,8 +1886,8 @@ class RhoStats:
         e2_model = catalog[column_config['e2_model']]
 
         # converting to g1, g2
-        e1_obs, e2_obs = e1e2_to_g1g2(e1_obs, e2_obs)
-        e1_model, e2_model = e1e2_to_g1g2(e1_model, e2_model)
+        # e1_obs, e2_obs = e1e2_to_g1g2(e1_obs, e2_obs)
+        # e1_model, e2_model = e1e2_to_g1g2(e1_model, e2_model)
 
         # Size (trace of second-moment matrix, or whatever T is in your pipeline)
         T_obs = catalog[column_config['T_obs']]
@@ -2510,6 +2517,159 @@ def update_astromatic_solution(image_path, config_dir=DEFAULT_CONFIG_DIR,
     updated_hdul.writeto(output_path, overwrite=True)
 
     print(f"[INFO] WCS solution updated and written to {output_path}")
+
+def grid_for_N(N, W, H, margin=0, phase=(0.5, 0.5)):
+    """
+    Create ~square grid for N points inside a W×H image with optional margin.
+    Returns x, y coordinates (floats) of length N.
+
+    Parameters
+    ----------
+    N : int
+        Number of points to place.
+    W, H : int
+        Image width and height in pixels.
+    margin : float, optional
+        Margin to keep from each image border.
+    phase : tuple of floats
+        Position of each point inside its cell (0–1). 
+        (0.5,0.5) = center of each cell.
+    """
+    # usable dimensions
+    usable_W = max(0.0, W - 2*margin)
+    usable_H = max(0.0, H - 2*margin)
+    if usable_W == 0 or usable_H == 0:
+        raise ValueError("Margin too large: no usable area remains.")
+
+    # choose cols/rows from usable aspect to keep spacing ~isotropic
+    cols = ceil(sqrt(N * (usable_W / usable_H)))
+    cols = max(1, cols)
+    rows = ceil(N / cols)
+    
+    dx = usable_W / cols
+    dy = usable_H / rows
+
+    xs = (np.arange(cols) + phase[0]) * dx + margin
+    ys = (np.arange(rows) + phase[1]) * dy + margin
+
+    XX, YY = np.meshgrid(xs, ys, indexing='xy')
+    X = XX.ravel()[:N]
+    Y = YY.ravel()[:N]
+    return X, Y, (cols, rows, dx, dy)
+
+def grid_stars_between_galaxies(Nstars, g_cols, g_rows, g_dx, g_dy, margin, W, H):
+    """
+    Create a coarser star grid aligned with the galaxy grid, 
+    such that stars are always at the geometric centers of four galaxies,
+    while being approximately equidistant from each other.
+    """
+    print("New Implementation")
+    # Define the galaxy coordinate axes
+    gal_xs = np.linspace(margin + g_dx/2, W - margin - g_dx/2, g_cols)
+    gal_ys = np.linspace(margin + g_dy/2, H - margin - g_dy/2, g_rows)
+
+    # Choose approximate square layout for stars
+    aspect = W / H
+    s_cols = int(np.sqrt(Nstars * aspect))
+    s_rows = int(np.round(Nstars / s_cols))
+
+    # Indices for stars within the galaxy grid
+    # Spread star centers evenly across available galaxy cells
+    i_idx = np.linspace(0, g_cols - 2, s_cols, dtype=int)
+    j_idx = np.linspace(0, g_rows - 2, s_rows, dtype=int)
+
+    # Compute true midpoints between those galaxy cells
+    star_xs = 0.5 * (gal_xs[i_idx] + gal_xs[i_idx + 1])
+    star_ys = 0.5 * (gal_ys[j_idx] + gal_ys[j_idx + 1])
+
+    # Build meshgrid of star coordinates
+    XXs, YYs = np.meshgrid(star_xs, star_ys, indexing='xy')
+    Xs, Ys = XXs.ravel(), YYs.ravel()
+
+    Xs, Ys = Xs[:Nstars], Ys[:Nstars]  # trim if overfilled
+
+    # Spacing between stars (purely diagnostic)
+    s_dx = np.mean(np.diff(star_xs)) if len(star_xs) > 1 else g_dx
+    s_dy = np.mean(np.diff(star_ys)) if len(star_ys) > 1 else g_dy
+
+    return Xs, Ys, (s_cols, s_rows, s_dx, s_dy)
+
+def admom_response(gal, wcs, image_pos):
+    """
+    Compute adaptive-moment shear response (R11, R22) for a GalSim object.
+    Only the diagonal response terms are estimated.
+
+    Parameters
+    ----------
+    gal : galsim.GSObject
+        The base (unsheared) galaxy model.
+    wcs : galsim.BaseWCS
+        The world coordinate system used to draw images.
+    image_pos : galsim.PositionD
+        Image position to evaluate the local WCS.
+
+    Returns
+    -------
+    R11, R22 : float
+        Adaptive-moment shear responses in g1 and g2.
+    """
+    delta = 0.01
+
+    # --- g1 finite difference ---
+    gal_1p = gal.shear(g1=+delta, g2=0.0)
+    gal_1m = gal.shear(g1=-delta, g2=0.0)
+
+    img_1p = gal_1p.drawImage(wcs=wcs.local(image_pos))
+    img_1m = gal_1m.drawImage(wcs=wcs.local(image_pos))
+
+    admom_1p = galsim.hsm.FindAdaptiveMom(img_1p)
+    admom_1m = galsim.hsm.FindAdaptiveMom(img_1m)
+
+    R11 = (admom_1p.observed_shape.g1 - admom_1m.observed_shape.g1) / (2 * delta)
+
+    # --- g2 finite difference ---
+    gal_2p = gal.shear(g1=0.0, g2=+delta)
+    gal_2m = gal.shear(g1=0.0, g2=-delta)
+
+    img_2p = gal_2p.drawImage(wcs=wcs.local(image_pos))
+    img_2m = gal_2m.drawImage(wcs=wcs.local(image_pos))
+
+    admom_2p = galsim.hsm.FindAdaptiveMom(img_2p)
+    admom_2m = galsim.hsm.FindAdaptiveMom(img_2m)
+
+    R22 = (admom_2p.observed_shape.g2 - admom_2m.observed_shape.g2) / (2 * delta)
+
+    return R11, R22
+
+def g_from_gal_jac(gal):
+    """
+    From a transformed GalSim object, return:
+      g1, g2  : reduced shear components
+      mu      : magnification (1/detJ)
+      kappa   : convergence inferred from detJ and |g|
+    """
+    J = np.asarray(gal.jac, dtype=float)  # [[dudx, dudy],[dvdx, dvdy]]
+
+    # Built-in decomposition to get the Shear object:
+    wcs = galsim.JacobianWCS(J[0,0], J[0,1], J[1,0], J[1,1])
+    scale, shear, theta, flip = wcs.getDecomposition()
+    g1, g2 = shear.g1, shear.g2
+
+    return g1, g2, scale**2, theta.deg, flip
+
+def get_psf_model_file(cat_file):
+    # Example:
+    # /scratch/.../cat/Abell3411_1_300_1683033980_clean_cat.fits
+    cat_dir = os.path.dirname(cat_file)
+    cat_name = os.path.basename(cat_file)
+
+    # Replace suffix
+    psf_name = cat_name.replace("_clean_cat.fits", "_clean_starcat.psf")
+
+    # Build path to psfex-output directory
+    psf_model_file = os.path.join(cat_dir, "psfex-output", psf_name)
+
+    return psf_model_file
 
 BASE_DIR = get_base_dir()
 MODULE_DIR = get_module_dir()

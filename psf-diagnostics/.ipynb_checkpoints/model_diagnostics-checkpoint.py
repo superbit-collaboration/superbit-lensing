@@ -15,7 +15,7 @@ import re
 # import warnings
 import ngmix
 import filecmp
-from superbit_lensing.utils import gaia_query, make_psfex_model, radec_to_xy, extract_vignette, add_admom_columns, get_psf_model_file, get_admoms_ngmix_fit
+from superbit_lensing.utils import gaia_query, make_psfex_model, radec_to_xy, extract_vignette, add_admom_columns, get_psf_model_file
 from superbit_lensing.match import SkyCoordMatcher
 import multiprocessing
 
@@ -288,20 +288,20 @@ def process_cluster(cluster):
             obs_model = ngmix.Observation(image=psf_model_im, jacobian=jac)
 
             try:
-                res_obs = get_admoms_ngmix_fit(obs_im)
-                res_model = get_admoms_ngmix_fit(obs_model)
+                res_obs = am.go(obs_im, guess=0.5)
+                res_model = am.go(obs_model, guess=0.5)
                 # res_obs = get_admoms(star_im, scale=scale, mode="galsim", reduced=False)
                 # res_model = get_admoms(psf_model_im, scale=scale, mode="galsim", reduced=False)
 
                 # res_em_obs = em.go(obs=obs_im, guess=psf_guesser._get_guess(obs_im))
                 # res_em_model = em.go(obs=obs_model, guess=psf_guesser._get_guess(obs_model))
                 if res_obs["flags"]==0:
-                    e1_admom_obs[i] = res_obs['g1']
-                    e2_admom_obs[i] = res_obs['g2']
+                    e1_admom_obs[i] = res_obs['e1']
+                    e2_admom_obs[i] = res_obs['e2']
                     T_admom_obs[i] = res_obs['T']
                 if res_model["flags"]==0:
-                    e1_admom_model[i] = res_model['g1']
-                    e2_admom_model[i] = res_model['g2']
+                    e1_admom_model[i] = res_model['e1']
+                    e2_admom_model[i] = res_model['e2']
                     T_admom_model[i] = res_model['T']
 
                 # if res_em_obs['flags'] == 0:
@@ -381,19 +381,19 @@ def process_cluster(cluster):
             obs_model = ngmix.Observation(image=psf_model_im, jacobian=jac)
 
             try:
-                res_obs = get_admoms_ngmix_fit(obs_im)
-                res_model = get_admoms_ngmix_fit(obs_model)
+                res_obs = am.go(obs_im, guess=0.5)
+                res_model = am.go(obs_model, guess=0.5)
 
                 # res_em_obs = em.go(obs=obs_im, guess=psf_guesser._get_guess(obs_im))
                 # res_em_model = em.go(obs=obs_model, guess=psf_guesser._get_guess(obs_model))
-                if res_obs["flags"]==0:
-                    e1_admom_obs_test[i] = res_obs['e1']
-                    e2_admom_obs_test[i] = res_obs['e2']
-                    T_admom_obs_test[i] = res_obs['T']
-                if res_model["flags"]==0:
-                    e1_admom_model_test[i] = res_model['e1']
-                    e2_admom_model_test[i] = res_model['e2']
-                    T_admom_model_test[i] = res_model['T']
+
+                e1_admom_obs_test[i] = res_obs['e1']
+                e2_admom_obs_test[i] = res_obs['e2']
+                T_admom_obs_test[i] = res_obs['T']
+
+                e1_admom_model_test[i] = res_model['e1']
+                e2_admom_model_test[i] = res_model['e2']
+                T_admom_model_test[i] = res_model['T']
 
                 # if res_em_obs['flags'] == 0:
                 #     e1e2T_obs = res_em_obs.get_gmix().get_e1e2T()

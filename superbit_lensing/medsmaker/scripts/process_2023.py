@@ -49,6 +49,10 @@ def parse_args():
     return parser.parse_args()
 
 def main(args):
+    print("Arguments received:")
+    for arg, value in vars(args).items():
+        print(f"  {arg}: {value}")
+    print("-" * 50)
     target_name = args.target_name
     data_dir = args.data_dir
     outdir = args.outdir
@@ -147,20 +151,20 @@ def main(args):
 
         # TODO: Make this less hard-coded
         # Create an instance of HotColdSExtractor
-        logprint('Setting up HotColdSExtractor configuration...\n')
+        # logprint('Setting up HotColdSExtractor configuration...\n')
 
-        hc_config = os.path.join(astro_config_dir, 'hc_config.yaml')
+        # hc_config = os.path.join(astro_config_dir, 'hc_config.yaml')
 
-        hcs = HotColdSExtractor(
-            science,
-            hc_config,
-            band,
-            target_name, 
-            data_dir,
-            astro_config_dir,
-            log=log,
-            vb=vb
-        )
+        # hcs = HotColdSExtractor(
+        #     science,
+        #     hc_config,
+        #     band,
+        #     target_name, 
+        #     data_dir,
+        #     astro_config_dir,
+        #     log=log,
+        #     vb=vb
+        # )
 
         bm.make_sextractor_weight()
 

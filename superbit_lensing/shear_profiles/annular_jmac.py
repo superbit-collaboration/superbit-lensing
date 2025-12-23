@@ -70,10 +70,24 @@ class ShearCalc():
         self.r = None
 
         if inputs is not None:
-            self.x = inputs['x']
-            self.y = inputs['y']
-            self.g1 = inputs['g1']
-            self.g2 = inputs['g2']
+            x   = np.array(inputs["x"],  copy=False)
+            y   = np.array(inputs["y"],  copy=False)
+            g1  = np.array(inputs["g1"], copy=False)
+            g2  = np.array(inputs["g2"], copy=False)
+
+            # Build a finite mask across all required columns
+            mask = np.isfinite(x) & np.isfinite(y) & np.isfinite(g1) & np.isfinite(g2)
+
+            # Store only the finite rows
+            self.x  = x[mask]
+            self.y  = y[mask]
+            self.g1 = g1[mask]
+            self.g2 = g2[mask]
+
+            # Report dropped rows (optional)
+            ndropped = np.sum(~mask)
+            if ndropped > 0:
+                print(f"[ShearCalc] Dropped {ndropped} rows with NaN/Inf")
 
         return
 
@@ -159,9 +173,47 @@ class Annular(object):
 
         try:
             tab = Table.read(annular_file, format='fits')
+            if 'admom_flag' in tab.columns:
+                admom_valid = tab['admom_flag']==1
+                print(f"[NOTE] Discarding admom fails in truth: {np.sum(~admom_valid)}")
+                tab = tab[admom_valid] 
+            if 'obj_class' in tab.columns:
+                gal_valid = tab['obj_class']=='gal'
+                print(f"[NOTE] Discarding anything that is not a galaxy: {np.sum(~gal_valid)}")
+                tab = tab[gal_valid] 
+            valid_redshift = (tab['redshift'] >= self.cat_info['cluster_redshift'])
+            print(f"[NOTE] Discarding {np.sum(~valid_redshift)} number of foreground galaxies out of total {len(tab)} galaxies")
+            tab = tab[valid_redshift]  
+
         except:
             tab = Table.read(annular_file, format='ascii')
         try:
+            self.x = tab[self.annular_info['xy_args'][0]]
+            self.y = tab[self.annular_info['xy_args'][1]]
+            self.g1 = tab[self.annular_info['shear_args'][0]]
+            self.g2 = tab[self.annular_info['shear_args'][1]]
+            
+            # -------- Define "valid shear" --------
+            # 1) finite values (no NaN / inf)
+            finite = (
+                np.isfinite(self.g1) &
+                np.isfinite(self.g2) &
+                np.isfinite(self.x) &
+                np.isfinite(self.y)
+            )
+
+            # 2) physically reasonable shear magnitude (|g| < 1)
+            gmag = np.hypot(self.g1, self.g2)
+            reasonable = gmag < 1.0
+
+            valid_shear = finite & reasonable
+
+            # If you want to be loud when everything is cut:
+            if not np.any(valid_shear):
+                raise RuntimeError("No objects with valid shear in table.")
+
+            # Keep only valid objects
+            #tab = tab[valid_shear]
             self.x = tab[self.annular_info['xy_args'][0]]
             self.y = tab[self.annular_info['xy_args'][1]]
             self.g1 = tab[self.annular_info['shear_args'][0]]
@@ -269,7 +321,12 @@ class Annular(object):
 
         nfw_file = self.nfw_info['nfw_file']
         nfw = Table.read(nfw_file, format='fits')
-
+        if 'admom_flag' in nfw.columns:
+            admom_valid = nfw['admom_flag']==1
+            nfw = nfw[admom_valid]        
+        if 'obj_class' in nfw.columns:
+            gal_valid = nfw['obj_class']=='gal'
+            nfw = nfw[gal_valid] 
         # NOTE: Let's come back to this in the future. By creating Nfactor truth
         #       subsamples w/ len=Ninjections, we can track the variance of the
         #       truth curve as a function of radial bin on top of the mean curve.
@@ -353,7 +410,7 @@ class Annular(object):
 
         return nfw_tab
 
-    def compute_profile(self, outfile, nfw_tab=None, overwrite=False):
+    def compute_profile(self, outfile, nfw_tab=None, overwrite=False, gtan_max=None):
         '''
         Computes mean tangential and cross shear of background (redshift-filtered)
         galaxies in azimuthal bins
@@ -372,7 +429,7 @@ class Annular(object):
         shear_tab['gcross'] = self.gcross
         shear_tab['weight'] = self.weight
 
-        table = _compute_profile(shear_tab, bins, nfw_tab=nfw_tab)
+        table = _compute_profile(shear_tab, bins, nfw_tab=nfw_tab, gtan_max=gtan_max)
 
         print(f'Writing out shear profile catalog to {outfile}')
         table.write(outfile, format='fits', overwrite=overwrite)
@@ -401,7 +458,7 @@ class Annular(object):
 
         return
 
-    def run(self, outfile, plotfile, Nresample, overwrite=False):
+    def run(self, outfile, plotfile, Nresample, overwrite=False, gtan_max=None):
 
         outdir = os.path.dirname(outfile)
 
@@ -419,7 +476,7 @@ class Annular(object):
 
         # Compute azimuthally averaged shear profiles
         profile_tab = self.compute_profile(
-            outfile, nfw_tab=nfw_tab, overwrite=overwrite
+            outfile, nfw_tab=nfw_tab, overwrite=overwrite, gtan_max=gtan_max
             )
 
         # Plot results
@@ -427,7 +484,7 @@ class Annular(object):
 
         return
 
-def _compute_profile(shear_tab, rbins, nfw_tab=None):
+def _compute_profile(shear_tab, rbins, nfw_tab=None, gtan_max=None):
     '''
     A way to compute the tangential shear profile from transformed shear
     catalogs w/o creating an Annular instance
@@ -511,6 +568,6 @@ def _compute_profile(shear_tab, rbins, nfw_tab=None):
         )
 
         # Compute single-realization shear bias relative to reference NFW
-        compute_shear_bias(profile_tab=table)
+        compute_shear_bias(profile_tab=table, gtan_max=gtan_max)
 
     return table

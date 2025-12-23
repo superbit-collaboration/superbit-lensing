@@ -22,9 +22,9 @@ source "$SLURM_SUBMIT_DIR/config.sh"
 which python
 
 if [ "$EXP" == "forecast" ]; then
-  python $CODEDIR/superbit_lensing/galsim/mock_superBIT_data_forecast.py $SLURM_SUBMIT_DIR/galsim_config.yaml -run_name ${cluster_name} -data_dir $DATADIR -ncores 18 --clobber --vb --master_seed $master_seed
+  python $CODEDIR/superbit_lensing/galsim/unit_tests/nfw_shear/mock_superBIT_data_forecast.py $SLURM_SUBMIT_DIR/galsim_config.yaml -run_name ${cluster_name} -data_dir $DATADIR -ncores 18 --clobber --vb --master_seed $master_seed
 elif [ "$EXP" == "backcast" ]; then
-  python $CODEDIR/superbit_lensing/galsim/mock_superBIT_data_backcast.py $SLURM_SUBMIT_DIR/galsim_config.yaml -run_name ${cluster_name} -data_dir $DATADIR -ncores 18 --clobber --vb --master_seed $master_seed
+  python $CODEDIR/superbit_lensing/galsim/unit_tests/nfw_shear/mock_superBIT_data_backcast_fiducial.py $SLURM_SUBMIT_DIR/galsim_config.yaml -run_name ${cluster_name} -data_dir $DATADIR -ncores 18 --clobber --vb --master_seed $master_seed
 fi
 
 # Record end time
