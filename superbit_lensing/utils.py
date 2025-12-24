@@ -1790,8 +1790,7 @@ def get_admoms(image: np.ndarray, scale: float, mode: str = "ngmix", reduced: bo
     # --- Normalize positive flux ---
     norm = np.sum(image[image > 0])
     if norm <= 0:
-        key1, key2 = ("g1", "g2") if reduced else ("e1", "e2")
-        return {key1: np.nan, key2: np.nan, "T": np.nan, "flag": 1}
+        return {"e1": np.nan, "e2": np.nan, "T": np.nan, "flags": 1}
 
     # --- Moment measurement ---
     if mode == "ngmix":
@@ -1813,8 +1812,7 @@ def get_admoms(image: np.ndarray, scale: float, mode: str = "ngmix", reduced: bo
 
     # --- Convert if reduced shear requested ---
     if reduced:
-        g1, g2 = e1e2_to_g1g2(e1, e2)
-        return {"g1": g1, "g2": g2, "T": T, "flags": flag}
+        e1, e2 = e1e2_to_g1g2(e1, e2)
 
     return {"e1": e1, "e2": e2, "T": T, "flags": flag}
 
@@ -1845,8 +1843,7 @@ def get_admoms_ngmix_fit(obs: "ngmix.Observation", reduced: bool = True) -> dict
     # --- Normalize positive flux ---
     norm = np.sum(image[image > 0])
     if norm <= 0:
-        key1, key2 = ("g1", "g2") if reduced else ("e1", "e2")
-        return {key1: np.nan, key2: np.nan, "T": np.nan, "flag": 1}
+        return {"e1": np.nan, "e2": np.nan, "T": np.nan, "flags": 1}
 
     # --- Measure moments with ngmix ---
     obs_norm = ngmix.Observation(image=image / norm, jacobian=jac)
@@ -1865,10 +1862,9 @@ def get_admoms_ngmix_fit(obs: "ngmix.Observation", reduced: bool = True) -> dict
 
     # --- Convert to reduced shear if requested ---
     if reduced:
-        g1, g2 = e1e2_to_g1g2(e1, e2)
-        return {"g1": g1, "g2": g2, "T": T_galsim, "flag": flag}
+        e1, e2 = e1e2_to_g1g2(e1, e2)
 
-    return {"e1": e1, "e2": e2, "T": T_galsim, "flag": flag}
+    return {"e1": e1, "e2": e2, "T": T_galsim, "flags": flag}
 
 class RhoStats:
     def __init__(self, catalog, column_config, pixel_scale=0.1408,

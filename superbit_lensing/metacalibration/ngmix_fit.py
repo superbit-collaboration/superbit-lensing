@@ -246,8 +246,8 @@ def mcal_dict2tab(mcal, obsdict, ident):
         for i in range(len(obs)):
             try:
                 admom_dict = utils.get_admoms_ngmix_fit(obs[i].psf, reduced=True)
-                if admom_dict['flag'] == 0:
-                    g1psf, g2psf, Tpsf = admom_dict['g1'], admom_dict['g2'], admom_dict['T']
+                if admom_dict['flags'] == 0:
+                    g1psf, g2psf, Tpsf = admom_dict['e1'], admom_dict['e2'], admom_dict['T']
                 else:
                     g1psf, g2psf, Tpsf = np.nan, np.nan, np.nan
 
