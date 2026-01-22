@@ -362,9 +362,15 @@ class Annular(object):
 
         # nfw_tab is a redshift-resampled subset of the full NFW table
         nfw_tab = Table(np.array(t),names = nfw.colnames)
-
+        
+        np.savez(
+            os.path.join(outdir, "redshift_arrays.npz"),
+            nfw_redshift=nfw_tab["redshift"].data,
+            selected_redshift=np.asarray(self.z),
+        )       
         # This should be in diagnostics, but do it here for now
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+ 
 
         ax.hist(nfw_tab['redshift'],bins=100,range=[self.z.min(),\
                                                     self.z.max()],histtype='step',label='nfw resamp', density=True)

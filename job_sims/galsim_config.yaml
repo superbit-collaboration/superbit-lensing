@@ -25,7 +25,7 @@ sky_bkg:            0.0519      # mean sky background from AG's paper       [e- 
 sky_sigma:          0.02        # standard deviation of sky background      [e- / s / px]
 nobj:               34300         # Number of galaxies (COSMOS 25.2 depth)    []
 nstars:             10           # Number of stars in the field              []
-nexp:               36          # Number of exposures per PSF model         []
+nexp:               39          # Number of exposures per PSF model         []
 nclustergal:        100         # Number of cluster galaxies (arbitrary)    []
 bandpass:     'crates_b'        # Catalog filter name for simulation        []
 jitter_fwhm:        0.5         # Kernel size of SuperBIT jitter            [arcsec]
@@ -50,7 +50,7 @@ cat_file_name:     'cosmos15_superbit2023_phot_shapes_with_sigma.csv' #'cosmos20
 cluster_cat_name:  'real_galaxy_catalog_23.5_example.fits' # path to cluster catalog
 star_cat_name:      'APRA_cluster_GAIA_starcats/GAIAstars_1E0657.csv' #'master_gaiastar_cat.fits' # File containing GAIA star fluxes
 outdir:            './forecasting/sim_test' # directory where output images and truth catalogs are saved
-emp_psf_path:      '/projects/mccleary_group/superbit/emp_psfs_best'
+emp_psf_path:      '/projects/mccleary_group/superbit/emp_psfs/emp_psfs_all/by_cluster/Abell3411'
 
 
 # Misc parameters

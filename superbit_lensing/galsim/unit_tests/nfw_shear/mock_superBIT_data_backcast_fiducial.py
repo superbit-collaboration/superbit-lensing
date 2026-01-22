@@ -1298,8 +1298,14 @@ def main(args):
         truth_catalog = galsim.OutputCatalog(names, types)
 
     all_psf_files = []
-    search_path = os.path.join(sbparams.emp_psf_path, 'psfex-output', '*.psf')
+    search_path = os.path.join(sbparams.emp_psf_path, '*.psf')
     all_psf_files.extend(glob(search_path))
+
+    if len(all_psf_files) == 0:
+        raise RuntimeError(
+            f"No PSF files found in '{sbparams.emp_psf_path}'. "
+            "Cannot proceed with simulation."
+        )
 
     for i in np.arange(1, sbparams.nexp+1):
         if mpi is True:
@@ -1321,7 +1327,8 @@ def main(args):
         full_image.setOrigin(dither_offsets[0], dither_offsets[1])
         full_image.wcs = wcs
 
-        psf_file = all_psf_files[0]
+        psf_idx = min(i-1, len(all_psf_files) - 1)
+        psf_file = all_psf_files[psf_idx]
         psf = galsim.des.DES_PSFEx(psf_file, wcs=wcs)
 
         # Ensure output directory exists
