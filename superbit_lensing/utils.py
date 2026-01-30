@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 import os
 import sys
@@ -2666,6 +2667,78 @@ def get_psf_model_file(cat_file):
     psf_model_file = os.path.join(cat_dir, "psfex-output", psf_name)
 
     return psf_model_file
+
+def wcs_manual(header, prefer_tpv: bool = True) -> WCS:
+    """
+    Build a robust 2D celestial WCS from a FITS header.
+
+    Parameters
+    ----------
+    header : astropy.io.fits.Header (or dict-like)
+        FITS header containing WCS keywords.
+    prefer_tpv : bool
+        If True and the header indicates TPV and PV* terms exist, return WCS(header).
+        If False, always return linear TAN WCS (ignoring TPV/PV).
+
+    Returns
+    -------
+    wcs_manual : astropy.wcs.WCS
+        A 2D WCS object.
+    """
+
+    # --- extract required keywords
+    crpix1 = header.get("CRPIX1")
+    crpix2 = header.get("CRPIX2")
+    crval1 = header.get("CRVAL1")
+    crval2 = header.get("CRVAL2")
+
+    cd1_1 = header.get("CD1_1")
+    cd1_2 = header.get("CD1_2", 0.0)
+    cd2_1 = header.get("CD2_1", 0.0)
+    cd2_2 = header.get("CD2_2")
+
+    # Basic validation (fail early with helpful message)
+    missing = []
+    for k, v in [
+        ("CRPIX1", crpix1), ("CRPIX2", crpix2),
+        ("CRVAL1", crval1), ("CRVAL2", crval2),
+        ("CD1_1", cd1_1), ("CD2_2", cd2_2),
+    ]:
+        if v is None:
+            missing.append(k)
+    if missing:
+        raise KeyError(f"Header missing required WCS keywords: {missing}")
+
+    # --- detect TPV + PV terms
+    ctype1 = header.get("CTYPE1", "") or ""
+    ctype2 = header.get("CTYPE2", "") or ""
+    is_tpv = ("TPV" in ctype1) or ("TPV" in ctype2)
+    has_pv_terms = any(str(k).startswith("PV") for k in header.keys())
+
+    # If requested, try header WCS first when TPV+PV appear
+    if prefer_tpv and is_tpv and has_pv_terms:
+        try:
+            w = WCS(header, naxis=2)
+            # In some broken headers, WCS init succeeds but transform is unusable.
+            # Quick sanity: if two pixels map to identical world coords, fallback.
+            p = [[0.0, 0.0], [1000.0, 1000.0]]
+            out = w.all_pix2world(p, 0)
+            if (out[0][0] != out[1][0]) or (out[0][1] != out[1][1]):
+                return w
+        except Exception:
+            # fall through to linear TAN
+            pass
+
+    # --- linear TAN fallback using CRPIX/CRVAL/CD
+    wcs_manual = WCS(naxis=2)
+    wcs_manual.wcs.crpix = [float(crpix1), float(crpix2)]
+    wcs_manual.wcs.crval = [float(crval1), float(crval2)]
+    wcs_manual.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    wcs_manual.wcs.cd = [
+        [float(cd1_1), float(cd1_2)],
+        [float(cd2_1), float(cd2_2)],
+    ]
+    return wcs_manual
 
 BASE_DIR = get_base_dir()
 MODULE_DIR = get_module_dir()

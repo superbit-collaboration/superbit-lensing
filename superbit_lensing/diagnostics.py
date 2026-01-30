@@ -456,6 +456,8 @@ def compute_metacal_quantities(mcal, qual_cuts, mcal_shear, shape_noise, cluster
     admom_flag = qual_cuts.get('admom_flag', None)
     min_admom_sigma = qual_cuts.get('min_admom_sigma', None)
 
+    max_gpsf = qual_cuts.get('max_gpsf', None)
+
     if cluster_redshift is not None:
         # Add in a little bit of a safety margin
         min_redshift = float(cluster_redshift) + 0.025
@@ -471,6 +473,9 @@ def compute_metacal_quantities(mcal, qual_cuts, mcal_shear, shape_noise, cluster
         cut_msg += f"\n# admom_flag = {admom_flag}"
     if min_admom_sigma is not None:
         cut_msg += f"\n# admom_sigma > {min_admom_sigma:.2f}"
+
+    if max_gpsf is not None:
+        cut_msg +=f"\n# g_psf < {max_gpsf}"
     cut_msg += " \n#\n"
     print(cut_msg)
 
@@ -491,6 +496,8 @@ def compute_metacal_quantities(mcal, qual_cuts, mcal_shear, shape_noise, cluster
         noshear_mask &= (mcal['admom_flag'] == admom_flag)
     if min_admom_sigma is not None:
         noshear_mask &= (mcal['admom_sigma'] > min_admom_sigma)
+    if max_gpsf is not None:
+        noshear_mask &= (mcal["gpsf_noshear"][:, 1]>-max_gpsf) &(mcal["gpsf_noshear"][:, 1]<max_gpsf) & (mcal["gpsf_noshear"][:, 0]>-max_gpsf) &(mcal["gpsf_noshear"][:, 0]<max_gpsf)
     
     noshear_selection = mcal[noshear_mask]
 
