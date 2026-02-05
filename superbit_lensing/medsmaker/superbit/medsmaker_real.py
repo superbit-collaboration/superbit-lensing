@@ -353,6 +353,7 @@ class BITMeasurement():
         image_files_filtered = []
         exp_std_fwhm = []
         exp_ellip = []
+        exp_nstars = []
         fail_criteria_exp = []
         for catfile, imfile in zip(image_cats, image_files):
             # Read star catalog from HDU 2
@@ -401,7 +402,9 @@ class BITMeasurement():
             valid_mask = np.isfinite(star_fwhm) & (star_fwhm > 0)
             star_fwhm_valid = star_fwhm[valid_mask]
 
-            if len(star_fwhm_valid) == 0:
+            nstars = len(star_fwhm_valid)
+
+            if nstars == 0:
                 continue  # skip if no valid stars
 
             # Apply 1–99 percentile filtering
@@ -440,6 +443,7 @@ class BITMeasurement():
             )
             exp_std_fwhm.append(std_fwhm)
             exp_ellip.append(median_e)
+            exp_nstars.append(nstars)
             fail_criteria_exp.append(fail_criteria)
             
             if not fail_criteria:
@@ -456,8 +460,9 @@ class BITMeasurement():
 
         kept_exposures = len(self.image_cats)
         percent_kept = (kept_exposures / total_exposures * 100) if total_exposures > 0 else 0
-
-        summary_text = f"Kept {kept_exposures} out of {total_exposures} exposures ({percent_kept:.1f}%)"
+        exp_nstars = np.array(exp_nstars)
+        mean_exp_nstars = np.nanmedian(exp_nstars)
+        summary_text = f"Kept {kept_exposures} out of {total_exposures} exposures ({percent_kept:.1f}%), Number of PSF stars: {int(np.round(mean_exp_nstars))}"
         print(summary_text)
         self.logprint(summary_text)
 

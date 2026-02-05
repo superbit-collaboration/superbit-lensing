@@ -32,6 +32,10 @@ def parse_args():
                         help='model exposure PSF using either piff or psfex')
     parser.add_argument('-psf_seed', type=int, default=None,
                         help='Seed for chosen PSF estimation mode')
+    parser.add_argument('-std_thresh', type=float, default=0.1,
+                        help = "std(FWHM) threshold for PSF stars, Default: 0.1")
+    parser.add_argument('-ellip_thresh', type=float, default=0.268,
+                        help = "|e| threshold for PSF stars, Default: 0.268")
     parser.add_argument('-star_config_dir', type=str, default=None,
                         help='Path to the directory containing the YAML ' + \
                              'configuration files for star processing')
@@ -49,10 +53,6 @@ def parse_args():
     return parser.parse_args()
 
 def main(args):
-    print("Arguments received:")
-    for arg, value in vars(args).items():
-        print(f"  {arg}: {value}")
-    print("-" * 50)
     target_name = args.target_name
     data_dir = args.data_dir
     outdir = args.outdir
@@ -65,6 +65,8 @@ def main(args):
     star_config_dir = args.star_config_dir
     detection_bandpass = args.detection_bandpass
     vb = args.vb
+    std_thresh = args.std_thresh
+    ellip_thresh = args.ellip_thresh
 
     if star_config_dir == None:
         star_config_dir = str(Path(utils.MODULE_DIR, 'medsmaker/configs'))
@@ -192,7 +194,7 @@ def main(args):
         
         # Set image catalogs attribute
         #bm.set_image_cats()
-        kept_exp = bm.filter_files(std_threshold=0.1, ellip_threshold=0.5)
+        kept_exp = bm.filter_files(std_threshold=std_thresh, ellip_threshold=ellip_thresh)
 
         # Build  a PSF model for each image.
         logprint('Making PSF models... \n')

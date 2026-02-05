@@ -33,6 +33,7 @@ import treecorr
 from scipy.interpolate import UnivariateSpline
 from shapely.geometry import Point, Polygon
 from math import ceil, sqrt
+from superbit_lensing.match import SkyCoordMatcher
 
 # Get the path to the root of the project (2 levels up from utils.py)
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -1631,6 +1632,82 @@ def make_psfex_model(psfcat_name, config_path=DEFAULT_CONFIG_DIR, psf_seed=None,
         model = None
         print(f'WARNING:\n Could not find PSFEx model file {psfex_model_file}\n')
     return model
+
+def infer_target_from_basename(catfilename: str) -> str:
+    base = os.path.basename(catfilename)
+
+    # ---- clean catalog: <target>_<band>_<exptime>_<unix>_clean_cat.fits
+    if base.endswith("_clean_cat.fits"):
+        stem = base[:-len("_clean_cat.fits")]  # remove suffix
+        try:
+            target, band, exptime_s, unix_s = stem.rsplit("_", 3)
+        except ValueError as e:
+            raise ValueError(f"Bad clean_cat filename format: {base}") from e
+
+        # Optional validations (can remove if you don't want strictness)
+        if not exptime_s.isdigit() or not unix_s.isdigit():
+            raise ValueError(f"Bad clean_cat numeric fields in: {base}")
+
+        return target
+
+    # ---- coadd catalog: <target>_coadd_<band>_cat.fits
+    if base.endswith("_cat.fits") and "_coadd_" in base:
+        stem = base[:-len("_cat.fits")]
+        try:
+            target, tag, band = stem.rsplit("_", 2)
+        except ValueError as e:
+            raise ValueError(f"Bad coadd_cat filename format: {base}") from e
+
+        if tag != "coadd":
+            raise ValueError(f"Expected 'coadd' token in: {base}")
+
+        return target
+
+    raise ValueError(f"Unknown catalog filename pattern: {base}")
+
+def add_gaia_star_column(catfilename, target=None, outfile=None, tolerance_deg=1e-4, overwrite=True):
+    # --- Load catalog ---
+    ss_fits = fits.open(catfilename)
+    try:
+        ext = 2 if len(ss_fits) == 3 else 1
+        cat = ss_fits[ext].data
+
+        if target is None:
+            target = infer_target_from_basename(catfilename)
+
+        gaia_stars = gaia_query(target)
+
+        matcher = SkyCoordMatcher(
+            cat, gaia_stars,
+            cat1_ratag='ALPHAWIN_J2000', cat1_dectag='DELTAWIN_J2000',
+            cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000',
+            return_idx=True, match_radius=tolerance_deg, verbose=False
+        )
+
+        _, _, idx, _ = matcher.get_matched_pairs()
+
+        is_gaia_star = np.zeros(len(cat), dtype=bool)
+        is_gaia_star[idx] = True
+
+        # --- Update/add column ---
+        if "is_gaia_star" in cat.names:
+            if overwrite:
+                # cast to the existing dtype just in case it's stored as int/byte
+                cat["is_gaia_star"][:] = is_gaia_star.astype(cat["is_gaia_star"].dtype)
+        else:
+            # add new scalar column
+            col = Column(name="is_gaia_star", format='L', array=is_gaia_star.astype(bool))
+            ss_fits[ext].columns.add_col(col)
+
+        # --- Write out ---
+        if outfile is None:
+            outfile = catfilename
+
+        ss_fits.writeto(outfile, overwrite=overwrite)
+        return Table(ss_fits[ext].data)
+
+    finally:
+        ss_fits.close()
 
 def add_admom_columns(catfilename, imagefilename=None, mode="ngmix", outfile=None, reduced=True, overwrite=True):
     """
