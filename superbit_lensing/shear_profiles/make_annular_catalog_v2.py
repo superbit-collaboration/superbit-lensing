@@ -89,6 +89,7 @@ class AnnularCatalog():
         self.outfile = cat_info['mcal_selected']
         self.outdir = cat_info['outdir']
         self.run_name = cat_info['run_name']
+        self.detection_band = cat_info['detection_band']
         self.redshift_cat = cat_info['redshift_cat']
         self.cluster_redshift = cat_info['cluster_redshift']
         self.nfw_file = cat_info['nfw_file']
@@ -381,6 +382,12 @@ class AnnularCatalog():
         # Save selected galaxies to file
         for key, val in self.config['mcal_cuts'].items():
             self.selected.meta[key] = val
+
+        # add nexp for all objects
+        cat_dir = os.path.join(data_dir, self.run_name, self.detection_band, "cat")
+        cal_dir = os.path.join(data_dir, self.run_name, self.detection_band, "cal")
+
+        self.selected = utils.ghost_detector(self.selected, cal_dir, cat_dir)
 
         self.selected = self.match_and_merge_color_mag(self.selected, color_mag_file, tolerance_deg=5e-5, idx_matcher=False)       
 
@@ -721,6 +728,7 @@ def main(args):
         'detect_cat': detect_cat,
         'mcal_file': mcal_file,
         'run_name': target_name,
+        'detection_band': detection_band,
         'mcal_selected': outfile,
         'outdir': outdir,
         'redshift_cat': redshift_cat,

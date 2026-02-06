@@ -4,6 +4,8 @@ import os
 import sys
 import yaml
 import re
+from glob import glob
+from tqdm import tqdm
 from astropy.table import Table
 from astroquery.vizier import Vizier
 from astroquery.ipac.ned import Ned
@@ -2816,6 +2818,47 @@ def wcs_manual(header, prefer_tpv: bool = True) -> WCS:
         [float(cd2_1), float(cd2_2)],
     ]
     return wcs_manual
+
+def ghost_detector(tab, cal_dir, cat_dir, tolerance_deg=0.5/3600):
+    cat_search_path = os.path.join(cat_dir, "*_clean_cat.fits")
+    cal_search_path = os.path.join(cal_dir, "*_clean.fits")
+
+    cat_files = sorted(glob(cat_search_path))
+    cal_files = sorted(glob(cal_search_path))
+
+    if "nexp_det" in tab.colnames:
+        print("[NOTE] Overwriting existing nexp_det column")
+    
+    if len(cat_files) == 0:
+        print(f"[WARNING] No catalog files found at: {cat_search_path}")
+        tab = tab.copy()
+        tab["nexp_det"] = np.zeros(len(tab), dtype=np.int32)
+        return tab
+
+    if len(cal_files) != len(cat_files):
+        print(f"[WARNING] catalog/exposure count mismatch: exposures={len(cal_files)} catalogs={len(cat_files)}")
+    else:
+        print(f"[NOTE] found {len(cat_files)} catalogs")
+
+    tab = tab.copy()
+    nexp = np.zeros(len(tab), dtype=np.int32)
+
+
+    for cat_file in tqdm(cat_files, desc="Matching exposures", total=len(cat_files)):
+        cat2 = Table.read(cat_file, hdu=2)  
+        matcher = SkyCoordMatcher(
+            tab, cat2,
+            cat1_ratag="ra", cat1_dectag="dec",
+            cat2_ratag="ALPHAWIN_J2000", cat2_dectag="DELTAWIN_J2000",
+            return_idx=True, match_radius=tolerance_deg, verbose=False
+        )
+
+        _, _, idx1, _ = matcher.get_matched_pairs()
+        nexp[idx1] += 1
+
+    tab["nexp_det"] = nexp
+    return tab
+
 
 BASE_DIR = get_base_dir()
 MODULE_DIR = get_module_dir()
