@@ -1962,8 +1962,8 @@ class RhoStats:
         e2_model = catalog[column_config['e2_model']]
 
         # converting to g1, g2
-        # e1_obs, e2_obs = e1e2_to_g1g2(e1_obs, e2_obs)
-        # e1_model, e2_model = e1e2_to_g1g2(e1_model, e2_model)
+        e1_obs, e2_obs = e1e2_to_g1g2(e1_obs, e2_obs)
+        e1_model, e2_model = e1e2_to_g1g2(e1_model, e2_model)
 
         # Size (trace of second-moment matrix, or whatever T is in your pipeline)
         T_obs = catalog[column_config['T_obs']]
@@ -2859,6 +2859,19 @@ def ghost_detector(tab, cal_dir, cat_dir, tolerance_deg=0.5/3600):
     tab["nexp_det"] = nexp
     return tab
 
+def get_galsim_tanwcs(image_xsize=9600, image_ysize=6400, center_ra=13.3 * galsim.hours, center_dec=33.1 * galsim.degrees, pixel_scale=0.141):
+    fiducial_full_image = galsim.ImageF(image_xsize, image_ysize)
+    theta = 0.0 * galsim.degrees
+    dudx = np.cos(theta) * pixel_scale
+    dudy = -np.sin(theta) * pixel_scale
+    dvdx = np.sin(theta) * pixel_scale
+    dvdy = np.cos(theta) * pixel_scale
+
+    affine = galsim.AffineTransform(dudx, dudy, dvdx, dvdy, origin=fiducial_full_image.true_center)
+    sky_center = galsim.CelestialCoord(ra=center_ra, dec=center_dec)
+    wcs = galsim.TanWCS(affine, sky_center, units=galsim.arcsec)
+
+    return wcs
 
 BASE_DIR = get_base_dir()
 MODULE_DIR = get_module_dir()

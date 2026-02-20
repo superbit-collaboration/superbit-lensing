@@ -1,7 +1,11 @@
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import zoom
 import numpy as np
+import glob
 import matplotlib.pyplot as plt
+import psfex
+import galsim
+import galsim.des
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.nddata import Cutout2D
@@ -25,7 +29,10 @@ import os
 from superbit_lensing.match import SkyCoordMatcher
 import matplotlib.colors as colors
 from matplotlib.path import Path
-from superbit_lensing.utils import build_clean_tan_wcs, read_ds9_ctr, get_cluster_info
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from superbit_lensing.utils import build_clean_tan_wcs, read_ds9_ctr, get_cluster_info, get_admoms, get_galsim_tanwcs
 
 def plot_comparison(cat, 
                    reference_key, 
@@ -1741,3 +1748,343 @@ def plot_kappa_difference_with_count_difference(kappa_file1, count_file1, kappa_
     # Display the plot
     plt.tight_layout()
     plt.show()
+
+def make_psfex_shape_maps(
+    psfex_file,
+    image_xsize=9600,
+    image_ysize=6400,
+    step=200,
+    margin=0,
+    smooth=True,
+    scale=0.141,
+    mode="ngmix",
+    reduced=True,
+    show=True,
+    return_vals=False
+):
+    """
+    Sample PSFEx model across the detector on a coarse grid and plot e1, e2, T maps.
+
+    Returns
+    -------
+    (e1_map, e2_map, T_map, xx, yy)
+      where maps have shape (Ny, Nx) and xx,yy are the coordinate grids.
+    """
+    interpolation = "bicubic" if smooth else "nearest"
+
+    # ---- load PSFEx model ----
+    model = psfex.PSFEx(psfex_file)
+
+    # ---- grid of sample points ----
+    x = np.arange(margin, image_xsize - margin, step)
+    y = np.arange(margin, image_ysize - margin, step)
+    xx, yy = np.meshgrid(x, y, indexing="xy")
+    Ny, Nx = xx.shape
+
+    e1_map = np.full((Ny, Nx), np.nan, dtype=float)
+    e2_map = np.full((Ny, Nx), np.nan, dtype=float)
+    T_map  = np.full((Ny, Nx), np.nan, dtype=float)
+
+    # ---- evaluate PSF + moments ----
+    for i in range(Ny):
+        for j in range(Nx):
+            y_im = int(yy[i, j])
+            x_im = int(xx[i, j])
+
+            try:
+                psf_im = model.get_rec(y_im, x_im)
+                #psf_im = psf_im/np.sum(psf_im)
+                res = get_admoms(psf_im, scale=scale, mode=mode, reduced=reduced)
+                e1_map[i, j] = res["e1"]
+                e2_map[i, j] = res["e2"]
+                T_map[i, j]  = res["T"]
+            except Exception:
+                # keep NaNs if anything fails
+                continue
+
+    # ---- colormaps (NaNs -> grey) ----
+    cmap_shape = cm.RdBu_r.copy()
+    cmap_shape.set_bad(color="lightgray")
+
+    cmap_T = cm.viridis.copy()
+    cmap_T.set_bad(color="lightgray")
+
+    # ---- plot ----
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5),sharey=True)
+
+    datas  = [e1_map, e2_map, T_map]
+    labels = ["$e_1$", "$e_2$", "$T$"]
+    cmaps  = [cmap_shape, cmap_shape, cmap_T]
+
+    for ax, data, label, cmap in zip(axes, datas, labels, cmaps):
+        im = ax.imshow(
+            data,
+            origin="lower",
+            extent=[margin, image_xsize - margin, margin, image_ysize - margin],
+            interpolation=interpolation,
+            cmap=cmap,
+        )
+
+        ax.set_xlabel("X [pixels]")
+        if ax is axes[0]:
+            ax.set_ylabel("Y [pixels]")
+        ax.set_title(f"PSF {label}")
+
+        # colorbar same height as image
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cbar = plt.colorbar(im, cax=cax)
+        cbar.set_label(label)
+
+    plt.tight_layout()
+
+    if show:
+        plt.show()
+    if return_vals:
+        return e1_map, e2_map, T_map, xx, yy
+    
+
+def make_psfex_shape_maps_galsim(
+    psfex_file,
+    image_xsize=9600,
+    image_ysize=6400,
+    step=200,
+    margin=0,
+    smooth=True,
+    scale=0.141,
+    mode="ngmix",
+    reduced=True,
+    show=True,
+    return_vals=False
+):
+    """
+    Sample PSFEx model across the detector on a coarse grid and plot e1, e2, T maps.
+
+    Returns
+    -------
+    (e1_map, e2_map, T_map, xx, yy)
+      where maps have shape (Ny, Nx) and xx,yy are the coordinate grids.
+    """
+    interpolation = "bicubic" if smooth else "nearest"
+
+    # ---- load PSFEx model ----
+    center_ra    =  13.3 * galsim.hours
+    center_dec   =  33.1 * galsim.degrees
+    pixel_scale  =  scale
+    npix_psf = 51
+    wcs = get_galsim_tanwcs(image_xsize, image_ysize, center_ra, center_dec, pixel_scale)
+    galsim_psf = galsim.des.DES_PSFEx(psfex_file, wcs=wcs)
+
+
+    # ---- grid of sample points ----
+    x = np.arange(margin, image_xsize - margin, step)
+    y = np.arange(margin, image_ysize - margin, step)
+    xx, yy = np.meshgrid(x, y, indexing="xy")
+    Ny, Nx = xx.shape
+
+    e1_map = np.full((Ny, Nx), np.nan, dtype=float)
+    e2_map = np.full((Ny, Nx), np.nan, dtype=float)
+    T_map  = np.full((Ny, Nx), np.nan, dtype=float)
+
+    # ---- evaluate PSF + moments ----
+    for i in range(Ny):
+        for j in range(Nx):
+            y_im = int(yy[i, j])
+            x_im = int(xx[i, j])
+
+            try:
+                image_position = galsim.PositionD(x_im, y_im)
+                psf = galsim_psf.getPSF(image_position)
+                psf_im = psf.drawImage(scale = pixel_scale,  nx=npix_psf, ny=npix_psf).array
+                res = get_admoms(psf_im, scale=scale, mode=mode, reduced=reduced)
+                e1_map[i, j] = res["e1"]
+                e2_map[i, j] = res["e2"]
+                T_map[i, j]  = res["T"]
+            except Exception:
+                # keep NaNs if anything fails
+                continue
+
+    # ---- colormaps (NaNs -> grey) ----
+    cmap_shape = cm.RdBu_r.copy()
+    cmap_shape.set_bad(color="lightgray")
+
+    cmap_T = cm.viridis.copy()
+    cmap_T.set_bad(color="lightgray")
+
+    # ---- plot ----
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5),sharey=True)
+
+    datas  = [e1_map, e2_map, T_map]
+    labels = ["$e_1$", "$e_2$", "$T$"]
+    cmaps  = [cmap_shape, cmap_shape, cmap_T]
+
+    for ax, data, label, cmap in zip(axes, datas, labels, cmaps):
+        im = ax.imshow(
+            data,
+            origin="lower",
+            extent=[margin, image_xsize - margin, margin, image_ysize - margin],
+            interpolation=interpolation,
+            cmap=cmap,
+        )
+
+        ax.set_xlabel("X [pixels]")
+        if ax is axes[0]:
+            ax.set_ylabel("Y [pixels]")
+        ax.set_title(f"PSF {label}")
+
+        # colorbar same height as image
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cbar = plt.colorbar(im, cax=cax)
+        cbar.set_label(label)
+
+    plt.tight_layout()
+
+    if show:
+        plt.show()
+    if return_vals:
+        return e1_map, e2_map, T_map, xx, yy
+
+def make_mean_psfex_shape_maps(
+    psfex_files,
+    image_xsize=9600,
+    image_ysize=6400,
+    step=200,
+    margin=0,
+    smooth=True,
+    scale=0.141,
+    mode="ngmix",
+    reduced=True,
+    show=True,
+    return_vals=False
+):
+    """
+    Sample multiple PSFEx models across the detector on a coarse grid, compute
+    per-pixel mean e1/e2/T across models, and plot e1, e2, T maps.
+
+    Returns
+    -------
+    (e1_mean, e2_mean, T_mean, xx, yy)
+      where maps have shape (Ny, Nx) and xx,yy are the coordinate grids.
+    """
+    interpolation = "bicubic" if smooth else "nearest"
+
+    # ---- grid of sample points ----
+    x = np.arange(margin, image_xsize - margin, step)
+    y = np.arange(margin, image_ysize - margin, step)
+    xx, yy = np.meshgrid(x, y, indexing="xy")
+    Ny, Nx = xx.shape
+
+    nfiles = len(psfex_files)
+
+    # store each file's maps then nanmean across axis=0
+    e1_stack = np.full((nfiles, Ny, Nx), np.nan, dtype=float)
+    e2_stack = np.full((nfiles, Ny, Nx), np.nan, dtype=float)
+    T_stack  = np.full((nfiles, Ny, Nx), np.nan, dtype=float)
+
+    for k, psfex_file in enumerate(psfex_files):
+        model = psfex.PSFEx(psfex_file)
+
+        for i in range(Ny):
+            for j in range(Nx):
+                y_im = int(yy[i, j])
+                x_im = int(xx[i, j])
+
+                try:
+                    psf_im = model.get_rec(y_im, x_im)
+                    # psf_im = psf_im / np.sum(psf_im)
+                    res = get_admoms(psf_im, scale=scale, mode=mode, reduced=reduced)
+
+                    e1_stack[k, i, j] = res["e1"]
+                    e2_stack[k, i, j] = res["e2"]
+                    T_stack[k, i, j]  = res["T"]
+                except Exception:
+                    continue
+
+    # ---- average across files (ignore failures) ----
+    e1_map = np.nanmean(e1_stack, axis=0)
+    e2_map = np.nanmean(e2_stack, axis=0)
+    T_map  = np.nanmean(T_stack, axis=0)
+
+    # ---- colormaps (NaNs -> grey) ----
+    cmap_shape = cm.RdBu_r.copy()
+    cmap_shape.set_bad(color="lightgray")
+
+    cmap_T = cm.viridis.copy()
+    cmap_T.set_bad(color="lightgray")
+
+    # ---- plot ----
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
+
+    datas  = [e1_map, e2_map, T_map]
+    labels = ["$e_1$", "$e_2$", "$T$"]
+    cmaps  = [cmap_shape, cmap_shape, cmap_T]
+
+    for ax, data, label, cmap in zip(axes, datas, labels, cmaps):
+        im = ax.imshow(
+            data,
+            origin="lower",
+            extent=[margin, image_xsize - margin, margin, image_ysize - margin],
+            interpolation=interpolation,
+            cmap=cmap,
+        )
+
+        ax.set_xlabel("X [pixels]")
+        if ax is axes[0]:
+            ax.set_ylabel("Y [pixels]")
+        ax.set_title(f"Mean PSF {label}")
+
+        # colorbar same height as image
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cbar = plt.colorbar(im, cax=cax)
+        cbar.set_label(label)
+
+    plt.tight_layout()
+
+    if show:
+        plt.show()
+
+    if return_vals:
+        return e1_map, e2_map, T_map, xx, yy
+
+def make_mean_psfex_shape_maps_from_dir(
+    psfex_dir,
+    image_xsize=9600,
+    image_ysize=6400,
+    step=200,
+    margin=0,
+    smooth=True,
+    scale=0.141,
+    mode="ngmix",
+    reduced=True,
+    show=True,
+    return_vals = False
+):
+    """
+    Find all .psf files in a directory and compute mean PSF shape maps.
+    """
+
+    # ---- find psf files ----
+    pattern = os.path.join(psfex_dir, "*.psf")
+    psfex_files = sorted(glob.glob(pattern))
+
+    if len(psfex_files) == 0:
+        raise FileNotFoundError(f"No .psf files found in {psfex_dir}")
+
+    print(f"Found {len(psfex_files)} PSFEx files.")
+
+    # ---- call your previous function ----
+    return make_mean_psfex_shape_maps(
+        psfex_files=psfex_files,
+        image_xsize=image_xsize,
+        image_ysize=image_ysize,
+        step=step,
+        margin=margin,
+        smooth=smooth,
+        scale=scale,
+        mode=mode,
+        reduced=reduced,
+        show=show,
+        return_vals=return_vals
+    )
