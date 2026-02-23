@@ -14,6 +14,7 @@ from astropy.visualization.wcsaxes import SphericalCircle
 from astropy.coordinates import SkyCoord
 from astropy.visualization import ZScaleInterval
 import matplotlib.patches as patches
+import matplotlib.ticker as mticker
 from matplotlib.patches import Circle
 
 from astropy.visualization import (MinMaxInterval, SqrtStretch, 
@@ -2089,9 +2090,6 @@ def make_mean_psfex_shape_maps_from_dir(
         return_vals=return_vals
     )
     
-import numpy as np
-import matplotlib.ticker as mticker
-
 
 class PSFLeakagePanelMaker:
     """
@@ -2372,7 +2370,7 @@ class PSFLeakagePanelMaker:
                 min_count=self.MIN_COUNT,
                 weights=self.weights[mask],
                 calibrate=self.CALIBRATE,
-                calib=np.asarray(calib_for_e1)[mask],
+                calib=np.asarray(calib_for_e1)[mask] if calib_for_e1 is not None else None,
                 subtract_global_mean=True,
                 x_center=self.x_center,
                 error_type=self.error_type,
@@ -2384,7 +2382,7 @@ class PSFLeakagePanelMaker:
                 min_count=self.MIN_COUNT,
                 weights=self.weights[mask],
                 calibrate=self.CALIBRATE,
-                calib=np.asarray(calib_for_e2)[mask],
+                calib=np.asarray(calib_for_e2)[mask] if calib_for_e2 is not None else None,
                 subtract_global_mean=True,
                 x_center=self.x_center,
                 error_type=self.error_type,
