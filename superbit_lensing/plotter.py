@@ -2088,3 +2088,385 @@ def make_mean_psfex_shape_maps_from_dir(
         show=show,
         return_vals=return_vals
     )
+    
+import numpy as np
+import matplotlib.ticker as mticker
+
+
+class PSFLeakagePanelMaker:
+    """
+    Wraps the existing logic into a reusable class.
+    IMPORTANT: logic is unchanged; we only move things into methods and make
+    e1_gal/e2_gal/etc. explicit inputs (stored on the instance).
+    """
+
+    def __init__(
+        self,
+        *,
+        e1_gal,
+        e2_gal,
+        weights,
+        NBIN=10,
+        MIN_COUNT=20,
+        CALIBRATE=False,
+        njac=30,
+        x_center="median",
+        error_type="sem",
+        color_e1="#3B4CC0",
+        color_e2="#B40426",
+    ):
+        # ---- store inputs / config (no logic change) ----
+        self.e1_gal = np.asarray(e1_gal)
+        self.e2_gal = np.asarray(e2_gal)
+        self.weights = np.asarray(weights)
+
+        self.NBIN = NBIN
+        self.MIN_COUNT = MIN_COUNT
+        self.CALIBRATE = CALIBRATE
+        self.njac = njac
+
+        self.x_center = x_center
+        self.error_type = error_type
+
+        self.color_e1 = color_e1
+        self.color_e2 = color_e2
+
+    # ---------------------------------------------------------------------
+    # (moved as-is) core stats helpers
+    # ---------------------------------------------------------------------
+    def percentile_binned_mean(
+        self,
+        x,
+        y,
+        nbin=20,
+        min_count=10,
+        weights=None,
+        calibrate=False,
+        calib=None,
+        subtract_global_mean=True,
+        x_center="median",
+        error_type="sem",  # "sem" or "std"
+    ):
+        """
+        Percentile-bin by x, compute <y> per bin and its uncertainty.
+        Returns x_bin, y_bin, yerr_bin, counts, edges
+        """
+        x = np.asarray(x)
+        y = np.asarray(y)
+
+        m = np.isfinite(x) & np.isfinite(y)
+        if weights is not None:
+            w = np.asarray(weights)
+            m &= np.isfinite(w)
+        else:
+            w = None
+
+        if calibrate:
+            if calib is None:
+                raise ValueError("calib must be provided when calibrate=True")
+            c = np.asarray(calib)
+            m &= np.isfinite(c)
+        else:
+            c = None
+
+        x = x[m]
+        y = y[m]
+        if w is not None:
+            w = w[m]
+        if c is not None:
+            c = c[m]
+
+        if subtract_global_mean:
+            y = y - (np.average(y, weights=w) if w is not None else np.mean(y))
+
+        edges = np.percentile(x, np.linspace(0, 100, nbin + 1))
+
+        x_bin, y_bin, yerr_bin, counts = [], [], [], []
+
+        for i in range(nbin):
+            if i < nbin - 1:
+                mbin = (x >= edges[i]) & (x < edges[i + 1])
+            else:
+                mbin = (x >= edges[i]) & (x <= edges[i + 1])
+
+            n = int(np.sum(mbin))
+            if n < min_count:
+                print(
+                    f"[WARNING] number of points in bin {i}: {n}  didn't pass min count = {min_count}"
+                )
+                continue
+
+            xb = np.median(x[mbin]) if x_center == "median" else np.mean(x[mbin])
+            yvals = y[mbin]
+
+            if w is None:
+                yb = np.mean(yvals)
+                if error_type == "sem":
+                    yerr = np.std(yvals, ddof=1) / np.sqrt(n)
+                else:
+                    yerr = np.std(yvals, ddof=1)
+            else:
+                wvals = w[mbin]
+                yb = np.average(yvals, weights=wvals)
+                yerr = np.sqrt(np.average((yvals - yb) ** 2, weights=wvals)) / np.sqrt(
+                    n
+                )
+
+            if calibrate:
+                cvals = c[mbin]
+                cb = np.median(cvals)
+                if cb == 0:
+                    continue
+                yb /= cb
+                yerr /= cb
+
+            x_bin.append(xb)
+            y_bin.append(yb)
+            yerr_bin.append(yerr)
+            counts.append(n)
+
+        return (
+            np.asarray(x_bin),
+            np.asarray(y_bin),
+            np.asarray(yerr_bin),
+            np.asarray(counts),
+            edges,
+        )
+
+    def slope_from_catalog(
+        self,
+        x,
+        y,
+        nbin=20,
+        min_count=10,
+        weights=None,
+        calibrate=False,
+        calib=None,
+        subtract_global_mean=True,
+        x_center="median",
+        error_type="sem",
+    ):
+        x_bin, y_bin, yerr_bin, _, _ = self.percentile_binned_mean(
+            x,
+            y,
+            nbin=nbin,
+            min_count=min_count,
+            weights=weights,
+            calibrate=calibrate,
+            calib=calib,
+            subtract_global_mean=subtract_global_mean,
+            x_center=x_center,
+            error_type=error_type,
+        )
+
+        w = 1.0 / yerr_bin**2
+        alpha, beta = np.polyfit(x_bin, y_bin, 1, w=w)  # y = beta + alpha x
+        return alpha, beta, x_bin, y_bin, yerr_bin
+
+    # ---------------------------------------------------------------------
+    # (moved as-is) plot helpers
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def make_panel_legend(
+        ax,
+        showe1e2_leg,
+        loc=None,
+        fontsize=None,
+        columnspacing=0.8,
+        handletextpad=0.3,
+    ):
+        handles, labels = ax.get_legend_handles_labels()
+
+        if showe1e2_leg:
+            order = [2, 3, 0, 1]
+            ncol = 2
+        else:
+            order = [0, 1]
+            ncol = 1
+
+        ax.legend(
+            [handles[i] for i in order],
+            [labels[i] for i in order],
+            ncol=ncol,
+            frameon=False,
+            columnspacing=columnspacing,
+            handletextpad=handletextpad,
+            loc=loc,
+            fontsize=fontsize,
+        )
+
+    @staticmethod
+    def latex_sci(x, precision=2):
+        """2.34e-3 -> 2.34 \\times 10^{-3}"""
+        if x == 0:
+            return "0"
+        exp = int(np.floor(np.log10(abs(x))))
+        mant = x / 10**exp
+        return rf"{mant:.{precision}f}\times 10^{{{exp}}}"
+
+    @staticmethod
+    def set_log_ticks_with_labels(ax, ticks=(10, 20, 30, 50, 100)):
+        ax.set_xscale("log")
+        ax.set_xticks(ticks)
+        ax.get_xaxis().set_major_formatter(mticker.ScalarFormatter())
+        ax.ticklabel_format(axis="x", style="plain")
+        ax.xaxis.set_minor_locator(
+            mticker.LogLocator(base=10, subs=np.arange(2, 10) * 0.1)
+        )
+        ax.xaxis.set_minor_formatter(mticker.NullFormatter())
+
+    # ---------------------------------------------------------------------
+    # the main thing: make_panel (logic unchanged)
+    # ---------------------------------------------------------------------
+    def make_panel(
+        self,
+        ax,
+        *,
+        x_psf,
+        xlab,
+        calib_for_e1,
+        calib_for_e2,
+        x_log_scale=False,
+        showe1e2_leg=False,
+    ):
+        alpha_full_1, beta_full_1, x_bin, y_bin_1, yerr_bin = self.slope_from_catalog(
+            x=x_psf,
+            y=self.e1_gal,
+            nbin=self.NBIN,
+            min_count=self.MIN_COUNT,
+            weights=self.weights,
+            calibrate=self.CALIBRATE,
+            calib=calib_for_e1,
+            subtract_global_mean=True,
+            x_center=self.x_center,
+            error_type=self.error_type,
+        )
+        alpha_full_2, beta_full_2, _, y_bin_2, yerr_bin_2 = self.slope_from_catalog(
+            x=x_psf,
+            y=self.e2_gal,
+            nbin=self.NBIN,
+            min_count=self.MIN_COUNT,
+            weights=self.weights,
+            calibrate=self.CALIBRATE,
+            calib=calib_for_e2,
+            subtract_global_mean=True,
+            x_center=self.x_center,
+            error_type=self.error_type,
+        )
+
+        N = len(x_psf)
+        jk_size = N // self.njac
+
+        alpha_jk_1, alpha_jk_2 = [], []
+
+        for i in range(self.njac):
+            mask = np.ones(N, dtype=bool)
+            mask[i * jk_size : (i + 1) * jk_size] = False
+
+            a1, _, _, _, _ = self.slope_from_catalog(
+                x_psf[mask],
+                self.e1_gal[mask],
+                nbin=self.NBIN,
+                min_count=self.MIN_COUNT,
+                weights=self.weights[mask],
+                calibrate=self.CALIBRATE,
+                calib=np.asarray(calib_for_e1)[mask],
+                subtract_global_mean=True,
+                x_center=self.x_center,
+                error_type=self.error_type,
+            )
+            a2, _, _, _, _ = self.slope_from_catalog(
+                x_psf[mask],
+                self.e2_gal[mask],
+                nbin=self.NBIN,
+                min_count=self.MIN_COUNT,
+                weights=self.weights[mask],
+                calibrate=self.CALIBRATE,
+                calib=np.asarray(calib_for_e2)[mask],
+                subtract_global_mean=True,
+                x_center=self.x_center,
+                error_type=self.error_type,
+            )
+
+            alpha_jk_1.append(a1)
+            alpha_jk_2.append(a2)
+
+        alpha_jk_1 = np.asarray(alpha_jk_1)
+        alpha_jk_2 = np.asarray(alpha_jk_2)
+
+        alpha_mean_1 = np.mean(alpha_jk_1)
+        alpha_err_1 = np.sqrt(
+            (self.njac - 1)
+            / self.njac
+            * np.sum((alpha_jk_1 - alpha_mean_1) ** 2)
+        )
+
+        alpha_mean_2 = np.mean(alpha_jk_2)
+        alpha_err_2 = np.sqrt(
+            (self.njac - 1)
+            / self.njac
+            * np.sum((alpha_jk_2 - alpha_mean_2) ** 2)
+        )
+
+        xx = np.linspace(np.min(x_bin), np.max(x_bin), 200)
+        yy_1 = beta_full_1 + alpha_full_1 * xx
+        yy_2 = beta_full_2 + alpha_full_2 * xx
+
+        ax.errorbar(
+            x_bin,
+            y_bin_1,
+            yerr=yerr_bin,
+            c=self.color_e1,
+            fmt="o",
+            capsize=2,
+            elinewidth=1.2,
+            label=r"$\langle e_1 \rangle$",
+        )
+        formatted_alpha = (
+            f"{alpha_full_1:.3f}"
+            if abs(alpha_full_1) >= 1e-2
+            else self.latex_sci(alpha_full_1, precision=2)
+        )
+        ax.plot(
+            xx,
+            yy_1,
+            linewidth=2,
+            c=self.color_e1,
+            label=rf"$\alpha_1 = {formatted_alpha}\ ({(abs(alpha_mean_1)/alpha_err_1):.2f}\sigma)$",
+        )
+
+        ax.errorbar(
+            x_bin,
+            y_bin_2,
+            yerr=yerr_bin_2,
+            c=self.color_e2,
+            fmt="s",
+            capsize=2,
+            elinewidth=1.2,
+            label=r"$\langle e_2 \rangle$",
+        )
+        formatted_alpha = (
+            f"{alpha_full_2:.3f}"
+            if abs(alpha_full_2) >= 1e-2
+            else self.latex_sci(alpha_full_2, precision=2)
+        )
+        ax.plot(
+            xx,
+            yy_2,
+            linewidth=2,
+            c=self.color_e2,
+            label=rf"$\alpha_2 = {formatted_alpha}\ ({(abs(alpha_mean_2)/alpha_err_2):.2f}\sigma)$",
+        )
+
+        if x_log_scale:
+            if xlab == r"${\rm SNR}$":
+                self.set_log_ticks_with_labels(ax, ticks=(10, 20, 30, 50, 100))
+            elif xlab == r"$T_{\rm gal}/T_{\rm PSF}$":
+                self.set_log_ticks_with_labels(ax, ticks=(3, 5, 7, 10, 20, 30))
+            else:
+                ax.set_xscale("log")
+
+        ax.axhline(0, color="0.4", linestyle="--", linewidth=1, zorder=0)
+        ax.set_xlabel(xlab)
+        self.make_panel_legend(ax, showe1e2_leg)
+
