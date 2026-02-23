@@ -2105,7 +2105,7 @@ class PSFLeakagePanelMaker:
         *,
         e1_gal,
         e2_gal,
-        weights,
+        weights=None,
         NBIN=10,
         MIN_COUNT=20,
         CALIBRATE=False,
@@ -2118,8 +2118,10 @@ class PSFLeakagePanelMaker:
         # ---- store inputs / config (no logic change) ----
         self.e1_gal = np.asarray(e1_gal)
         self.e2_gal = np.asarray(e2_gal)
-        self.weights = np.asarray(weights)
-
+        if weights is not None:
+            self.weights = np.asarray(weights)
+        else:
+            self.weights = np.ones_like(self.e1_gal)
         self.NBIN = NBIN
         self.MIN_COUNT = MIN_COUNT
         self.CALIBRATE = CALIBRATE
@@ -2324,8 +2326,8 @@ class PSFLeakagePanelMaker:
         *,
         x_psf,
         xlab,
-        calib_for_e1,
-        calib_for_e2,
+        calib_for_e1=None,
+        calib_for_e2=None,
         x_log_scale=False,
         showe1e2_leg=False,
     ):
