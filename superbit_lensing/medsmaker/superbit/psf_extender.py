@@ -1,6 +1,9 @@
 import numpy as np
+import fitsio
 import piff
 import galsim
+from galsim.des import DES_PSFEx
+import superbit_lensing.utils as utils
 
 import ipdb
 
@@ -169,3 +172,82 @@ def _true_extender(psf, stamp_size, psf_pix_scale):
     psf_extended = TrueExtender(psf)
 
     return psf_extended
+
+class PSFWrapper(dict):
+    """
+    Helper wrapper that provides the PSFEx-style methods expected by MEDS.
+
+    Parameters
+    ----------
+    psf_file : str
+        Path to the PSFEx `.psf` file.
+    image_file : str
+        Path to the image file that provides the WCS.
+    npix : int
+        Size of the PSF cutout (npix x npix).
+    """
+
+    def __init__(self, psf_file: str, image_file: str | None = None, npix: int = 51):
+        super().__init__()
+
+        self.psf_file = psf_file
+
+        if image_file is not None:
+            self.wcs = self.galsim_wcs(image_file)
+        else:
+            self.wcs = utils.get_galsim_tanwcs()
+
+        self.npix = int(npix)
+
+        self.load()
+
+    def load(self) -> None:
+        hdr = fitsio.read_header(self.psf_file, ext=1)
+        self["filename"] = self.psf_file
+        self["poldeg"] = int(hdr["POLDEG1"])
+        self["masksize"] = np.array([hdr["PSFAXIS1"], hdr["PSFAXIS2"], hdr["PSFAXIS3"]], dtype=int)
+        self["contextoffset"] = np.array([hdr["POLZERO1"], hdr["POLZERO2"]], dtype=float)
+        self["contextscale"] = np.array([hdr["POLSCAL1"], hdr["POLSCAL2"]], dtype=float)
+        self["psf_samp"] = float(hdr["PSF_SAMP"])
+        self.psfex_model = DES_PSFEx(self.psf_file, wcs=self.wcs)
+
+    def get_rec(self, row, col):
+        """
+        Return a PSF image (npix x npix) at the requested detector location.
+
+        Notes
+        -----
+        `row, col` are assumed to be 0-indexed image coordinates. We add +1
+        when building the GalSim PositionD to match FITS/WCS convention.
+        """
+        row = float(row)
+        col = float(col)
+
+        img_pos = galsim.PositionD(col + 1.0, row + 1.0)
+        wcs_loc = self.wcs.local(img_pos)
+
+        psf_local = self.psfex_model.getPSF(img_pos)
+        psf_im = psf_local.drawImage(
+            nx=self.npix,
+            ny=self.npix,
+            wcs=wcs_loc,
+            method="no_pixel",
+        ).array
+        return psf_im
+
+    def get_center(self, row, col):
+        # MEDS expects the center of the returned cutout in (row, col) order.
+        cen = (self.npix - 1.0) / 2.0
+        return cen, cen
+
+    def get_rec_shape(self, row, col):
+        return (self.npix, self.npix)
+
+    @staticmethod
+    def galsim_wcs(image_file, image_ext=0):
+        hd = fitsio.read_header(image_file, ext=image_ext)
+        hd = {k.upper(): hd[k] for k in hd if k is not None}
+        wcs = galsim.FitsWCS(header=hd)
+        assert not isinstance(wcs, galsim.PixelScale)  # sanity check
+        return wcs
+    

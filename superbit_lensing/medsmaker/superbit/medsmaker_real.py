@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import astropy.units as u
 import superbit_lensing.utils as utils
 from superbit_lensing.match import SkyCoordMatcher
-from superbit_lensing.medsmaker.superbit.psf_extender import psf_extender
+from superbit_lensing.medsmaker.superbit.psf_extender import psf_extender, PSFWrapper
 import glob
 import pdb
 import copy
@@ -1006,10 +1006,11 @@ class BITMeasurement():
                 self.psf_models.append(piff_model)
 
             elif psf_mode == 'psfex':
-                psfex_model, psfex_model_file = self._make_psfex_model(
+                _, psfex_model_file = self._make_psfex_model(
                     image_cat, config_path=config_path,
                     star_config=star_config
                     )
+                psfex_model = PSFWrapper(psf_file=psfex_model_file, image_file=image_file)
                 self.psf_models.append(psfex_model)
                 self.psf_model_files.append(psfex_model_file)
 
