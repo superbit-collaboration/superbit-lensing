@@ -177,6 +177,9 @@ class PSFWrapper(dict):
     """
     Helper wrapper that provides the PSFEx-style methods expected by MEDS.
 
+    This implementation is inspired by the DES/DECADE/DELVE PSFWrapper:
+    https://github.com/delve-survey/mcal_sim_test/blob/main/psf_wrapper.py
+
     Parameters
     ----------
     psf_file : str
