@@ -42,6 +42,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 CLUSTERS_CSV = os.path.join(PROJECT_ROOT, 'data', 'SuperBIT_target_galactic_coords.csv')
 TARGET_LIST = os.path.join(PROJECT_ROOT, 'data', 'SuperBIT_target_list.csv')
 DESI_MASTER_FILE = "/projects/mccleary_group/superbit/desi_data/zall-pix-iron.fits"
+DEFAULT_EM_PARS = {"tol": 1.0e-7, "maxiter": 50000}
 desi_table = [
     'TARGETID', 'SURVEY', 'PROGRAM', 'OBJTYPE', 'SPECTYPE', 
     'TARGET_RA', 'TARGET_DEC', 'Z', 'ZERR', 'ZWARN', 'ZCAT_NSPEC', 'ZCAT_PRIMARY'
@@ -1839,7 +1840,7 @@ def add_admom_columns(catfilename, imagefilename=None, mode="ngmix", outfile=Non
 
     return Table(ss_fits[ext].data)
 
-def get_admoms(image: np.ndarray, scale: float, mode: str = "ngmix", reduced: bool = True) -> dict:
+def get_admoms(image: np.ndarray, scale: float, mode: str = "ngmix", seed: int = 124, reduced: bool = True) -> dict:
     """
     Measure adaptive moments (ADMOM) of an image using either ngmix or GalSim.
 
@@ -1863,8 +1864,10 @@ def get_admoms(image: np.ndarray, scale: float, mode: str = "ngmix", reduced: bo
             - "T": size measure (2 * sigma^2)
             - "flag": int (0 = success, nonzero = failure)
     """
+    rng = np.random.RandomState(seed)
+    
     # image center
-    cx, cy = image.shape[1] / 2, image.shape[0] / 2
+    cx, cy = (image.shape[1]-1) / 2, (image.shape[0]-1) / 2
     jac = ngmix.jacobian.DiagonalJacobian(scale=scale, row=cy, col=cx)
 
     # --- Normalize positive flux ---
@@ -1875,7 +1878,7 @@ def get_admoms(image: np.ndarray, scale: float, mode: str = "ngmix", reduced: bo
     # --- Moment measurement ---
     if mode == "ngmix":
         obs_im = ngmix.Observation(image=image / norm, jacobian=jac)
-        am = ngmix.admom.AdmomFitter()
+        am = ngmix.admom.AdmomFitter(rng=rng)
         res = am.go(obs_im, guess=0.5)
         e1, e2, T, flag = res["e1"], res["e2"], res["T"], res["flags"]
 
@@ -1896,7 +1899,7 @@ def get_admoms(image: np.ndarray, scale: float, mode: str = "ngmix", reduced: bo
 
     return {"e1": e1, "e2": e2, "T": T, "flags": flag}
 
-def get_admoms_ngmix_fit(obs: "ngmix.Observation", reduced: bool = True) -> dict:
+def get_admoms_ngmix_fit(obs: "ngmix.Observation", seed: int = 124, reduced: bool = True) -> dict:
     """
     Measure adaptive moments (ADMOM) of an image using ngmix and GalSim.
 
@@ -1916,6 +1919,7 @@ def get_admoms_ngmix_fit(obs: "ngmix.Observation", reduced: bool = True) -> dict
             - "T": size measure (2 * sigma^2)
             - "flag": int (0 = success, 1 = failure)
     """
+    rng = np.random.RandomState(seed)
     jac = obs._jacobian
     scale = jac.get_scale()
     image = obs.image
@@ -1927,7 +1931,7 @@ def get_admoms_ngmix_fit(obs: "ngmix.Observation", reduced: bool = True) -> dict
 
     # --- Measure moments with ngmix ---
     obs_norm = ngmix.Observation(image=image / norm, jacobian=jac)
-    am = ngmix.admom.AdmomFitter()
+    am = ngmix.admom.AdmomFitter(rng=rng)
     res = am.go(obs_norm, guess=0.5)
     e1, e2, T_ngmix = res["e1"], res["e2"], res["T"]
 
@@ -1945,6 +1949,31 @@ def get_admoms_ngmix_fit(obs: "ngmix.Observation", reduced: bool = True) -> dict
         e1, e2 = e1e2_to_g1g2(e1, e2)
 
     return {"e1": e1, "e2": e2, "T": T_galsim, "flags": flag}
+
+def get_admoms_of_best_fit_em5_image(image: np.ndarray, scale: float, reduced: bool = True, seed: int = 124, em_pars: dict = DEFAULT_EM_PARS) -> dict:
+    rng = np.random.RandomState(seed)
+    # image center
+    cx, cy = (image.shape[1]-1) / 2, (image.shape[0]-1) / 2
+    jac = ngmix.jacobian.DiagonalJacobian(scale=scale, row=cy, col=cx)
+    
+    # --- Normalize positive flux ---
+    norm = np.sum(image[image > 0])
+    if norm <= 0:
+        return {"e1": np.nan, "e2": np.nan, "T": np.nan, "flags": 1}
+    
+    obs_im = ngmix.Observation(image=image, jacobian=jac)
+    psf_guesser = ngmix.guessers.GMixPSFGuesser(rng=rng, ngauss=5)
+    em = ngmix.em.EMFitter(maxiter=em_pars["maxiter"], tol=em_pars["tol"])
+
+    res_em_model = em.go(obs=obs_im, guess=psf_guesser._get_guess(obs_im))
+    
+    if res_em_model["flags"] != 0:
+        return {"e1": np.nan, "e2": np.nan, "T": np.nan, "flags": 1}
+
+    em_model_image = res_em_model.make_image()
+
+    return get_admoms(image=em_model_image, scale=scale, seed=seed+1, reduced=reduced), em_model_image
+
 
 class RhoStats:
     def __init__(self, catalog, column_config, pixel_scale=0.1408,

@@ -1828,7 +1828,9 @@ def make_psfex_shape_maps(
             interpolation=interpolation,
             cmap=cmap,
         )
-
+        ax.set_xlim(0, image_xsize)
+        ax.set_ylim(0, image_ysize)
+        ax.set_facecolor("lightgray")
         ax.set_xlabel("X [pixels]")
         if ax is axes[0]:
             ax.set_ylabel("Y [pixels]")
@@ -2473,100 +2475,6 @@ class PSFLeakagePanelMaker:
         ax.set_xlabel(xlab)
         self.make_panel_legend(ax, showe1e2_leg)
 
-def em5_psfex_shape_maps(
-    psfex_file,
-    image_file = None,
-    image_xsize=9600,
-    image_ysize=6400,
-    step=200,
-    margin=0,
-    smooth=True,
-    scale=0.141,
-    mode="ngmix",
-    reduced=True,
-    show=True,
-    return_vals=False
-):
-    """
-    Sample PSFEx model across the detector on a coarse grid and plot e1, e2, T maps.
 
-    Returns
-    -------
-    (e1_map, e2_map, T_map, xx, yy)
-      where maps have shape (Ny, Nx) and xx,yy are the coordinate grids.
-    """
-    interpolation = "bicubic" if smooth else "nearest"
-
-    # ---- load PSFEx model ----
-    model = PSFWrapper(psf_file=psfex_file, image_file=image_file)
-    #model = psfex.PSFEx(psfex_file)
-
-    # ---- grid of sample points ----
-    x = np.arange(margin, image_xsize - margin, step)
-    y = np.arange(margin, image_ysize - margin, step)
-    xx, yy = np.meshgrid(x, y, indexing="xy")
-    Ny, Nx = xx.shape
-
-    e1_map = np.full((Ny, Nx), np.nan, dtype=float)
-    e2_map = np.full((Ny, Nx), np.nan, dtype=float)
-    T_map  = np.full((Ny, Nx), np.nan, dtype=float)
-
-    # ---- evaluate PSF + moments ----
-    for i in range(Ny):
-        for j in range(Nx):
-            y_im = int(yy[i, j])
-            x_im = int(xx[i, j])
-
-            try:
-                psf_im = model.get_rec(y_im, x_im)
-                #psf_im = psf_im/np.sum(psf_im)
-                res = get_admoms(psf_im, scale=scale, mode=mode, reduced=reduced)
-                e1_map[i, j] = res["e1"]
-                e2_map[i, j] = res["e2"]
-                T_map[i, j]  = res["T"]
-            except Exception:
-                # keep NaNs if anything fails
-                continue
-
-    # ---- colormaps (NaNs -> grey) ----
-    cmap_shape = cm.RdBu_r.copy()
-    cmap_shape.set_bad(color="lightgray")
-
-    cmap_T = cm.viridis.copy()
-    cmap_T.set_bad(color="lightgray")
-
-    # ---- plot ----
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5),sharey=True)
-
-    datas  = [e1_map, e2_map, T_map]
-    labels = ["$e_1$", "$e_2$", "$T$"]
-    cmaps  = [cmap_shape, cmap_shape, cmap_T]
-
-    for ax, data, label, cmap in zip(axes, datas, labels, cmaps):
-        im = ax.imshow(
-            data,
-            origin="lower",
-            extent=[margin, image_xsize - margin, margin, image_ysize - margin],
-            interpolation=interpolation,
-            cmap=cmap,
-        )
-
-        ax.set_xlabel("X [pixels]")
-        if ax is axes[0]:
-            ax.set_ylabel("Y [pixels]")
-        ax.set_title(f"PSF {label}")
-
-        # colorbar same height as image
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        cbar = plt.colorbar(im, cax=cax)
-        cbar.set_label(label)
-
-    plt.tight_layout()
-
-    if show:
-        plt.show()
-    if return_vals:
-        return e1_map, e2_map, T_map, xx, yy
 
 
