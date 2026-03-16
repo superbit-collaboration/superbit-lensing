@@ -40,3 +40,30 @@ python data_downloader.py {cluster_name} [--username USERNAME] [--data-dir DATA_
 - `cluster_name`: Name of the cluster (e.g., Abell3411)
 - `-username`: (Optional) Your username for hen.astro.utoronto.ca. If not provided, you will be prompted.
 - `-data-dir`: (Optional) Base directory for data. Default: /projects/mccleary_group/superbit/union
+
+
+## dust_utils.py 
+A utility function for applying milky way dust extinction corrections using the CSFD dust map
+
+
+### Run the script: 
+you can create a small running script 
+```
+from utility_scripts.dust_utils import deredden_catalog
+
+deredden_catalog(
+    catname='/path/to/input.fits',
+    outname='/path/to/output.fits',
+    ra_colname='ra',
+    dec_colname='dec',
+    cluster='Abell3411', # set to None to process all clusters
+)
+```
+
+### Notes: 
+The CSFD dust map data must be downloaded before use. A shared copy lives at `/projects/mccleary_group/amit.m/dust/dust/`. 
+By default, deredden_catalog points there automatically (dust_map=False). If you have your own copy downloaded, `pass dust_map=True`.
+
+Default band names are `['m_u', 'm_b', 'm_g']` and default wavelengths are `[3950, 4760, 5970]` Å.
+
+
