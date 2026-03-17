@@ -7,6 +7,20 @@ from dust_extinction.parameter_averages import G23
 import numpy as np
 import os
 
+def compute_colors(tab):
+
+    m_u_corr = np.array(tab['m_u_corr_csfd'], dtype=float)
+    m_b_corr = np.array(tab['m_b_corr_csfd'], dtype=float)
+    m_g_corr = np.array(tab['m_g_corr_csfd'], dtype=float)
+ 
+    tab['corr_color_ub'] = m_u_corr - m_b_corr
+    tab['corr_color_bg'] = m_b_corr - m_g_corr
+ 
+    print("  Computed corr_color_ub (U-B)")
+    print("  Computed corr_color_bg (B-G)")
+ 
+    return tab
+
 
 def deredden_catalog(
     catname,                # path to the input FITS catalog
@@ -84,6 +98,8 @@ def deredden_catalog(
         tab[key_name] = corr_band
         print(f"  Corrected {band_names[i]} -> {key_name}")
 
+    tab = compute_colors(tab)
+
     # Build output filename
     if outname is None:
         base, ext = os.path.splitext(catname)
@@ -94,3 +110,11 @@ def deredden_catalog(
     tab.write(outname, format='fits', overwrite=True)
 
     print("Done!")
+
+
+    
+
+
+    
+
+
