@@ -153,8 +153,27 @@ class make_coadds_for_dualmode():
             current_file_path.parent.parent.parent / "data" / "masks" / "mask_dark_55percent_300.npy"
         )
         self.bands = ["b", "g", "u"]
-        self.image_files = {band: self.set_image_files(band) for band in self.bands}
-        self.sex_wgt_files = {band: self.set_weight_files(self.image_files[band]) for band in self.bands}
+        self.image_files = {}
+        self.sex_wgt_files = {}
+        self.science_endings = {}
+        for band in self.bands:
+            image_files, ending = self.set_image_files(band)
+            sex_wgt_files = self.set_weight_files(image_files)
+            self.image_files[band] = image_files
+            self.sex_wgt_files[band] = sex_wgt_files
+            self.science_endings[band] = ending
+        
+        unique_endings = set(self.science_endings.values())
+
+        if len(unique_endings) > 1:
+            raise ValueError(
+                f"Inconsistent science file endings across bands: {unique_endings}. "
+                f"Details per band: {self.science_endings}"
+            )
+
+        # Safe: exactly one unique ending
+        self.science_ending = unique_endings.pop()
+        
         self.base_path = os.path.join(self.data_dir, self.cluster_name)
         self.dual_mode_dir = f"{self.base_path}/sextractor_dualmode"
         self.base_coadd_dir = f"{self.dual_mode_dir}/coadd"
@@ -213,13 +232,24 @@ class make_coadds_for_dualmode():
 
     def set_image_files(self, band):
         # Load in the science frames
-        endings = ["cal", "clean"]
+        endings = ["cal", "clean", "sim"]
         science = []
+        found_endings = []
 
         for ending in endings:
-            search_path = os.path.join(self.data_dir, self.cluster_name, band, 'cal', f'*{ending}.fits')
-            science.extend(glob(search_path))
-        return science
+            exp_dir = os.path.join(self.data_dir, self.cluster_name, band, 'cal')
+            search_path = os.path.join(exp_dir, f'*{ending}.fits')
+            files = glob(search_path)
+            if files:  # if matches found
+                found_endings.append(ending)
+                science.extend(files)
+
+        if len(found_endings) == 0:
+            raise FileNotFoundError(f"No science files found with endings {endings} in {exp_dir}")
+        elif len(found_endings) > 1:
+            raise ValueError(f"Multiple endings found: {found_endings}. Only one ending type is allowed.")
+        science_ending = found_endings[0]
+        return science, science_ending
 
     def set_weight_files(self, image_files):
         '''

@@ -611,7 +611,7 @@ class BITMeasurement():
         print(f'saved catalog with {len(Table.read(cat_file, hdu=2))} objects to {cat_file} \n')
         if admoms:
             print(f"adding admoms columns to {cat_file}")
-            cat = utils.add_admom_columns(cat_file, mode="galsim")
+            cat = utils.add_admom_columns(cat_file, mode="ngmix")
         return cat_file
 
     def make_sextractor_weight(self):

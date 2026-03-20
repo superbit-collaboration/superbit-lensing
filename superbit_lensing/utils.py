@@ -1991,8 +1991,8 @@ class RhoStats:
         e2_model = catalog[column_config['e2_model']]
 
         # converting to g1, g2
-        e1_obs, e2_obs = e1e2_to_g1g2(e1_obs, e2_obs)
-        e1_model, e2_model = e1e2_to_g1g2(e1_model, e2_model)
+        #e1_obs, e2_obs = e1e2_to_g1g2(e1_obs, e2_obs)
+        #e1_model, e2_model = e1e2_to_g1g2(e1_model, e2_model)
 
         # Size (trace of second-moment matrix, or whatever T is in your pipeline)
         T_obs = catalog[column_config['T_obs']]

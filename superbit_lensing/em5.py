@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import galsim
-from astropy.table import Table
+from astropy.table import Table, vstack
 
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -119,7 +119,9 @@ class EM5PsfexMaps:
         # flatten coordinates
         tab["x"] = self.xx.ravel()
         tab["y"] = self.yy.ravel()
-        tab["r"] = np.sqrt((tab["x"]-4800)**2 + (tab["y"]-3200)**2)
+        xc = 0.5 * self.image_xsize
+        yc = 0.5 * self.image_ysize
+        tab["r"] = np.sqrt((tab["x"] - xc)**2 + (tab["y"] - yc)**2)
         iy, ix = np.indices(self.e1.shape)
         tab["ix"] = ix.ravel()
         tab["iy"] = iy.ravel()
@@ -151,13 +153,13 @@ def compute_residuals(m: EM5PsfexMaps):
     rT = m.T  - m.T_em
     return r1, r2, rT
 
-def format_colorbar(im, ax, vmin, vmax):
+def format_colorbar(im, ax, vmin, vmax, ndecimals=2):
     """Helper function for colorbars"""
     import matplotlib.pyplot as plt
-    cbar = plt.colorbar(im, ax=ax, shrink=0.8)
+    cbar = plt.colorbar(im, ax=ax, shrink=0.815)
     ticks = np.linspace(vmin, vmax, 5)
     cbar.set_ticks(ticks)
-    cbar.set_ticklabels([f"{vmin:.2f}", "", f"{((vmin+vmax)/2):.2f}", "", f"{vmax:.2f}"])
+    cbar.set_ticklabels([f"{vmin:.{ndecimals}f}", "", f"{((vmin+vmax)/2):.{ndecimals}f}", "", f"{vmax:.{ndecimals}f}"])
     return cbar
 
 def compute_em5_psfex_maps(
@@ -226,7 +228,7 @@ def compute_em5_psfex_maps(
         scale=scale, mode=mode, reduced=reduced,
     )
 
-def plot_em5_psfex_maps(m, show=True):
+def plot_em5_psfex_maps(m, show=True, SHOW_MODEL_ROW=True, SHOW_OBSERV_ROW=True):
     """
     Plot observed/model/residual PSF moment maps from an EM5PsfexMaps result.
 
@@ -250,9 +252,8 @@ def plot_em5_psfex_maps(m, show=True):
     cmap_T.set_bad(color="lightgray")
 
     # ---- plot ----
-    SHOW_MODEL_ROW = True
-    nrows = 3 if SHOW_MODEL_ROW else 2
-    fig_width = 15
+    nrows = int(SHOW_OBSERV_ROW) + int(SHOW_MODEL_ROW) + 1
+    fig_width = 17
     cell_aspect = m.Ny / m.Nx
     fig_height = fig_width * (nrows / 3) * cell_aspect
 
@@ -260,9 +261,9 @@ def plot_em5_psfex_maps(m, show=True):
     axes = np.array(axes).reshape(nrows, 3)
 
     COLOR_LIMITS = {
-        "e_lim": 0.08,       # for e1 and e2
-        "e_res_lim": 0.01,   # for e1 and e2 residuals
-        "T_res_lim": 0.01,   # for T residuals
+        "e_lim": 0.06,
+        "e_res_lim": 0.015,
+        "T_res_lim": 0.005,
     }
     e_lim = COLOR_LIMITS["e_lim"]
     e_res_lim = COLOR_LIMITS["e_res_lim"]
@@ -271,92 +272,95 @@ def plot_em5_psfex_maps(m, show=True):
     # Residuals (derived; not stored)
     residual_1_map, residual_2_map, residual_T_map = compute_residuals(m)
 
-    interpolation = 'nearest'
+    interpolation = 'bicubic'
     extent = m.extent
 
+    current_row = 0
+
     # Observed row
-    im1 = axes[0, 0].imshow(
-        m.e1, origin="lower", cmap="RdBu_r",
-        vmin=-e_lim, vmax=e_lim, aspect="equal", interpolation=interpolation,
-        extent=extent,
-    )
-    axes[0, 0].set_aspect("equal")
-    format_colorbar(im1, axes[0, 0], -e_lim, e_lim)
+    if SHOW_OBSERV_ROW:
+        im1 = axes[current_row, 0].imshow(
+            m.e1, origin="lower", cmap="RdBu_r",
+            vmin=-e_lim, vmax=e_lim, aspect="equal", interpolation=interpolation,
+            extent=extent,
+        )
+        axes[current_row, 0].set_aspect("equal")
+        format_colorbar(im1, axes[current_row, 0], -e_lim, e_lim)
 
-    im2 = axes[0, 1].imshow(
-        m.e2, origin="lower", cmap="RdBu_r",
-        vmin=-e_lim, vmax=e_lim, aspect="equal", interpolation=interpolation,
-        extent=extent,
-    )
-    axes[0, 1].set_aspect("equal")
-    format_colorbar(im2, axes[0, 1], -e_lim, e_lim)
+        im2 = axes[current_row, 1].imshow(
+            m.e2, origin="lower", cmap="RdBu_r",
+            vmin=-e_lim, vmax=e_lim, aspect="equal", interpolation=interpolation,
+            extent=extent,
+        )
+        axes[current_row, 1].set_aspect("equal")
+        format_colorbar(im2, axes[current_row, 1], -e_lim, e_lim)
 
-    im3 = axes[0, 2].imshow(
-        m.T, origin="lower", cmap="viridis",
-        aspect="equal", interpolation=interpolation,
-        extent=extent,
-    )
-    axes[0, 2].set_aspect("equal")
-    format_colorbar(im3, axes[0, 2], np.nanmin(m.T), np.nanmax(m.T))
+        im3 = axes[current_row, 2].imshow(
+            m.T, origin="lower", cmap="viridis",
+            aspect="equal", interpolation=interpolation,
+            extent=extent,
+        )
+        axes[current_row, 2].set_aspect("equal")
+        format_colorbar(im3, axes[current_row, 2], np.nanmin(m.T), np.nanmax(m.T))
 
-    # Model row (if enabled)
+        current_row += 1
+
+    # Model row
     if SHOW_MODEL_ROW:
-        im4 = axes[1, 0].imshow(
+        im4 = axes[current_row, 0].imshow(
             m.e1_em, origin="lower", cmap="RdBu_r",
             vmin=-e_lim, vmax=e_lim, aspect="equal", interpolation=interpolation,
             extent=extent,
         )
-        axes[1, 0].set_aspect("equal")
-        format_colorbar(im4, axes[1, 0], -e_lim, e_lim)
+        axes[current_row, 0].set_aspect("equal")
+        format_colorbar(im4, axes[current_row, 0], -e_lim, e_lim)
 
-        im5 = axes[1, 1].imshow(
+        im5 = axes[current_row, 1].imshow(
             m.e2_em, origin="lower", cmap="RdBu_r",
             vmin=-e_lim, vmax=e_lim, aspect="equal", interpolation=interpolation,
             extent=extent,
         )
-        axes[1, 1].set_aspect("equal")
-        format_colorbar(im5, axes[1, 1], -e_lim, e_lim)
+        axes[current_row, 1].set_aspect("equal")
+        format_colorbar(im5, axes[current_row, 1], -e_lim, e_lim)
 
-        im6 = axes[1, 2].imshow(
+        im6 = axes[current_row, 2].imshow(
             m.T_em, origin="lower", cmap="viridis",
             aspect="equal", interpolation=interpolation,
             extent=extent,
         )
-        axes[1, 2].set_aspect("equal")
-        format_colorbar(im6, axes[1, 2], np.nanmin(m.T_em), np.nanmax(m.T_em))
+        axes[current_row, 2].set_aspect("equal")
+        format_colorbar(im6, axes[current_row, 2], np.nanmin(m.T_em), np.nanmax(m.T_em))
+
+        current_row += 1
 
     # Residual row
-    row_idx = 2 if SHOW_MODEL_ROW else 1
-
-    im7 = axes[row_idx, 0].imshow(
+    im7 = axes[current_row, 0].imshow(
         residual_1_map, origin="lower", cmap="RdBu_r",
         vmin=-e_res_lim, vmax=e_res_lim, aspect="equal", interpolation=interpolation,
         extent=extent,
     )
-    axes[row_idx, 0].set_aspect("equal")
-    format_colorbar(im7, axes[row_idx, 0], -e_res_lim, e_res_lim)
+    axes[current_row, 0].set_aspect("equal")
+    format_colorbar(im7, axes[current_row, 0], -e_res_lim, e_res_lim, ndecimals=3)
 
-    im8 = axes[row_idx, 1].imshow(
+    im8 = axes[current_row, 1].imshow(
         residual_2_map, origin="lower", cmap="RdBu_r",
         vmin=-e_res_lim, vmax=e_res_lim, aspect="equal", interpolation=interpolation,
         extent=extent,
     )
-    axes[row_idx, 1].set_aspect("equal")
-    format_colorbar(im8, axes[row_idx, 1], -e_res_lim, e_res_lim)
+    axes[current_row, 1].set_aspect("equal")
+    format_colorbar(im8, axes[current_row, 1], -e_res_lim, e_res_lim, ndecimals=3)
 
-    im9 = axes[row_idx, 2].imshow(
+    im9 = axes[current_row, 2].imshow(
         residual_T_map, origin="lower", cmap="RdBu_r",
         vmin=-T_res_lim, vmax=T_res_lim, aspect="equal", interpolation=interpolation,
         extent=extent,
     )
-    axes[row_idx, 2].set_aspect("equal")
-    format_colorbar(im9, axes[row_idx, 2], -T_res_lim, T_res_lim)
+    axes[current_row, 2].set_aspect("equal")
+    format_colorbar(im9, axes[current_row, 2], -T_res_lim, T_res_lim, ndecimals=3)
+    
 
-    # Axis labels
-    nx_ticks = 5
-    ny_ticks = 5
-    xt = np.linspace(m.x.min(), m.x.max(), nx_ticks)
-    yt = np.linspace(m.y.min(), m.y.max(), ny_ticks)
+    xt = np.array([2000, 4000, 6000, 8000])  # override for nice round numbers
+    yt = np.array([2000, 4000, 6000])  # override for nice round numbers    
 
     for i in range(nrows):
         for j in range(3):
@@ -381,17 +385,23 @@ def plot_em5_psfex_maps(m, show=True):
                 ax.set_yticks([])
 
     # Column titles
-    col_titles = [r"$e_1$", r"$e_2$", r"$T$"]
+    if SHOW_MODEL_ROW or SHOW_OBSERV_ROW:
+        col_titles = [r"$e_1$", r"$e_2$", r"$T$"]
+    else:
+        col_titles = [r"$\delta e_1$", r"$\delta e_2$", r"$\delta T$"]
     for j, title in enumerate(col_titles):
         axes[0, j].set_title(title, pad=10)
 
     # Row labels
-    if SHOW_MODEL_ROW:
-        row_labels = ["Observed", "Model", "Residual"]
+    if SHOW_MODEL_ROW and SHOW_OBSERV_ROW:
+        row_labels = ["Observed (PSFEx)", "NGMix Model (EM5)", "Residual"]
         y_positions = [0.83, 0.50, 0.17]
-    else:
+    elif SHOW_OBSERV_ROW and not SHOW_MODEL_ROW:
         row_labels = ["Observed", "Residual"]
         y_positions = [0.765, 0.28]
+    else:
+        row_labels = [""]
+        y_positions = [0.55]
 
     for label, ypos in zip(row_labels, y_positions):
         fig.text(
@@ -400,10 +410,9 @@ def plot_em5_psfex_maps(m, show=True):
             fontsize=16, transform=fig.transFigure,
             clip_on=False,
         )
-
+    
     if show:
         plt.show()
-
     return fig, axes
 
 def assert_compatible_maps(maps_list):
@@ -489,8 +498,24 @@ class EM5PsfexMapCollection:
 
     def plot_mean(self, show=True):
         m_avg = self.mean()
-        return plot_em5_psfex_maps(m_avg, show=show)
+        return plot_em5_psfex_maps(m_avg, show=show, SHOW_MODEL_ROW=True, SHOW_OBSERV_ROW=True)
     
+    def to_table(self, add_map_id=True) -> Table:
+        tabs = []
+
+        for i, m in enumerate(self.maps_list):
+            tab = m.to_table()
+
+            if add_map_id:
+                tab["map_id"] = i
+
+            tabs.append(tab)
+
+        if len(tabs) == 0:
+            return Table()
+
+        return vstack(tabs, metadata_conflicts="silent")    
+
 
 
 

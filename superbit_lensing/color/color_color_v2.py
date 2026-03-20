@@ -22,9 +22,9 @@ desi_table_primary = ['TARGET_RA', 'TARGET_DEC', 'ZCAT_PRIMARY', 'OBJTYPE', 'ZWA
 ned_table = ['RA', 'DEC', 'Redshift']
 DESI_MASTER_FILE = "/projects/mccleary_group/superbit/desi_data/zall-pix-iron.fits"
 
-MAG_ZP_b = 28.66794
-MAG_ZP_g = 27.490537
-MAG_ZP_u = 26.48623
+MAG_ZP_b = 29.146
+MAG_ZP_g = 29.391
+MAG_ZP_u = 27.148
 
 def main(args):
     print("=== Arguments Passed to the Script ===")
@@ -60,12 +60,13 @@ def main(args):
     # Check for starcat_union first, else fall back to starcat
     if os.path.exists(file_b_stars_union):
         file_b_stars = file_b_stars_union
-    elif os.path.exists(file_b_stars_fallback):
-        file_b_stars = file_b_stars_fallback
-        print(f"Warning: Using fallback star catalog for band b: {file_b_stars}")
     else:
-        file_b_stars = file_b_stars_fallback_2nd
-        print(f"Warning: Using Gaia fallback star catalog for band b: {file_b_stars}")
+        if os.path.exists(file_b_stars_fallback):
+            file_b_stars = file_b_stars_fallback
+            print(f"Warning: Using fallback star catalog for band b: {file_b_stars}")
+        else:
+            file_b_stars = file_b_stars_fallback_2nd
+            print(f"Warning: Using Gaia fallback star catalog for band b: {file_b_stars}")
     
     try:
         star_data_b = gaia_query(cluster_name)
@@ -91,17 +92,35 @@ def main(args):
     size_mag_file = f"{plot_dir}/{cluster_name}_b_size_mag.png"
     output_fits = f"{output_dir}/{cluster_name}_colors_mags.fits"
     output_star_fits = f"{output_dir}/{cluster_name}_colors_mags_stars.fits"
-    os.makedirs(plot_dir, exist_ok=True)
-    os.makedirs(output_dir, exist_ok=True)
     diag_path = os.path.join(dual_mode_path, "diags")
     dual_cat_path = os.path.join(dual_mode_path, "cat")
-    os.makedirs(diag_path, exist_ok=True)
-    os.makedirs(dual_cat_path, exist_ok=True)
+    for d in [plot_dir, output_dir, diag_path, dual_cat_path]:
+        os.makedirs(d, exist_ok=True)
     
     swarp = sex.make_coadds_for_dualmode(datadir, cluster_name, config_dir=config_dir, overwrite_coadds=args.overwrite_coadds, projection=projection)
     coadd_files = swarp.coadd_file_names
     file_b, file_g, file_u = coadd_files['b'], coadd_files['g'], coadd_files['u']
 
+    if swarp.science_ending == "sim":
+        truth_file = os.path.join(datadir, cluster_name, "b", "cal", f"{cluster_name}_truth_b.fits")
+        if not os.path.exists(truth_file):
+            print(f"Warning: Truth file not found for simulated data: {truth_file}")
+            pass
+        else:
+            truth_data = Table.read(truth_file, format='fits', hdu=1)
+            star_data_b = truth_data[truth_data['obj_class'] == "star"]
+            gal_data_b = truth_data[truth_data['obj_class'] == "gal"]
+            star_data_b.rename_columns(['ra', 'dec'], ['ALPHAWIN_J2000', 'DELTAWIN_J2000'])
+            gal_data_b.rename_columns(['ra', 'dec', "redshift"], ['TARGET_RA', 'TARGET_DEC', 'Z'])
+            gal_data_b.add_column(np.zeros(len(gal_data_b)), name="ZERR")
+
+            for col in desi_table:
+                if col not in gal_data_b.colnames:
+                    if col in ['TARGETID', 'ZWARN', 'ZCAT_NSPEC', 'ZCAT_PRIMARY']:
+                        gal_data_b[col] = np.zeros(len(gal_data_b), dtype=int)
+                    else:
+                        gal_data_b[col] = np.full(len(gal_data_b), '', dtype=str)
+                        
     # Ensure input files exist
     if not os.path.exists(file_b) or not os.path.exists(file_g) or not os.path.exists(file_u):
         raise FileNotFoundError(f"One or more input files not found:\n{file_b}\n{file_g}\n{file_u}")    
@@ -177,6 +196,8 @@ def main(args):
         
         for attempt in range(max_attempts):
             try:
+                if swarp.science_ending == 'sim':
+                    raise ValueError("Simulated data does not have real NED matches, skipping NED query.")
                 print(f"Attempting NED query (attempt {attempt+1}/{max_attempts}) with radius={current_radius:.4f} deg...")
                 ned_cat = utils.ned_query(rad_deg=current_radius, ra_center=center_ra_b, dec_center=center_dec_b)
                 print(f"Successfully queried NED with {len(ned_cat)} results at radius {current_radius:.4f} deg")
@@ -231,6 +252,9 @@ def main(args):
     except Exception as e:
         print(f"Failed to read desi file ({e}), creating an empty catalog.")
         desi = Table(names=desi_table, dtype=['f8'] * len(desi_table))
+
+    if swarp.science_ending == 'sim':
+        desi = gal_data_b
 
     print("Star matching and object discarding is starting...")
     try:
@@ -352,7 +376,10 @@ def main(args):
         if not np.isnan(redshifts_desi[i]):
             z_best[i] = redshifts_desi[i]
             z_best_err[i] = redshift_err_desi[i]
-            z_source[i] = 'DESI'
+            if swarp.science_ending == 'sim':
+                z_source[i] = 'TRUTH'
+            else:
+                z_source[i] = 'DESI'
         elif not np.isnan(redshifts_ned[i]):
             z_best[i] = redshifts_ned[i]
             z_best_err[i] = -1

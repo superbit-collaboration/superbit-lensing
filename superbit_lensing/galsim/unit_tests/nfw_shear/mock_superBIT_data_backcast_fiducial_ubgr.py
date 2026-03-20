@@ -209,39 +209,40 @@ def make_obj(i, obj_type, *args, **kwargs):
     try:
         obj_index = int(i)
         logprint(f'Starting {obj_type} {i}')
-        stamp, truth = func(*args, **kwargs, obj_index=i)
+        stamps, truth = func(*args, **kwargs, obj_index=i)
         logprint(f'{obj_type} {i} completed succesfully')
     except galsim.errors.GalSimError:
         logprint(f'{obj_type} {i} has failed, skipping...')
         return i, None, None
 
-    return i, stamp, truth
+    return i, stamps, truth
 
-def combine_objs(make_obj_outputs, full_image, truth_catalog, exp_num):
+def combine_objs(make_obj_outputs, full_images, truth_catalog, exp_num):
     '''
     (i, stamps, truths) are the output of make_obj
     exp_num is the exposure number. Only add to truth table if == 1
     '''
-
+    bands = ["u","g","r","b"]
     # flatten outputs into 1 list
     make_obj_outputs = [item for sublist in make_obj_outputs
                         for item in sublist]
 
-    for i, stamp, truth in make_obj_outputs:
+    for i, stamps, truth in make_obj_outputs:
 
-        if (stamp is None) or (truth is None):
+        if (stamps is None) or (truth is None):
             continue
 
         # Find the overlapping bounds:
-        bounds = stamp.bounds & full_image.bounds
+        bounds = stamps['b'].bounds & full_images['b'].bounds
 
         # Finally, add the stamp to the full image.
         try:
-            full_image[bounds] += stamp[bounds]
+            for band in bands:
+                full_images[band][bounds] += stamps[band][bounds]
         except galsim.errors.GalSimBoundsError as e:
             print(e)
 
-        this_flux = np.sum(stamp.array)
+        this_flux = np.sum(stamps['b'].array)
 
         if exp_num == 1:
             row = [i, truth.cosmos_index, truth.x, truth.y,
@@ -255,7 +256,7 @@ def combine_objs(make_obj_outputs, full_image, truth_catalog, exp_num):
                    ]
             truth_catalog.addRow(row)
 
-    return full_image, truth_catalog
+    return full_images, truth_catalog
 
 def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, gal_image_pos=None, obj_index=None):
     """
@@ -288,7 +289,12 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, gal
     ## Note units of sbparams.gain is assumed to be be e-/ADU.
     index = int(np.floor(ud()*len(cosmos_cat)))
     gal_z = cosmos_cat[index]['ZPDF']
-    gal_flux = cosmos_cat[index][sbparams.bandpass] * sbparams.exp_time / sbparams.gain
+    bands = ["u", "g", "r", "b"]
+
+    gal_flux = {
+        band: cosmos_cat[index][f"crates_{band}"] * sbparams.exp_time / sbparams.gain
+        for band in bands
+    }
     phi = cosmos_cat[index]['c10_sersic_fit_phi'] * galsim.radians
     q = cosmos_cat[index]['c10_sersic_fit_q']
     g1_cosmos = cosmos_cat[index]['c10_gaussian_g1']
@@ -332,27 +338,34 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, gal
     # ====================================================================
 
     # gal = galsim.Exponential(flux=gal_flux, half_light_radius=half_light_radius)
-    gal = galsim.Sersic(n = n,
-                        flux = gal_flux,
-                        half_light_radius = half_light_radius)
-    # gal  = galsim.Gaussian(sigma=sigma, flux=gal_flux)
+    # Base galaxy (unit flux)
 
-    gal = gal.shear(q = q, beta = phi)
-    logprint.debug('created galaxy')
+    bands = ["u","g","r","b"]
+    stamps = {}
 
-    ## Apply a random rotation
+    gal = galsim.Sersic(
+        n=n,
+        flux=1.0,
+        half_light_radius=half_light_radius
+    )
+
+    gal = gal.shear(q=q, beta=phi)
+
     theta = ud()*2.0*np.pi*galsim.radians
     gal = gal.rotate(theta)
 
-    ## Apply a random rotation
     theta = ud()*2.0*np.pi*galsim.radians
     gal = gal.rotate(theta)
 
-    ## Get the reduced shears and magnification at this point
+    # Apply lensing
     try:
-        nfw_shear, mu, kappa = nfw_lensing(nfw, uv_pos, gal_z)
-        g1=nfw_shear.g1; g2=nfw_shear.g2
-        gal = gal.lens(g1, g2, mu)
+        logprint("Doing nothing ")
+        # nfw_shear, mu, kappa = nfw_lensing(nfw, uv_pos, gal_z)
+        # g1=nfw_shear.g1; g2=nfw_shear.g2
+        # gal = gal.lens(g1, g2, mu)
+        g1 = 0.0; g2 = 0.0
+        mu = 1.0
+        kappa = 0.0
     except galsim.errors.GalSimError:
         logprint(f'could not lens galaxy at z = {gal_z}, setting default values...')
         g1 = 0.0; g2 = 0.0
@@ -360,16 +373,25 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, gal
         kappa = 0.0
 
     this_psf = psf.getPSF(image_pos)
-    logprint.debug("obtained PSF at image position")
 
-    gsp=galsim.GSParams(maximum_fft_size=32768)
-    final = galsim.Convolve([this_psf, gal],gsparams=gsp)
+    gsp = galsim.GSParams(maximum_fft_size=32768)
+
+    for band in bands:
+
+        gal_band = gal.withFlux(gal_flux[band])
+
+        final = galsim.Convolve([this_psf, gal_band], gsparams=gsp)
+
+        stamp = final.drawImage(wcs=wcs.local(image_pos))
+        stamp.setCenter(image_pos.x, image_pos.y)
+
+        stamps[band] = stamp
+    
     logprint.debug("Convolved galaxy and PSF at image position")
 
     logprint.debug('Convolved star and PSF at galaxy position')
 
-    stamp = final.drawImage(wcs=wcs.local(image_pos))
-    stamp.setCenter(image_pos.x,image_pos.y)
+
     logprint.debug('drew & centered galaxy!')
     galaxy_truth=truth()
     galaxy_truth.cosmos_index = cosmos_cat[index]['NUMBER']
@@ -395,7 +417,7 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, gal
     calculate_admoms_with_timeout(gal, wcs, image_pos, galaxy_truth, sbparams, timeout_seconds=10)
 
     logprint.debug('stamp made, moving to next galaxy')
-    return stamp, galaxy_truth
+    return stamps, galaxy_truth
 
 def make_cluster_galaxy(ud, wcs, affine, centerpix, cluster_cat, psf, sbparams, logprint, obj_index=None):
     """
@@ -523,18 +545,23 @@ def make_a_star(ud, pud, k, wcs, affine, psf, sbparams, logprint, star_image_pos
             star_flux *= 0.8271672
         else:
             raise NotImplementedError('Star power law only implemented for crates_b!')
-
     # Generate PSF at location of star, convolve with optical model to make a star
-    star_flux = 44984.64
+    # star_flux = 44984.64
     deltastar = galsim.DeltaFunction(flux=star_flux)
     this_psf = psf.getPSF(image_pos)
     logprint.debug("obtained PSF at image position")
 
     gsp=galsim.GSParams(maximum_fft_size=32768)
+    
     star = galsim.Convolve([this_psf, deltastar],gsparams=gsp)
 
     star_stamp = star.drawImage(wcs=wcs.local(image_pos)) # before it was scale = 0.206, and that was bad!
     star_stamp.setCenter(image_pos.x, image_pos.y)
+    
+    bands = ["u","g","r","b"]
+    star_stamps = {}
+    for band in bands:
+        star_stamps[band] = star_stamp
 
     star_truth = truth()
     star_truth.ra = ra.deg; star_truth.dec = dec.deg
@@ -559,7 +586,7 @@ def make_a_star(ud, pud, k, wcs, affine, psf, sbparams, logprint, star_image_pos
         logprint.debug('sigma calculation failed')
         star_truth.mom_size=-9999.
 
-    return star_stamp, star_truth
+    return star_stamps, star_truth
 
 class SuperBITParameters:
     __req_params = ['run_name', 'outdir']
@@ -1138,6 +1165,12 @@ def main(args):
     size_wg = (cosmos_cat['FLUX_RADIUS'] > 0) & (cosmos_cat['c10_sersic_fit_hlr'] < 50)
     cosmos_cat = cosmos_cat[size_wg]
 
+    previous_truth = Table.read("/n23data1/saha/simulated_data/rbg_run/sim1_truth_b.fits")
+    # exclude galaxies that were in the previous truth catalog
+    cosmos_idx = previous_truth['cosmos_index']
+    cosmos_cat = cosmos_cat[~np.isin(cosmos_cat['NUMBER'], cosmos_idx)]
+    logprint(f'After excluding galaxies in previous truth catalog, {len(cosmos_cat)} galaxies remain')
+
     try:
         cluster_cat = galsim.COSMOSCatalog(sbparams.cluster_cat_name,
                                            dir=sbparams.cosmosdir)
@@ -1235,19 +1268,25 @@ def main(args):
 
     # Get current band for directory structure
     band = sbparams.bandpass.replace("crates_", "")
+    bands = ["u","g","r","b"]
+    
+    output_dirs = {}
+    
     
     # Determine output directory based on whether we're using directory structure
     if sbparams.use_dir_structure:
         # Use the band/cal directory in the hierarchical structure
         output_dir = os.path.join(sbparams.run_outdir, band, "cal")
-        
-        # Also prepare the out directory path for logging when using data_dir
-        out_dir = os.path.join(sbparams.run_outdir, band, "out")
+        for band in bands:
+            output_dirs[band] = os.path.join(sbparams.run_outdir, band, "cal")
+            if not os.path.exists(output_dirs[band]):
+                os.makedirs(output_dirs[band])
+                logprint(f'Created directory: {output_dirs[band]}')
+            # Also prepare the out directory path for logging when using data_dir
+        out_dir = os.path.join(sbparams.run_outdir, 'b', "out")
         
         # Ensure the cal directory exists (should already be created, but just in case)
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-            logprint(f'Created directory: {output_dir}')
+
             
         # Ensure the out directory exists
         if not os.path.exists(out_dir):
@@ -1321,19 +1360,33 @@ def main(args):
             M.barrier()
 
         outnum = str(i).zfill(3)
-        outname = f'{run_name}_{outnum}_{band}_sim.fits'
-        file_name = os.path.join(output_dir, outname)
+        bands = ["u","g","r","b"]
+        file_names = {}
+
+        for band in bands:
+            outname = f'{run_name}_{outnum}_{band}_sim.fits'
+            file_name = os.path.join(output_dirs[band], outname)
+            file_names[band] = file_name
 
         # Set up the image:
-        full_image = galsim.ImageF(sbparams.image_xsize, sbparams.image_ysize)
-        sky_level = sbparams.exp_time * sbparams.sky_bkg / sbparams.gain
-        full_image.fill(sky_level)
+        sky_levels = {
+            "u": sbparams.exp_time * 0.009 / sbparams.gain,
+            "g": sbparams.exp_time * 0.134 / sbparams.gain,
+            "r": sbparams.exp_time * 0.134 / sbparams.gain,
+            "b": sbparams.exp_time * 0.08  / sbparams.gain,
+        }
 
-        ## Define X & Y dither offsets
+        full_images = {}
+
         dither_offsets = rng.integers(-100, 100, size=2)
         logprint(f'dithers are {dither_offsets}')
-        full_image.setOrigin(dither_offsets[0], dither_offsets[1])
-        full_image.wcs = wcs
+
+        for band, sky in sky_levels.items():
+            img = galsim.ImageF(sbparams.image_xsize, sbparams.image_ysize)
+            img.fill(sky)
+            img.setOrigin(dither_offsets[0], dither_offsets[1])
+            img.wcs = wcs
+            full_images[band] = img
 
         psf_idx = min(i-1, len(all_psf_files) - 1)
         psf_file = all_psf_files[psf_idx]
@@ -1360,7 +1413,7 @@ def main(args):
                 # Create batches
                 batch_indices = utils.setup_batches(sbparams.nobj, ncores)
 
-                full_image, truth_catalog = combine_objs(
+                full_images, truth_catalog = combine_objs(
                     pool.starmap(
                         make_obj_runner,
                         ([
@@ -1376,7 +1429,7 @@ def main(args):
                           logprint
                           ] for k in range(ncores))
                         ),
-                    full_image,
+                    full_images,
                     truth_catalog,
                     i
                     )
@@ -1395,7 +1448,7 @@ def main(args):
 
                 try:
                     # make single galaxy object
-                    stamp, truth = make_a_galaxy(ud=ud,
+                    stamps, truth = make_a_galaxy(ud=ud,
                                                 wcs=wcs,
                                                 affine=affine,
                                                 cosmos_cat=cosmos_cat,
@@ -1405,15 +1458,17 @@ def main(args):
                                                 logprint=logprint
                                                 )
                     # Find the overlapping bounds:
-                    bounds = stamp.bounds & full_image.bounds
+                    bounds = stamps['b'].bounds & full_images['b'].bounds
 
                     # Finally, add the stamp to the full image.
 
-                    full_image[bounds] += stamp[bounds]
+                    for band, sky in sky_levels.items():
+                        full_images[band][bounds] += stamps[band][bounds]
+                        
                     time2 = time.time()
                     tot_time = time2-time1
                     logprint(f'Galaxy {k} positioned relative to center t={tot_time} s')
-                    this_flux=np.sum(stamp.array)
+                    this_flux=np.sum(stamps['b'].array)
 
                     if i == 1:
                         row = [ k, truth.cosmos_index, truth.x, truth.y, truth.ra, truth.dec, truth.g1,
@@ -1511,7 +1566,7 @@ def main(args):
             with Pool(ncores) as pool:
                 batch_indices = utils.setup_batches(sbparams.nstars, ncores)
 
-                full_image, truth_catalog = combine_objs(
+                full_images, truth_catalog = combine_objs(
                     pool.starmap(
                         make_obj_runner,
                         ([
@@ -1527,7 +1582,7 @@ def main(args):
                           logprint
                           ] for k in range(sbparams.ncores))
                         ),
-                    full_image,
+                    full_images,
                     truth_catalog,
                     i
                     )
@@ -1543,7 +1598,7 @@ def main(args):
                 time1 = time.time()
                 ud = galsim.UniformDeviate(sbparams.stars_seed+k+1)
                 pud = np.random.default_rng(sbparams.stars_seed)
-                star_stamp,truth = make_a_star(ud=ud,pud=pud,
+                star_stamps,truth = make_a_star(ud=ud,pud=pud,
                                             index=k,
                                             wcs=wcs,
                                             affine=affine,
@@ -1552,17 +1607,18 @@ def main(args):
                                             logprint=logprint,
                                             star_image_pos=star_image_pos
                                             )
-                bounds = star_stamp.bounds & full_image.bounds
+                bounds = star_stamps['b'].bounds & full_images['b'].bounds
 
                 # Add the stamp to the full image.
                 try:
-                    full_image[bounds] += star_stamp[bounds]
+                    for band, sky in sky_levels.items():
+                        full_images[band][bounds] += star_stamps[band][bounds]
 
                     time2 = time.time()
                     tot_time = time2-time1
 
                     logprint(f'Star {k}: positioned relative to center, t={tot_time} s')
-                    this_flux=np.sum(star_stamp.array)
+                    this_flux=np.sum(star_stamps['b'].array)
 
                     if i == 1:
                         row = [ k, truth.cosmos_index, truth.x, truth.y, truth.ra, truth.dec,
@@ -1576,12 +1632,13 @@ def main(args):
 
         # If not using MPI, then this is already done
         if mpi is True:
+            M = MPIHelper()
             # Gather results from MPI processes, reduce to single result on root
             # Using same names on left and right sides is hiding lots of MPI magic
-            full_image = M.gather(full_image)
+            full_images = M.gather(full_images)
             truth_catalog = M.gather(truth_catalog)
             if M.is_mpi_root():
-                full_image = reduce(combine_images, full_image)
+                full_images = reduce(combine_images, full_images)
 
                 if i == 1:
                     truth_catalog = reduce(combine_catalogs, truth_catalog)
@@ -1597,8 +1654,6 @@ def main(args):
             # Add dark current
             logprint('Adding Dark current')
             dark_noise = sbparams.dark_current * sbparams.exp_time
-            full_image += dark_noise
-
             # Add ccd noise
             logprint('Adding CCD noise')
             noise = galsim.CCDNoise(
@@ -1607,17 +1662,21 @@ def main(args):
                 read_noise=sbparams.read_noise,
                 rng=galsim.BaseDeviate(sbparams.noise_seed)
                 )
+            for band, sky in sky_levels.items():
+                full_images[band] += dark_noise
 
-            full_image.addNoise(noise)
+                full_images[band].addNoise(noise)
 
             logprint.debug('Added noise to final output image')
             
             # Make sure the output directory exists
+            
             os.makedirs(os.path.dirname(file_name), exist_ok=True)
 
             try:
-                full_image.write(file_name, clobber=clobber)
-                logprint(f'Wrote image to {file_name}')
+                for band, full_image in full_images.items():
+                    full_image.write(file_names[band], clobber=clobber)
+                    logprint(f'Wrote image to {file_names[band]}')
             except OSError as e:
                 logprint(f'OSError: {e}')
                 raise e
