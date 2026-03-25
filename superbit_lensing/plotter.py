@@ -1,6 +1,7 @@
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import zoom
 import numpy as np
+import pandas as pd
 import glob
 import matplotlib.pyplot as plt
 import psfex
@@ -33,8 +34,11 @@ from matplotlib.path import Path
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from superbit_lensing.utils import build_clean_tan_wcs, read_ds9_ctr, get_cluster_info, get_admoms, get_galsim_tanwcs
+from superbit_lensing.utils import build_clean_tan_wcs, read_ds9_ctr, get_cluster_info, get_admoms, get_galsim_tanwcs, get_sky_footprint_center_radius
 from superbit_lensing.medsmaker.superbit.psf_extender import PSFWrapper
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+TARGET_LIST = os.path.join(PROJECT_ROOT, 'data', 'SuperBIT_target_list.csv')
+
 
 def plot_comparison(cat, 
                    reference_key, 
@@ -1236,7 +1240,7 @@ class ClusterRedSequenceAnalysis:
     for galaxy clusters.
     """
     
-    def __init__(self, cluster_name, datadir=None, datafilename=None, delz=0.02, radius_th=-1):
+    def __init__(self, cluster_name, datadir=None, datafilename=None, delz=0.02, radius_th=-1, cluster_redshift=None):
         """
         Initialize the cluster analysis.
         
@@ -1260,7 +1264,7 @@ class ClusterRedSequenceAnalysis:
         # Initialize attributes that will be populated
         self.ra_center = None
         self.dec_center = None
-        self.cluster_redshift = None
+        self.cluster_redshift = cluster_redshift
         self.cm_cat = None
         self.red_sequence_mask = None
         self.cluster_member_indices = None
@@ -1270,7 +1274,6 @@ class ClusterRedSequenceAnalysis:
         Load all necessary data for the cluster.
         """
         # Get cluster info
-        self.ra_center, self.dec_center, self.cluster_redshift = get_cluster_info(self.cluster_name)
         
         # Load catalog
         if self.datafilename is not None:
@@ -1290,6 +1293,13 @@ class ClusterRedSequenceAnalysis:
             f'{self.cluster_name}', "sextractor_dualmode", "coadd")        
 
         self.cm_cat = Table.read(self.color_mag_file)
+        
+        cluster_data = pd.read_csv(TARGET_LIST)
+        idx = cluster_data['SuperBIT_name'] == self.cluster_name
+        if not idx.any():
+            self.ra_center, self.dec_center, radius = get_sky_footprint_center_radius(self.cm_cat)
+        else:
+            self.ra_center, self.dec_center, self.cluster_redshift = get_cluster_info(self.cluster_name)
         
         # Filter valid detections
         valid = (self.cm_cat['FLUX_AUTO_b'] > 0) & \
@@ -1629,7 +1639,7 @@ class ClusterRedSequenceAnalysis:
     def _make_rgb_image(self, u_fits=None, b_fits=None, g_fits=None, stretch='asinh', 
                     percentile_limits=(0.5, 99.5),
                     red_boost_factor=1.1, green_supression=0.9, blue_suppression=0.9,
-                    dpi=600, format='png', figsize=(12, 12), save_path=None, mark_members=True):
+                    dpi=600, format='png', figsize=(12, 12), save_path=None, mark_members=False):
         """
         Create an RGB image from three FITS files with enhanced red coloration for galaxies.
         

@@ -122,8 +122,14 @@ def main(args):
                         gal_data_b[col] = np.full(len(gal_data_b), '', dtype=str)
                         
     # Ensure input files exist
-    if not os.path.exists(file_b) or not os.path.exists(file_g) or not os.path.exists(file_u):
-        raise FileNotFoundError(f"One or more input files not found:\n{file_b}\n{file_g}\n{file_u}")    
+    files = [file_b, file_g, file_u]
+    missing_files = [f for f in files if not os.path.exists(f)]
+
+    if missing_files:
+        raise FileNotFoundError(
+            "Missing input file(s):\n" + "\n".join(missing_files)
+        )
+        
     file_b_cat = f"{dual_cat_path}/{cluster_name}_coadd_b_cat.fits"
     file_g_cat = f"{dual_cat_path}/{cluster_name}_coadd_g_cat.fits"
     file_u_cat = f"{dual_cat_path}/{cluster_name}_coadd_u_cat.fits"
@@ -199,7 +205,7 @@ def main(args):
                 if swarp.science_ending == 'sim':
                     raise ValueError("Simulated data does not have real NED matches, skipping NED query.")
                 print(f"Attempting NED query (attempt {attempt+1}/{max_attempts}) with radius={current_radius:.4f} deg...")
-                ned_cat = utils.ned_query(rad_deg=current_radius, ra_center=center_ra_b, dec_center=center_dec_b)
+                ned_cat = ned_query(rad_deg=current_radius, ra_center=center_ra_b, dec_center=center_dec_b)
                 print(f"Successfully queried NED with {len(ned_cat)} results at radius {current_radius:.4f} deg")
                 ned_query_success = True
                 
@@ -464,8 +470,8 @@ def main(args):
 
     # Step 5: Classify NED Matches by Redshift
     cluster_redshift = redshift
-    cluster_redshift_up = cluster_redshift + delz
-    cluster_redshift_down = cluster_redshift - delz
+    cluster_redshift_up = cluster_redshift #+ delz
+    cluster_redshift_down = cluster_redshift #- delz
     z_matched = z_best
 
     # Filter out entries where z_best is NaN (or empty, if applicable)
@@ -626,14 +632,14 @@ def main(args):
     # Step 8: Plot the Color-Magnitude Diagram
     plt.figure(figsize=(8, 6))
     valid_flux = (flux_b > 0) & (flux_g > 0) & (flux_u > 0)
-    plt.scatter(color_index_bg[valid_flux], color_index_ub[valid_flux], s=5, alpha=0.10, color='blue', label='Galaxies')
+    #plt.scatter(color_index_bg[valid_flux], color_index_ub[valid_flux], s=5, alpha=0.10, color='blue', label='Galaxies')
     if args.plot_stars:
         plt.scatter(color_bg_stars, color_ub_stars, s=5, alpha=0.10, color='red', label='Stars')
 
     if args.plot_redshifts:
-        plt.scatter(color_index_bg_high, color_index_ub_high, s=10, alpha=0.3, color='orange', label=f'High-z (z > {cluster_redshift_up:.2f}): : {len(high_z_indices)}')
-        plt.scatter(color_index_bg_mid, color_index_ub_mid, s=10, alpha=0.3, color='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}): {len(mid_z_indices)}')
-        plt.scatter(color_index_bg_low, color_index_ub_low, s=10, alpha=0.3, color='red', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
+        plt.scatter(color_index_bg_high, color_index_ub_high, s=10, alpha=0.3, color='red', label=f'High-z (z > {cluster_redshift_up:.2f}): : {len(high_z_indices)}')
+        #plt.scatter(color_index_bg_mid, color_index_ub_mid, s=10, alpha=0.3, color='lime', label=f'Members ({cluster_redshift_down:.2f} < z ≤ {cluster_redshift_up:.2f}): {len(mid_z_indices)}')
+        plt.scatter(color_index_bg_low, color_index_ub_low, s=10, alpha=0.3, color='blue', label=f'Low-z (z ≤ {cluster_redshift_down:.2f}): {len(low_z_indices)}')
 
     #plt.ylim(-4.2, 3.8)
     #plt.xlim(-20, -2)

@@ -222,11 +222,11 @@ class make_coadds_for_dualmode():
             with multiprocessing.Pool(processes=num_tasks) as pool:
                 pool.starmap(run_command, [(cmd, cores_per_task) for cmd in commands_to_run])
         
-            # **Augment coadd images**
-            for band, coadd_file in files.items():
-                if os.path.exists(coadd_file):
-                    self.augment_coadd_image(coadd_file)
-                    print(f"Augmented coadd image for band {band}: {coadd_file}")
+        # **Augment coadd images**
+        for band, coadd_file in files.items():
+            if os.path.exists(coadd_file):
+                self.augment_coadd_image(coadd_file)
+                print(f"Augmented coadd image for band {band}: {coadd_file}")
 
         return files
 
@@ -249,6 +249,7 @@ class make_coadds_for_dualmode():
         elif len(found_endings) > 1:
             raise ValueError(f"Multiple endings found: {found_endings}. Only one ending type is allowed.")
         science_ending = found_endings[0]
+        print(f"[INFO] Band {band}: found {len(science)} files with ending '{science_ending}'")
         return science, science_ending
 
     def set_weight_files(self, image_files):
@@ -266,7 +267,6 @@ class make_coadds_for_dualmode():
         for img_name in img_names:
             sex_wgt_file_name = img_name.replace('.fits', '.sex_weight.fits')
             if not os.path.exists(sex_wgt_file_name):
-                print(f'Weight map not found for {img_name}, creating one...')
                 with fits.open(img_name) as img:
                     # Assuming the image data is in the primary HDU
                     img_data = img[0].data  

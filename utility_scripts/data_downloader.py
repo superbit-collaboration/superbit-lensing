@@ -6,6 +6,9 @@ import subprocess
 import argparse
 from astropy.io import fits
 
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+TEMPLATE_DIR = os.path.join(PROJECT_ROOT, 'template')
+
 def create_cluster_directory(cluster_name, data_dir="/projects/mccleary_group/superbit/union"):
     """
     Create a new cluster directory based on the template directory or create it manually if template doesn't exist.
@@ -23,7 +26,7 @@ def create_cluster_directory(cluster_name, data_dir="/projects/mccleary_group/su
         (Path to the newly created cluster directory, Path to the preliminary directory)
     """
     # Define paths
-    template_dir = os.path.join(data_dir, "template")
+    template_dir = TEMPLATE_DIR
     cluster_dir = os.path.join(data_dir, cluster_name)
     
     # Check if the cluster directory already exists
@@ -31,29 +34,13 @@ def create_cluster_directory(cluster_name, data_dir="/projects/mccleary_group/su
         print(f"Directory already exists: {cluster_dir}")
     else:
         print(f"Creating directory: {cluster_dir}")
+        print(f"Copying structure from template directory: {template_dir}")
+        shutil.copytree(template_dir, cluster_dir)
         
-        # Check if template directory exists
-        if os.path.exists(template_dir):
-            # Copy template directory structure
-            print(f"Copying structure from template directory: {template_dir}")
-            shutil.copytree(template_dir, cluster_dir)
-        else:
-            # Create directory structure manually
-            print("Template directory not found. Creating directory structure manually.")
-            os.makedirs(cluster_dir, exist_ok=True)
-            
-            # Create band directories
-            for band in ['u', 'b', 'g']:
-                for subdir in ['cal', 'cat', 'coadd', 'out']:
-                    path = os.path.join(cluster_dir, band, subdir)
-                    os.makedirs(path, exist_ok=True)
-                    print(f"Created: {path}")
-            
-            # Create detection directories
-            for subdir in ['cat', 'coadd']:
-                path = os.path.join(cluster_dir, 'det', subdir)
-                os.makedirs(path, exist_ok=True)
-                print(f"Created: {path}")
+        for root, dirs, files in os.walk(cluster_dir):
+            for file in files:
+                if file == ".gitkeep":
+                    os.remove(os.path.join(root, file))
     
     # Create preliminary directory for downloading data
     prelim_dir = os.path.join(cluster_dir, "preliminary")
@@ -215,16 +202,16 @@ def organize_by_band(good_dir, cluster_dir, cluster_name):
     u_dir = os.path.join(cluster_dir, "u", "cal")
     b_dir = os.path.join(cluster_dir, "b", "cal")
     g_dir = os.path.join(cluster_dir, "g", "cal")
+    unknown_dir = os.path.join(cluster_dir, "unknown")
     
-    os.makedirs(u_dir, exist_ok=True)
-    os.makedirs(b_dir, exist_ok=True)
-    os.makedirs(g_dir, exist_ok=True)
+    unknown_dir = os.path.join(cluster_dir, "unknown")
+
+    for d in [u_dir, b_dir, g_dir, unknown_dir]:
+        os.makedirs(d, exist_ok=True)
     
     # Initialize counters
-    u_count = 0
-    b_count = 0
-    g_count = 0
-    unknown_count = 0
+    u_count = b_count = g_count = unknown_count = 0
+
     
     # Move files to appropriate directories
     for file in os.listdir(good_dir):
@@ -246,7 +233,8 @@ def organize_by_band(good_dir, cluster_dir, cluster_name):
             shutil.move(file_path, os.path.join(g_dir, file))
             g_count += 1
         else:
-            print(f"Warning: Could not determine band for {file}")
+            shutil.move(file_path, os.path.join(unknown_dir, file))
+            print(f"⚠️ Unknown band → moved to unknown/: {file}")
             unknown_count += 1
     
     # Print summary statistics
@@ -256,6 +244,8 @@ def organize_by_band(good_dir, cluster_dir, cluster_name):
     print(f"  g-band exposures: {g_count}")
     if unknown_count > 0:
         print(f"  Unknown band: {unknown_count}")
+    if os.path.exists(unknown_dir) and not os.listdir(unknown_dir):
+        os.rmdir(unknown_dir)
     print(f"  Total organized: {u_count + b_count + g_count}")
 
 def main():
