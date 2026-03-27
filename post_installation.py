@@ -36,59 +36,123 @@ def get_shell_config_file():
     
     return rc_file
 
-def add_bit_download_alias(current_dir, datadir, username=None):
-    """Add bit-download alias to shell configuration file."""
+def setup_dustmaps(save_path):
+    """Handle dustmaps setup interactively and safely."""
+    
+    from dustmaps.config import config
+    config.reset()
+    
+    dust_dir = os.path.join(save_path, 'dust_maps')
+    
+    print("\n" + "="*60)
+    print("DUST MAP SETUP")
+    print("="*60)
+    print("This will download the SFD dust map of Chiang (2023) [https://arxiv.org/abs/2306.03926] (~300 MB).")
+    print("This is recommended if you want to run colors and mags")
+    print(f"Location: {dust_dir}")
+    
+    choice = input("\nDo you want to download dust maps now? (y/n): ").strip().lower()
+    
+    if choice not in ['y', 'yes']:
+        print("Skipping dust map setup.")
+        return
+    
+    # Set data directory
+    config['data_dir'] = dust_dir
+    
+    # Check if already exists
+    if os.path.exists(dust_dir) and os.listdir(dust_dir):
+        print("\nDust maps directory already exists.")
+        reuse = input("Reuse existing maps instead of downloading? (y/n): ").strip().lower()
+        
+        if reuse in ['y', 'yes']:
+            print("Using existing dust maps.")
+            return
+        else:
+            print("Re-downloading dust maps...")
+    
+    try:
+        import dustmaps.csfd
+        
+        print("\nDownloading CSFD dust maps...")
+        dustmaps.csfd.fetch(clobber=False)
+        
+        print("✅ Dust maps successfully installed.")
+        
+    except Exception as e:
+        print(f"\n❌ Failed to download dust maps: {e}")
+        print("Retry later with:")
+        print("  python -c 'import dustmaps.csfd; dustmaps.csfd.fetch(clobber=False)'")
+
+def add_bit_alias(current_dir, datadir, username=None):
+    """Add bit-download, cleanup, and filechecker aliases to shell config."""
+    
     rc_file = get_shell_config_file()
     
-    # Construct the alias command
-    script_path = os.path.join(current_dir, 'utility_scripts', 'data_downloader.py')
+    # Script paths
+    downloader_script_path = os.path.join(current_dir, 'utility_scripts', 'data_downloader.py')
+    clean_up_script_path = os.path.join(current_dir, 'utility_scripts', 'cleanup.py')
+    file_checker_script_path = os.path.join(current_dir, 'utility_scripts', 'filechecker.py')
     
+    # Alias commands
     if username:
-        alias_cmd = f'alias bit-download="python {script_path} --data-dir {datadir} --username {username}"'
+        alias_cmd = f'alias bit-download="python {downloader_script_path} --data-dir {datadir} --username {username}"'
     else:
-        alias_cmd = f'alias bit-download="python {script_path} --data-dir {datadir}"'
+        alias_cmd = f'alias bit-download="python {downloader_script_path} --data-dir {datadir}"'
+        
+    cleanup_alias_cmd = f'alias cleanup="python {clean_up_script_path} --data_dir {datadir}"'
+    filechecker_alias_cmd = f'alias filechecker="python {file_checker_script_path} --data_dir {datadir}"'
     
-    # Check if alias already exists
+    # ---------- CHECK IF ANY ALIAS EXISTS ----------
     alias_exists = False
+    alias_keys = ['alias bit-download=', 'alias cleanup=', 'alias filechecker=']
+    
     if os.path.exists(rc_file):
         with open(rc_file, 'r') as f:
             content = f.read()
-            if 'alias bit-download=' in content:
+            if any(key in content for key in alias_keys):
                 alias_exists = True
     
+    # ---------- HANDLE OVERWRITE ----------
     if alias_exists:
-        print(f"\nbit-download alias already exists in {rc_file}")
-        update = input("Do you want to update it with new settings? (yes/no): ").strip().lower()
+        print(f"\nSuperBIT aliases already exist in {rc_file}")
+        update = input("Do you want to update all of them? (yes/no): ").strip().lower()
         if update not in ['yes', 'y']:
             return
         
-        # Remove old alias
+        # Remove ALL related aliases + header
         with open(rc_file, 'r') as f:
             lines = f.readlines()
         
         with open(rc_file, 'w') as f:
             for line in lines:
-                if line.strip().startswith('alias bit-download='):
+                stripped = line.strip()
+                
+                if any(stripped.startswith(k) for k in alias_keys):
                     continue
-                if line.strip() == '# SuperBIT data download alias (added by post_installation.py)':
+                if stripped == '# SuperBIT aliases (added by post_installation.py)':
                     continue
+                
                 f.write(line)
-
     
-    # Add the alias
+    # ---------- ADD ALL ALIASES ----------
     try:
         with open(rc_file, 'a') as f:
-            f.write(f"\n# SuperBIT data download alias (added by post_installation.py)\n")
+            f.write("\n# SuperBIT aliases (added by post_installation.py)\n")
             f.write(f"{alias_cmd}\n")
+            f.write(f"{cleanup_alias_cmd}\n")
+            f.write(f"{filechecker_alias_cmd}\n")
         
-        print(f"\nAdded bit-download alias to {rc_file}")
-        print("\nTo download data in the future, use:")
+        print(f"\nAdded SuperBIT aliases to {rc_file}")
+        print("\nAvailable commands:")
         print("  bit-download <cluster_name>")
-        print("\nNote: You need to reload your shell or run:")
+        print("  cleanup <cluster_name>")
+        print("  filechecker <cluster_name>")
+        print("\nReload your shell or run:")
         print(f"  source {rc_file}")
         
     except Exception as e:
-        print(f"\nError adding alias to {rc_file}: {e}")
+        print(f"\nError adding aliases to {rc_file}: {e}")
 
 def update_config_sh(config_file, datadir, codedir, env_name=None):
     """Update the DATADIR and CODEDIR in the config.sh file."""
@@ -469,6 +533,7 @@ def main(env_name=None):
     
     # Ask about downloading catalogs
     username = download_catalogs(save_path)
+    setup_dustmaps(save_path)
 
     # Ask about setting up simulation branch
     setup_sim = input("\nDo you want to set up a simulation branch? (y/n): ").strip().lower()
@@ -505,7 +570,7 @@ def main(env_name=None):
     print("\n" + "="*60)
     print("SETTING UP BIT-DOWNLOAD ALIAS")
     print("="*60)
-    add_bit_download_alias(current_dir, save_path, username)
+    add_bit_alias(current_dir, save_path, username)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Setup script for SuperBIT lensing configs.")

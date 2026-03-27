@@ -11,7 +11,8 @@ import ipdb
 import time
 from superbit_lensing.match import SkyCoordMatcher
 from superbit_lensing.color import sextractor_dual as sex
-from superbit_lensing.utils import gaia_query, ned_query, get_sky_footprint_center_radius
+from superbit_lensing.utils import gaia_query, ned_query, get_sky_footprint_center_radius, separate_catalog_by_regions
+from superbit_lensing.dust import DustCorrector
 
 lovoccs_table = ['RA', 'DEC', 'Redshift', 'Redshift_error']
 desi_table = [
@@ -20,7 +21,7 @@ desi_table = [
 ]
 desi_table_primary = ['TARGET_RA', 'TARGET_DEC', 'ZCAT_PRIMARY', 'OBJTYPE', 'ZWARN']
 ned_table = ['RA', 'DEC', 'Redshift']
-DESI_MASTER_FILE = "/projects/mccleary_group/superbit/desi_data/zall-pix-iron.fits"
+DESI_MASTER_FILE = "/n23data1/saha/data/desi_data/zall-pix-iron.fits"
 
 MAG_ZP_b = 29.146
 MAG_ZP_g = 29.391
@@ -45,6 +46,9 @@ def main(args):
     base_path = os.path.join(datadir, cluster_name)
     redshift_file = os.path.join(datadir, f'catalogs/redshifts/{cluster_name}_NED_redshifts.csv')
     lovoccs_file = os.path.join(datadir, f'catalogs/lovoccs/{cluster_name}_lovoccs_redshifts.fits')
+    mask_file_path = os.path.join(datadir, "star_masks")
+    mask_file = os.path.join(mask_file_path, f"{cluster_name}_b_starmask_physical.reg")
+    
     if os.path.exists(DESI_MASTER_FILE):
         desi_file = DESI_MASTER_FILE
         print(f"Using DESI_MASTER_FILE: {DESI_MASTER_FILE}")
@@ -91,6 +95,7 @@ def main(args):
     out_file_cm_ub = f"{plot_dir}/{cluster_name}_u_b_color_mag.png"
     size_mag_file = f"{plot_dir}/{cluster_name}_b_size_mag.png"
     output_fits = f"{output_dir}/{cluster_name}_colors_mags.fits"
+    output_junk_fits = f"{output_dir}/{cluster_name}_colors_mags_junks.fits"
     output_star_fits = f"{output_dir}/{cluster_name}_colors_mags_stars.fits"
     diag_path = os.path.join(dual_mode_path, "diags")
     dual_cat_path = os.path.join(dual_mode_path, "cat")
@@ -264,7 +269,7 @@ def main(args):
 
     print("Star matching and object discarding is starting...")
     try:
-        matcher_b_stars = SkyCoordMatcher(data_b, star_data_b, match_radius=tolerance_deg)
+        matcher_b_stars = SkyCoordMatcher(data_b, star_data_b, match_radius=tolerance_deg, verbose=False)
         matched_data_b_stars, matched_star_data_b = matcher_b_stars.get_matched_pairs()
 
         # Filter out stars from the main catalogs using both RA and DEC
@@ -280,9 +285,9 @@ def main(args):
 
     discarded_count = np.sum(~mask)
 
-    print(f"Band b - Total objects: {len(data_b)}, Stars: {len(star_data_b)}, Discarded: {discarded_count}, Proceeding to next step: {len(data_b_filtered)}")
-    print(f"Band g - Total objects: {len(data_g)}, Stars: {len(star_data_b)}, Discarded: {discarded_count}, Proceeding to next step: {len(data_g_filtered)}")
-    print(f"Band u - Total objects: {len(data_u)}, Stars: {len(star_data_b)}, Discarded: {discarded_count}, Proceeding to next step: {len(data_u_filtered)}")
+    print(f"All Bands - Total objects: {len(data_b)}, Stars: {len(star_data_b)}, Discarded: {discarded_count}, Proceeding to next step: {len(data_b_filtered)}")
+    # print(f"Band g - Total objects: {len(data_g)}, Stars: {len(star_data_b)}, Discarded: {discarded_count}, Proceeding to next step: {len(data_g_filtered)}")
+    # print(f"Band u - Total objects: {len(data_u)}, Stars: {len(star_data_b)}, Discarded: {discarded_count}, Proceeding to next step: {len(data_u_filtered)}")
 
 
     # Step 2: Interband Matching
@@ -305,31 +310,43 @@ def main(args):
     m_b = matched_data_b_valid["MAG_AUTO"] #-2.5 * np.log10(flux_b[valid_flux])
     m_g = matched_data_g_valid["MAG_AUTO"] #-2.5 * np.log10(flux_g[valid_flux])
     m_u = matched_data_u_valid["MAG_AUTO"] #-2.5 * np.log10(flux_u[valid_flux])
+    ra_b_valid, dec_b_valid = matched_data_b_valid['ALPHAWIN_J2000'], matched_data_b_valid['DELTAWIN_J2000']
+    
+    # ==== Dust Correction happening here ======
+    dust = DustCorrector()
+    Ax = dust(ra_b_valid, dec_b_valid)
+    
+    m_b = m_b - Ax['b']
+    m_g = m_g - Ax['g']
+    m_u = m_u - Ax['u']
+    
     m_b_err = matched_data_b_valid["MAGERR_AUTO"]  # Error in b-band magnitude
     m_g_err = matched_data_g_valid["MAGERR_AUTO"]  # Error in g-band magnitude  
     m_u_err = matched_data_u_valid["MAGERR_AUTO"]  # Error in u-band magnitude    
     
     color_index_bg = m_b - m_g
     color_index_ub = m_u - m_b
+    color_index_ug = m_u - m_g
 
     # Calculate errors on color indices
     color_index_bg_err = np.sqrt(m_b_err**2 + m_g_err**2)
-    color_index_ub_err = np.sqrt(m_u_err**2 + m_b_err**2)    
+    color_index_ub_err = np.sqrt(m_u_err**2 + m_b_err**2)
+    color_index_ug_err = np.sqrt(m_u_err**2 + m_g_err**2)   
 
     # Use SkyCoordMatcher for NED matching
     matcher_ned = SkyCoordMatcher(ned_cat, matched_data_b, cat1_ratag='RA', cat1_dectag='DEC',
-                 cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', return_idx=True, match_radius=1 * tolerance_deg)
+                 cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', return_idx=True, match_radius=1 * tolerance_deg, verbose=False)
     matched_ned, matched_data_b_ned, idx1_ned, idx2_ned = matcher_ned.get_matched_pairs()
 
     print(f"Number of matched galaxies with known ned redshifts: {len(matched_ned)}")
 
     matcher_lovoccs = SkyCoordMatcher(lovoccs, matched_data_b, cat1_ratag='RA', cat1_dectag='DEC',
-                 cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', return_idx=True, match_radius=1 * tolerance_deg)
+                 cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', return_idx=True, match_radius=1 * tolerance_deg, verbose=False)
     matched_lovoccs, matched_data_b_lovoccs, idx1_lovoccs, idx2_lovoccs = matcher_lovoccs.get_matched_pairs()
     print(f"Number of matched galaxies with known lovoccs redshifts: {len(matched_lovoccs)}")
 
     matcher_desi = SkyCoordMatcher(desi, matched_data_b, cat1_ratag='TARGET_RA', cat1_dectag='TARGET_DEC',
-                 cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', return_idx=True, match_radius=1 * tolerance_deg)
+                 cat2_ratag='ALPHAWIN_J2000', cat2_dectag='DELTAWIN_J2000', return_idx=True, match_radius=1 * tolerance_deg, verbose=False)
     matched_desi, matched_data_b_desi, idx1_desi, idx2_desi = matcher_desi.get_matched_pairs()
     print(f"Number of matched galaxies with known desi redshifts: {len(matched_desi)}")
     
@@ -409,6 +426,8 @@ def main(args):
         final_table['id'] = matched_data_b[valid_flux]["NUMBER"]
         final_table['ra'] = ra_dec_table['ra'][valid_flux]
         final_table['dec'] = ra_dec_table['dec'][valid_flux]
+        final_table['XWIN_IMAGE'] = matched_data_b['XWIN_IMAGE'][valid_flux]
+        final_table['YWIN_IMAGE'] = matched_data_b['YWIN_IMAGE'][valid_flux]
         final_table['FLAGS'] = matched_data_b['FLAGS'][valid_flux]
         final_table['m_b'] = m_b
         final_table['m_b_err'] = matched_data_b[valid_flux]["MAGERR_AUTO"]
@@ -428,10 +447,10 @@ def main(args):
         final_table['FLUXERR_AUTO_g'] = matched_data_g["FLUXERR_AUTO"][valid_flux]
         final_table['FLUX_AUTO_u'] = flux_u[valid_flux]
         final_table['FLUXERR_AUTO_u'] = matched_data_u["FLUXERR_AUTO"][valid_flux]
-        final_table['VIGNET_b'] = matched_data_b["VIGNET"][valid_flux]
-        final_table['VIGNET_g'] = matched_data_g["VIGNET"][valid_flux]
-        final_table['VIGNET_u'] = matched_data_u["VIGNET"][valid_flux]
         if args.vignet_updater:
+            final_table['VIGNET_b'] = matched_data_b["VIGNET"][valid_flux]
+            final_table['VIGNET_g'] = matched_data_g["VIGNET"][valid_flux]
+            final_table['VIGNET_u'] = matched_data_u["VIGNET"][valid_flux]
             final_table['VIGNET_b_im'] = vignet_updater_b.cat_data["im_vignett"]
             final_table['VIGNET_g_im'] = vignet_updater_g.cat_data["im_vignett"]
             final_table['VIGNET_u_im'] = vignet_updater_u.cat_data["im_vignett"]
@@ -451,8 +470,13 @@ def main(args):
         final_table['SNR_combined'] = np.sqrt(final_table['SNR_b']**2 + final_table['SNR_g']**2 + final_table['SNR_u']**2)
         final_table['color_bg'] = color_index_bg
         final_table['color_ub'] = color_index_ub
+        final_table['color_ug'] = color_index_ug
         final_table['color_bg_err'] = color_index_bg_err
         final_table['color_ub_err'] = color_index_ub_err
+        final_table['color_ug_err'] = color_index_ug_err
+        final_table['Ax_b'] = Ax['b']
+        final_table['Ax_g'] = Ax['g']
+        final_table['Ax_u'] = Ax['u']
         final_table['Z_ned'] = redshifts_ned[valid_flux]
         final_table['Z_lovoccs'] = redshifts_lovoccs[valid_flux]
         final_table['ZERR_lovoccs'] = redshift_err_lovoccs[valid_flux]
@@ -465,8 +489,15 @@ def main(args):
         final_table['Z_best'] = z_best[valid_flux]
         final_table['ZERR_best'] = z_best_err[valid_flux]
         final_table['Z_source'] = z_source[valid_flux]
+        
+        # ======== Applying Star Mask =========
+        junks, final_table, reg_mask = separate_catalog_by_regions(mask_file, final_table)
+        
         # Save as a FITS file
-        final_table.write(output_fits, format='fits', overwrite=True)        
+        final_table.write(output_fits, format='fits', overwrite=True)
+        junks.write(output_junk_fits, format='fits', overwrite=True)
+        print(f"Wrote the Galaxy color mags to: {output_fits}")     
+        print(f"Wrote the Junk color mags to: {output_junk_fits}")    
 
     # Step 5: Classify NED Matches by Redshift
     cluster_redshift = redshift
@@ -486,7 +517,7 @@ def main(args):
     #filter with snr
     #snr_threshold = -1e30
     snr_mask = (matched_data_b_filtered['SNR_WIN']>snr_threshold) & (matched_data_g_filtered['SNR_WIN']>snr_threshold) & (matched_data_u_filtered['SNR_WIN']>snr_threshold)
-    print(f"Number of objects with SNR > {snr_threshold} in all bands: {np.sum(snr_mask)}")
+    # print(f"Number of objects with SNR > {snr_threshold} in all bands: {np.sum(snr_mask)}")
     z_best_filtered = z_best_filtered[snr_mask]
     matched_data_b_filtered = matched_data_b_filtered[snr_mask]
     matched_data_g_filtered = matched_data_g_filtered[snr_mask]
@@ -532,9 +563,9 @@ def main(args):
     valid_flux_high = (flux_b_high > 0) & (flux_g_high > 0) & (flux_u_high > 0)
     valid_flux_low = (flux_b_low > 0) & (flux_g_low > 0) & (flux_u_low > 0)
     valid_flux_mid = (flux_b_mid > 0) & (flux_g_mid > 0) & (flux_u_mid > 0)
-    print(f"Number of objects with invalid fluxes in high_z: {np.sum(~valid_flux_high)}")
-    print(f"Number of objects with invalid fluxes in mid_z: {np.sum(~valid_flux_mid)}")
-    print(f"Number of objects with invalid fluxes in low_z: {np.sum(~valid_flux_low)}")
+    # print(f"Number of objects with invalid fluxes in high_z: {np.sum(~valid_flux_high)}")
+    # print(f"Number of objects with invalid fluxes in mid_z: {np.sum(~valid_flux_mid)}")
+    # print(f"Number of objects with invalid fluxes in low_z: {np.sum(~valid_flux_low)}")
 
     m_b_high = high_z_b[valid_flux_high]["MAG_AUTO"] #-2.5 * np.log10(flux_b_high[valid_flux_high])
     m_g_high = high_z_g[valid_flux_high]["MAG_AUTO"] #-2.5 * np.log10(flux_g_high[valid_flux_high]) 
@@ -567,12 +598,13 @@ def main(args):
 
     valid_flux_stars = (flux_stars_b > 0) & (flux_stars_g > 0) & (flux_stars_u > 0)
     discard_count = np.sum(~valid_flux_stars)
-    print(f"Number of stars discarded due to invalid flux: {discard_count}")
+    # print(f"Number of stars discarded due to invalid flux: {discard_count}")
     m_stars_b = matched_star_data_b[valid_flux_stars]['MAG_AUTO'] #-2.5 * np.log10(flux_stars_b[valid_flux_stars])
     m_stars_g = matched_star_data_g[valid_flux_stars]['MAG_AUTO'] #-2.5 * np.log10(flux_stars_g[valid_flux_stars])
     m_stars_u = matched_star_data_u[valid_flux_stars]['MAG_AUTO'] #-2.5 * np.log10(flux_stars_u[valid_flux_stars])
     color_bg_stars = m_stars_b - m_stars_g
     color_ub_stars = m_stars_u - m_stars_b
+    color_ug_stars = m_stars_u - m_stars_g
 
     if args.save_fits:
         ra_dec_table = matched_star_data_b['ALPHAWIN_J2000', 'DELTAWIN_J2000']
@@ -593,11 +625,13 @@ def main(args):
         final_table['FLUX_AUTO_b'] = flux_stars_b[valid_flux_stars]
         final_table['FLUX_AUTO_g'] = flux_stars_g[valid_flux_stars]
         final_table['FLUX_AUTO_u'] = flux_stars_u[valid_flux_stars]
-        final_table['VIGNET_b'] = matched_star_data_b["VIGNET"][valid_flux_stars]
-        final_table['VIGNET_g'] = matched_star_data_g["VIGNET"][valid_flux_stars]
-        final_table['VIGNET_u'] = matched_star_data_u["VIGNET"][valid_flux_stars]
         final_table['color_bg'] = color_bg_stars
         final_table['color_ub'] = color_ub_stars
+        final_table['color_ug'] = color_ug_stars
+        if args.vignet_updater:
+            final_table['VIGNET_b'] = matched_star_data_b["VIGNET"][valid_flux_stars]
+            final_table['VIGNET_g'] = matched_star_data_g["VIGNET"][valid_flux_stars]
+            final_table['VIGNET_u'] = matched_star_data_u["VIGNET"][valid_flux_stars]
 
         # Save as a FITS file
         final_table.write(output_star_fits, format='fits', overwrite=True)        
@@ -620,14 +654,19 @@ def main(args):
             hdr['TTYPE12'] = ('FLUX_AUTO_b', 'SE flux measurement in b-band')
             hdr['TTYPE13'] = ('FLUX_AUTO_g', 'SE flux measurement in g-band')
             hdr['TTYPE14'] = ('FLUX_AUTO_u', 'SE flux measurement in u-band')
-            hdr['TTYPE15'] = ('VIGNET_b', 'VIGNET in b-band')
-            hdr['TTYPE16'] = ('VIGNET_g', 'VIGNET in g-band')
-            hdr['TTYPE17'] = ('VIGNET_u', 'VIGNET in u-band')
-            hdr['TTYPE18'] = ('color_bg', 'Color index (m_b - m_g)')
-            hdr['TTYPE19'] = ('color_ub', 'Color index (m_u - m_b)')
+            hdr['TTYPE15'] = ('color_bg', 'Color index (m_b - m_g)')
+            hdr['TTYPE16'] = ('color_ub', 'Color index (m_u - m_b)')
+            hdr['TTYPE17'] = ('color_ug', 'Color index (m_u - m_g)')
+            if args.vignet_updater:
+                hdr['TTYPE18'] = ('VIGNET_b', 'VIGNET in b-band')
+                hdr['TTYPE19'] = ('VIGNET_g', 'VIGNET in g-band')
+                hdr['TTYPE20'] = ('VIGNET_u', 'VIGNET in u-band')
+
 
             # Save changes
             hdul.flush()
+            
+        print(f"Wrote the Star color mags to: {output_star_fits}") 
 
     # Step 8: Plot the Color-Magnitude Diagram
     plt.figure(figsize=(8, 6))
@@ -649,7 +688,7 @@ def main(args):
     plt.grid(True, linestyle='--', alpha=0.5)
     plt.legend(loc='upper left')
     plt.savefig(output_file, dpi=300)
-    print(f"Plot saved to '{output_file}'")
+    #print(f"Plot saved to '{output_file}'")
 
     if args.plot_color_mag:
         plt.figure(figsize=(8, 6))
@@ -671,7 +710,7 @@ def main(args):
         plt.grid(True, linestyle='--', alpha=0.5)
         plt.legend(loc='upper left')
         plt.savefig(out_file_cm_bg, dpi=300)
-        print(f"Plot saved to '{out_file_cm_bg}'")        
+        #print(f"Plot saved to '{out_file_cm_bg}'")        
 
         plt.figure(figsize=(8, 6))
         plt.scatter(m_b[valid_flux], color_index_ub[valid_flux], s=5, alpha=0.10, color='blue', label='Galaxies')
@@ -691,7 +730,7 @@ def main(args):
         plt.grid(True, linestyle='--', alpha=0.5)
         plt.legend(loc='upper left')
         plt.savefig(out_file_cm_ub, dpi=300)
-        print(f"Plot saved to '{out_file_cm_ub}'")   
+        #print(f"Plot saved to '{out_file_cm_ub}'")   
 
     if True:
         plt.figure(figsize=(8, 6))
@@ -705,7 +744,7 @@ def main(args):
         plt.legend()
         plt.grid(True, linestyle='--', alpha=0.5)
         plt.savefig(size_mag_file, dpi=300)
-        print(f"Plot saved to '{size_mag_file}'")
+        #print(f"Plot saved to '{size_mag_file}'")
         plt.show()            
 
 if __name__ == "__main__":

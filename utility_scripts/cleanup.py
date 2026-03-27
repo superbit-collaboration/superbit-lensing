@@ -52,8 +52,10 @@ def clean_band(cluster_path, band):
     safe_rmtree(os.path.join(band_path, "arr"))
 
 
-def main(clustername):
-    cluster_path = os.path.join(DATADIR, clustername)
+def main(args):
+    datadir = args.data_dir
+    clustername = args.clustername
+    cluster_path = os.path.join(datadir, clustername)
     if not os.path.isdir(cluster_path):
         raise ValueError(f"Cluster path does not exist: {cluster_path}")
 
@@ -69,6 +71,8 @@ def main(clustername):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Cleanup cluster directories")
     parser.add_argument("clustername", help="Name of the cluster")
+    parser.add_argument('--data_dir', type=str, default=DATADIR,
+                        help='Base directory for data (default: /projects/mccleary_group/superbit/union)')
     args = parser.parse_args()
 
-    main(args.clustername)
+    main(args)
