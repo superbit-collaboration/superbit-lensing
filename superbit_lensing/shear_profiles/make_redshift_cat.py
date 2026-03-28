@@ -12,6 +12,14 @@ import os
 DESI_MASTER_FILE = "/projects/mccleary_group/superbit/desi_data/zall-pix-iron.fits"
 ned_table = ['RA', 'DEC', 'Redshift']
 
+def ensure_parent_dir(filepath):
+    """
+    Ensure the parent directory of a file exists.
+    """
+    parent = os.path.dirname(filepath)
+    if parent and not os.path.exists(parent):
+        os.makedirs(parent, exist_ok=True)
+
 def make_redshift_catalog(datadir, target, band, detect_cat_path, tolerance_deg=1/3600, fail_silently=True):
     """
     Create a redshift catalog by matching detection catalog sources with known spectroscopic redshifts.
@@ -46,6 +54,11 @@ def make_redshift_catalog(datadir, target, band, detect_cat_path, tolerance_deg=
     ned_redshifts_path = os.path.join(datadir, "catalogs", "redshifts", f"{target}_NED_redshifts.csv")
     lovoccs_path = f"{datadir}/catalogs/lovoccs/{target}_lovoccs_redshifts.fits"
     desi_path = f"{datadir}/catalogs/desi/{target}_desi_spectra.fits"
+
+    ensure_parent_dir(ned_redshifts_path)
+    ensure_parent_dir(lovoccs_path)
+    ensure_parent_dir(desi_path)
+
     # First try to load from file
     try:
         print(f"Attempting to load redshifts from {ned_redshifts_path}")
@@ -64,7 +77,7 @@ def make_redshift_catalog(datadir, target, band, detect_cat_path, tolerance_deg=
             try:
                 print(f"Attempting NED query (attempt {attempt+1}/{max_attempts}) with radius={current_radius:.4f} deg...")
                 #raise Exception("Forced NED query failure for testing")
-                #ned_redshifts = utils.ned_query(rad_deg=current_radius, ra_center=center_ra, dec_center=center_dec)
+                ned_redshifts = utils.ned_query(rad_deg=current_radius, ra_center=center_ra, dec_center=center_dec)
                 print(f"Successfully queried NED with {len(ned_redshifts)} results at radius {current_radius:.4f} deg")
                 ned_query_success = True
                 

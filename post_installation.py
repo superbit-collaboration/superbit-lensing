@@ -227,7 +227,7 @@ def download_catalogs(datadir):
     print("CATALOG DOWNLOAD SETUP")
     print("="*60)
     
-    response = input("\nDo you want to set up your data directory by downloading star catalogs, NED catalogs, etc. from hen? (yes/no): ").strip().lower()
+    response = input("\nDo you want to set up your data directory by downloading star catalogs, NED catalogs, Star Masks etc. (~2.6 GB) from hen? (yes/no): ").strip().lower()
     
     if response not in ['yes', 'y']:
         print("Skipping catalog download.")
@@ -298,7 +298,7 @@ def update_galsim_config(sim_path, current_dir):
             elif stripped.startswith("datadir:"):
                 line = f"datadir:           '{os.path.join(sim_path, 'sim_utils/galsim_data')}' # Path to repo/galsim data directory\n"
             elif stripped.startswith("emp_psf_path:"):
-                line = f"emp_psf_path:      '{os.path.join(sim_path, 'sim_utils/emp_psfs_order5')}'\n"
+                line = f"emp_psf_path:      '{os.path.join(sim_path, 'sim_utils/emp_psfs/emp_psfs_best/psfex-output')}'\n"
             new_lines.append(line)
     
     with open(config_file, "w") as f:
@@ -536,7 +536,9 @@ def main(env_name=None):
     setup_dustmaps(save_path)
 
     # Ask about setting up simulation branch
-    setup_sim = input("\nDo you want to set up a simulation branch? (y/n): ").strip().lower()
+    print("\nSimulation branch setup:")
+    print("This will download real SuperBIT PSFs (PSFEx .psf files), image headers, some diagnostics files, and COSMOS2015 catalogs needed for galaxy injections, total (~3.0 GB)")
+    setup_sim = input("Do you want to set up a simulation branch? (y/n): ").strip().lower()
     if setup_sim == 'y':
         sim_default_path = os.path.join(current_dir, 'simulated_data')
         sim_path_input = input(f"Enter the path for simulated data (default: {sim_default_path}): ").strip()
@@ -568,7 +570,7 @@ def main(env_name=None):
     setup_job_submission_dir(current_dir)
     # Add bit-download alias
     print("\n" + "="*60)
-    print("SETTING UP BIT-DOWNLOAD ALIAS")
+    print("SETTING UP BIT ALIAS")
     print("="*60)
     add_bit_alias(current_dir, save_path, username)
 

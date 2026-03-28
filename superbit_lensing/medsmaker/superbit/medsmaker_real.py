@@ -102,6 +102,7 @@ class BITMeasurement():
 
                 # Try saving the query result for reuse
                 try:
+                    os.makedirs(os.path.dirname(self.star_file), exist_ok=True)
                     self.gaia_stars.write(self.star_file, format="fits", overwrite=True)
                     print(f"[INFO] Saved queried GAIA stars to {self.star_file}")
                 except Exception as e_save:
