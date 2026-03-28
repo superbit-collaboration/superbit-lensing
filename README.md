@@ -2,6 +2,8 @@
 
 A pipeline for weak gravitational lensing analysis of SuperBIT observations, performing ngmix fits (including metacalibration) on real and simulated images.
 
+[![arXiv](https://img.shields.io/badge/arXiv-2603.18376-b31b1b.svg)](https://arxiv.org/abs/2603.18376)
+
 ## Pipeline overview
 
 The pipeline is organized into five submodules within `superbit_lensing`, each of which can be used independently:
