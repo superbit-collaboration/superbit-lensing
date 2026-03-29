@@ -250,6 +250,8 @@ class make_coadds_for_dualmode():
             raise ValueError(f"Multiple endings found: {found_endings}. Only one ending type is allowed.")
         science_ending = found_endings[0]
         print(f"[INFO] Band {band}: found {len(science)} files with ending '{science_ending}'")
+        if len(science) == 0:
+            raise FileNotFoundError(f"No science files found for band {band} with ending '{science_ending}' in {exp_dir}")
         return science, science_ending
 
     def set_weight_files(self, image_files):

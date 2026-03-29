@@ -2,6 +2,7 @@ import os
 import argparse
 from glob import glob
 from astropy.io import fits
+from astropy.table import Table
 
 # ---------------------------
 # Default data directory
@@ -14,42 +15,39 @@ BOLD = "\033[1m"
 RESET = "\033[0m"
 
 
+def load_summary_table(path):
+    table = Table.read(path)
+    summary = {}
+
+    for row in table:
+        target = row["target"]
+        summary[target] = {
+            "u": row["u_good"],
+            "b": row["b_good"],
+            "g": row["g_good"],
+        }
+
+    return summary
+
+
 def check_band(data_dir, cluster_name, band):
-    """
-    Check number of clean exposures and their quality for a given band.
-    """
     path = os.path.join(data_dir, cluster_name, band, "cal", "*_clean.fits")
     files = glob(path)
 
-    total = len(files)
     good = 0
-    bad = 0
-    unknown = 0
 
     for f in files:
         try:
             with fits.open(f) as hdul:
-                header = hdul[0].header
-                img_qual = header.get("IMG_QUAL", "UNKNOWN")
+                img_qual = hdul[0].header.get("IMG_QUAL", "UNKNOWN")
 
                 if img_qual == "GOOD":
                     good += 1
-                elif img_qual == "BAD":
-                    bad += 1
-                else:
-                    unknown += 1
 
         except Exception as e:
             print(f"[WARNING] Could not read {f}: {e}")
-            unknown += 1
 
-    return {
-        "band": band,
-        "total": total,
-        "good": good,
-        "bad": bad,
-        "unknown": unknown,
-    }
+    return good
 
 
 def main():
@@ -63,18 +61,39 @@ def main():
 
     args = parser.parse_args()
 
+    # ---------------------------
+    # Load summary table
+    # ---------------------------
+    summary_table = os.path.join(args.data_dir, "catalogs/exposure_summary.fits")
+    summary = load_summary_table(summary_table)
+
+    if args.cluster not in summary:
+        print(f"{RED}Cluster {args.cluster} not found in summary table!{RESET}")
+        return
+
+    expected = summary[args.cluster]
+
     bands = ["u", "b", "g"]
 
-    print(f"\nChecking cluster: {args.cluster}")
+    print(f"\n{BOLD}Checking cluster:{RESET} {args.cluster}")
     print(f"Data directory: {args.data_dir}\n")
 
     for band in bands:
-        result = check_band(args.data_dir, args.cluster, band)
+        actual_good = check_band(args.data_dir, args.cluster, band)
+        expected_good = expected[band]
+
+        # ---------------------------
+        # Compare
+        # ---------------------------
+        if actual_good == expected_good:
+            status = f"{GREEN}MATCH ✔{RESET}"
+        else:
+            status = f"{RED}MISMATCH ✘{RESET}"
 
         print(f"{BOLD}Band: {band}{RESET}")
-        print(f"  Total               : {result['total']}")
-        print(f"  GOOD                : {GREEN}{result['good']}{RESET}")
-        print(f"  BAD                 : {result['bad']}")
+        print(f"  GOOD (local)   : {actual_good}")
+        print(f"  GOOD (expected): {expected_good}")
+        print(f"  Status         : {status}")
         print("-" * 40)
 
 

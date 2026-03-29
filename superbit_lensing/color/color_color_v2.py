@@ -313,9 +313,13 @@ def main(args):
     ra_b_valid, dec_b_valid = matched_data_b_valid['ALPHAWIN_J2000'], matched_data_b_valid['DELTAWIN_J2000']
     
     # ==== Dust Correction happening here ======
-    dust = DustCorrector()
-    Ax = dust(ra_b_valid, dec_b_valid)
-    
+    try:
+        dust = DustCorrector()
+        Ax = dust(ra_b_valid, dec_b_valid)
+    except Exception as e:
+        print(f"Dust correction failed ({e}), using zero corrections.")
+        Ax = {'b': 0, 'g': 0, 'u': 0}
+
     m_b = m_b - Ax['b']
     m_g = m_g - Ax['g']
     m_u = m_u - Ax['u']
@@ -491,14 +495,18 @@ def main(args):
         final_table['Z_source'] = z_source[valid_flux]
         
         # ======== Applying Star Mask =========
-        junks, final_table, reg_mask = separate_catalog_by_regions(mask_file, final_table)
+        if os.path.exists(mask_file):
+            print(f"Applying star mask from file: {mask_file}")
+            junks, final_table, reg_mask = separate_catalog_by_regions(mask_file, final_table)
+            print(f"Number of objects classified as junk (within star mask): {len(junks)}")
+            junks.write(output_junk_fits, format='fits', overwrite=True)
+            print(f"Wrote the Junk color mags to: {output_junk_fits}")    
+        else:
+            print(f"Star mask file not found: {mask_file}. Skipping star masking step.")
         
         # Save as a FITS file
         final_table.write(output_fits, format='fits', overwrite=True)
-        junks.write(output_junk_fits, format='fits', overwrite=True)
         print(f"Wrote the Galaxy color mags to: {output_fits}")     
-        print(f"Wrote the Junk color mags to: {output_junk_fits}")    
-
     # Step 5: Classify NED Matches by Redshift
     cluster_redshift = redshift
     cluster_redshift_up = cluster_redshift #+ delz
