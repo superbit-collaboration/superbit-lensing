@@ -8,6 +8,8 @@ from astropy.table import Table
 # Default data directory
 # ---------------------------
 DATA_DIR = "/n23data1/saha/data"
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+SUMMARY_TAB_FILE = os.path.join(PROJECT_ROOT, 'data', 'bit_exposure_summary.fits')
 
 GREEN = "\033[92m"
 RED = "\033[91m"
@@ -64,8 +66,7 @@ def main():
     # ---------------------------
     # Load summary table
     # ---------------------------
-    summary_table = os.path.join(args.data_dir, "catalogs/exposure_summary.fits")
-    summary = load_summary_table(summary_table)
+    summary = load_summary_table(SUMMARY_TAB_FILE)
 
     if args.cluster not in summary:
         print(f"{RED}Cluster {args.cluster} not found in summary table!{RESET}")
