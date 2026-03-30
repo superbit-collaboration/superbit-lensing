@@ -84,8 +84,8 @@ class DustCorrector:
 
         lam_val = lam.value
 
-        num = np.trapezoid(T * AxAv * lam_val, lam_val)
-        den = np.trapezoid(T * lam_val, lam_val)
+        num = np.trapz(T * AxAv * lam_val, lam_val)
+        den = np.trapz(T * lam_val, lam_val)
 
         return num / den
 
