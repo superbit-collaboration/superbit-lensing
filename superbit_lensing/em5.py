@@ -397,7 +397,7 @@ def plot_em5_psfex_maps(m, show=True, SHOW_MODEL_ROW=True, SHOW_OBSERV_ROW=True)
         row_labels = ["Observed (PSFEx)", "NGMix Model (EM5)", "Residual"]
         y_positions = [0.83, 0.50, 0.17]
     elif SHOW_OBSERV_ROW and not SHOW_MODEL_ROW:
-        row_labels = ["Observed", "Residual"]
+        row_labels = ["Observed (PSFEx)", "Residual (PSFEx-EM5)"]
         y_positions = [0.765, 0.28]
     else:
         row_labels = [""]
@@ -498,7 +498,7 @@ class EM5PsfexMapCollection:
 
     def plot_mean(self, show=True):
         m_avg = self.mean()
-        return plot_em5_psfex_maps(m_avg, show=show, SHOW_MODEL_ROW=True, SHOW_OBSERV_ROW=True)
+        return plot_em5_psfex_maps(m_avg, show=show, SHOW_MODEL_ROW=False, SHOW_OBSERV_ROW=True)
     
     def to_table(self, add_map_id=True) -> Table:
         tabs = []
