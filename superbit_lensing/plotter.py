@@ -1360,15 +1360,20 @@ class ClusterRedSequenceAnalysis:
         mid_z_indices = np.where((z_matched > self.cluster_redshift_down) & 
                                 (z_matched <= self.cluster_redshift_up))[0]
         
+        # Count galaxies in each redshift class
+        self.n_high_z = len(high_z_indices)
+        self.n_low_z = len(low_z_indices)
+        self.n_mid_z = len(mid_z_indices)
+
         # Extract data for each redshift class
         self.high_z_b = matched_data_b_ned[high_z_indices]
         self.low_z_b = matched_data_b_ned[low_z_indices]
         self.mid_z_b = matched_data_b_ned[mid_z_indices]
-        
-        print(f"Galaxies with z > {self.cluster_redshift_up:0.2f}: {len(high_z_indices)}")
-        print(f'Galaxies with {self.cluster_redshift_down:0.2f} < z ≤ {self.cluster_redshift_up:0.2f}: {len(mid_z_indices)}')
-        print(f"Galaxies with z ≤ {self.cluster_redshift_down:0.2f}: {len(low_z_indices)}")
-        
+
+        print(f"Galaxies with z > {self.cluster_redshift_up:0.2f}: {self.n_high_z}")
+        print(f'Galaxies with {self.cluster_redshift_down:0.2f} < z ≤ {self.cluster_redshift_up:0.2f}: {self.n_mid_z}')
+        print(f"Galaxies with z ≤ {self.cluster_redshift_down:0.2f}: {self.n_low_z}")
+
         # Store colors and magnitudes for each class
         self.color_index_high = self.high_z_b[self.color_index_col]
         self.m_b_high = self.high_z_b["m_b"]
@@ -1454,26 +1459,36 @@ class ClusterRedSequenceAnalysis:
         elif self.color_index_col == 'color_ub':
             color_label = r"$m_u - m_b$"
             
-        axes[0].scatter(self.m_b, self.color_index, s=5, alpha=0.1, color='blue', label="All Galaxies")
+# Background cloud — grey instead of blue so it doesn't compete with categorical colors
+        axes[0].scatter(self.m_b, self.color_index, s=5, alpha=0.08, color="#878787", label="All Galaxies")
+
+        # Red sequence — keep red but use a darker shade for contrast
         axes[0].scatter(self.m_b[self.red_sequence_mask], self.color_index[self.red_sequence_mask], 
-                       s=15, color='red', edgecolors='black', label="Red Sequence Galaxies")
+                       s=15, color='firebrick', edgecolors='k', linewidths=0.4, label="Red Sequence Galaxies")
+
         m_b_range = np.linspace(min(self.m_b), max(self.m_b), 100)
-        axes[0].plot(m_b_range, self.a * m_b_range + self.b, color='red', linestyle='--', 
+        axes[0].plot(m_b_range, self.a * m_b_range + self.b, color='firebrick', linestyle='--', 
                     label=f"red-seq line, {color_label} = {self.b}")
-        axes[0].scatter(self.m_b_high, self.color_index_high, s=12, edgecolors='black', 
-                       facecolors='orange', label=f'High-z (z > {self.cluster_redshift_up:.2f})')
-        axes[0].scatter(self.m_b_mid, self.color_index_mid, s=12, edgecolors='black', 
-                       facecolors='lime', label=f'Members ({self.cluster_redshift_down:.2f} < z ≤ {self.cluster_redshift_up:.2f})')
-        axes[0].scatter(self.m_b_low, self.color_index_low, s=12, edgecolors='black', 
-                       facecolors='red', label=f'Low-z (z ≤ {self.cluster_redshift_down:.2f})')
+
+        # Redshift bins — use colorblind-friendly, high-contrast palette
+        axes[0].scatter(self.m_b_high, self.color_index_high, s=14, edgecolors='k', linewidths=0.4,
+                       facecolors='#FFB000', label=f'High-z (z > {self.cluster_redshift_up:.2f}): {self.n_high_z}')   # vermillion
+        axes[0].scatter(self.m_b_mid, self.color_index_mid, s=14, edgecolors='k', linewidths=0.4,
+                       facecolors='#1AFF1A', label=f'Members ({self.cluster_redshift_down:.2f} < z ≤ {self.cluster_redshift_up:.2f}): {self.n_mid_z}')  # bright green
+        axes[0].scatter(self.m_b_low, self.color_index_low, s=14, edgecolors='k', linewidths=0.4,
+                       facecolors='#5D3FD3', label=f'Low-z (z ≤ {self.cluster_redshift_down:.2f}): {self.n_low_z}')  # purple
         axes[0].set_xlabel(r"$m_b$")
         axes[0].set_ylabel(color_label)
         axes[0].set_title(f"Red Sequence in {self.cluster_name}")
-        axes[0].legend()
+        leg = axes[0].legend(fontsize=12, loc='lower left',
+                             frameon=True, fancybox=False,
+                             edgecolor='#AAAAAA', framealpha=0.92,
+                             handletextpad=0.4, borderpad=0.5)
+        leg.get_frame().set_linewidth(0.5)
         axes[0].grid(True, linestyle='--', alpha=0.5)
         
         # Second plot: Spatial distribution of red-sequence galaxies
-        im = axes[1].imshow(self.smoothed_hist.T[:, ::-1], origin='lower', aspect='equal', cmap='magma',
+        im = axes[1].imshow(self.smoothed_hist.T[:, ::-1], origin='lower', aspect='equal', cmap='magma', interpolation='bicubic',
                            extent=[self.ra_max, self.ra_min, self.dec_min, self.dec_max])
         # axes[1].scatter(self.ra_center_inverted, self.dec_center, color='lime', marker='x', 
         #                s=50, label="X-ray Center")
@@ -1527,7 +1542,7 @@ class ClusterRedSequenceAnalysis:
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
         
         # Spatial distribution with contours
-        im = ax.imshow(smoothed_for_contours.T[:, ::-1], origin='lower', aspect='equal', cmap='magma',
+        im = ax.imshow(smoothed_for_contours.T[:, ::-1], origin='lower', aspect='equal', cmap='magma', interpolation='bicubic',
                       extent=[self.ra_max, self.ra_min, self.dec_min, self.dec_max])
         
         # Draw contours
