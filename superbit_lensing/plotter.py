@@ -1240,7 +1240,7 @@ class ClusterRedSequenceAnalysis:
     for galaxy clusters.
     """
     
-    def __init__(self, cluster_name, datadir=None, datafilename=None, delz=0.02, radius_th=-1, cluster_redshift=None):
+    def __init__(self, cluster_name, datadir=None, megafilename=None, datafilename=None, delz=0.02, color_index='bg', radius_th=-1, cluster_redshift=None, only_specz=True):
         """
         Initialize the cluster analysis.
         
@@ -1253,14 +1253,27 @@ class ClusterRedSequenceAnalysis:
         delz : float
             Redshift tolerance for cluster membership (default: 0.02)
         """
-        if datafilename is None and datadir is None:
-            raise ValueError("Either datafilename or datadir must be provided.")        
+        if (datafilename is None) and (datadir is None) and (megafilename is None):
+            raise ValueError("Either datafilename, datadir, or megafilename must be provided.")
         self.cluster_name = cluster_name
-        self.datadir = datadir
+        if datafilename is not None or megafilename is not None:
+            self.datadir = './'
+        else:
+            self.datadir = datadir
         self.datafilename = datafilename
+        self.megafilename = megafilename
         self.delz = delz
         self.radius_th=radius_th
-        
+        self.only_specz = only_specz
+        if color_index == 'bg':
+            self.color_index_col = 'color_bg'
+        elif color_index == 'ug':
+            self.color_index_col = 'color_ug'
+        elif color_index == "ub":
+            self.color_index_col = 'color_ub'
+        else:
+            raise ValueError("Invalid color index. Choose from 'bg', 'ug', or 'ub'.")
+
         # Initialize attributes that will be populated
         self.ra_center = None
         self.dec_center = None
@@ -1278,6 +1291,15 @@ class ClusterRedSequenceAnalysis:
         # Load catalog
         if self.datafilename is not None:
             self.color_mag_file = self.datafilename
+        elif self.megafilename is not None:
+            print("Using mega file:", self.megafilename)
+            mega_cm_cat = Table.read(self.megafilename)
+            cm_cat = mega_cm_cat[mega_cm_cat['CLUSTER'] == self.cluster_name]
+            self.color_mag_file = os.path.join(
+                self.datadir, 
+                f'{self.cluster_name}_colors_mags.fits'
+            )
+            cm_cat.write(self.color_mag_file, overwrite=True)
         else:
             self.color_mag_file = os.path.join(
                 self.datadir, 
@@ -1311,7 +1333,7 @@ class ClusterRedSequenceAnalysis:
         # Extract magnitudes and colors
         self.m_b = self.cm_cat["m_b"]
         self.m_g = self.cm_cat["m_g"]
-        self.color_index = self.cm_cat["color_bg"]
+        self.color_index = self.cm_cat[self.color_index_col]
         
         # Process redshift data
         self._process_redshift_data()
@@ -1319,8 +1341,14 @@ class ClusterRedSequenceAnalysis:
     def _process_redshift_data(self):
         """Process redshift data and classify galaxies by redshift."""
         z = self.cm_cat['Z_best']
-        z_matched = z[~np.isnan(z)]
-        matched_data_b_ned = self.cm_cat[~np.isnan(z)]
+        z_source = self.cm_cat['Z_source']
+        if self.only_specz:
+            valid_z_mask = ((z_source == 'DESI') | (z_source == 'NED')) & np.isfinite(z)
+        else:
+            valid_z_mask = np.isfinite(z)
+            
+        z_matched = z[valid_z_mask]
+        matched_data_b_ned = self.cm_cat[valid_z_mask]
         
         # Redshift boundaries
         self.cluster_redshift_up = self.cluster_redshift + self.delz
@@ -1342,11 +1370,11 @@ class ClusterRedSequenceAnalysis:
         print(f"Galaxies with z ≤ {self.cluster_redshift_down:0.2f}: {len(low_z_indices)}")
         
         # Store colors and magnitudes for each class
-        self.color_index_high = self.high_z_b["color_bg"]
+        self.color_index_high = self.high_z_b[self.color_index_col]
         self.m_b_high = self.high_z_b["m_b"]
-        self.color_index_mid = self.mid_z_b["color_bg"]
+        self.color_index_mid = self.mid_z_b[self.color_index_col]
         self.m_b_mid = self.mid_z_b["m_b"]
-        self.color_index_low = self.low_z_b["color_bg"]
+        self.color_index_low = self.low_z_b[self.color_index_col]
         self.m_b_low = self.low_z_b["m_b"]
         
     def compute_red_sequence(self, a=0.0, b=1.55, tolerance=0.1, resolution=0.5, sigma=1.5, save_path=None):
@@ -1419,12 +1447,19 @@ class ClusterRedSequenceAnalysis:
         fig, axes = plt.subplots(1, 2, figsize=(14, 6))
         
         # First plot: Color-Magnitude Diagram
+        if self.color_index_col == 'color_bg':
+            color_label = r"$m_b - m_g$"
+        elif self.color_index_col == 'color_ug':
+            color_label = r"$m_u - m_g$"
+        elif self.color_index_col == 'color_ub':
+            color_label = r"$m_u - m_b$"
+            
         axes[0].scatter(self.m_b, self.color_index, s=5, alpha=0.1, color='blue', label="All Galaxies")
         axes[0].scatter(self.m_b[self.red_sequence_mask], self.color_index[self.red_sequence_mask], 
                        s=15, color='red', edgecolors='black', label="Red Sequence Galaxies")
         m_b_range = np.linspace(min(self.m_b), max(self.m_b), 100)
         axes[0].plot(m_b_range, self.a * m_b_range + self.b, color='red', linestyle='--', 
-                    label=f"red-seq line, $m_b - m_g$ = {self.b}")
+                    label=f"red-seq line, {color_label} = {self.b}")
         axes[0].scatter(self.m_b_high, self.color_index_high, s=12, edgecolors='black', 
                        facecolors='orange', label=f'High-z (z > {self.cluster_redshift_up:.2f})')
         axes[0].scatter(self.m_b_mid, self.color_index_mid, s=12, edgecolors='black', 
@@ -1432,21 +1467,21 @@ class ClusterRedSequenceAnalysis:
         axes[0].scatter(self.m_b_low, self.color_index_low, s=12, edgecolors='black', 
                        facecolors='red', label=f'Low-z (z ≤ {self.cluster_redshift_down:.2f})')
         axes[0].set_xlabel(r"$m_b$")
-        axes[0].set_ylabel(r"$m_b - m_g$")
+        axes[0].set_ylabel(color_label)
         axes[0].set_title(f"Red Sequence in {self.cluster_name}")
         axes[0].legend()
         axes[0].grid(True, linestyle='--', alpha=0.5)
         
         # Second plot: Spatial distribution of red-sequence galaxies
-        im = axes[1].imshow(self.smoothed_hist.T[:, ::-1], origin='lower', aspect='auto', cmap='magma',
+        im = axes[1].imshow(self.smoothed_hist.T[:, ::-1], origin='lower', aspect='equal', cmap='magma',
                            extent=[self.ra_max, self.ra_min, self.dec_min, self.dec_max])
-        axes[1].scatter(self.ra_center_inverted, self.dec_center, color='lime', marker='x', 
-                       s=50, label="X-ray Center")
+        # axes[1].scatter(self.ra_center_inverted, self.dec_center, color='lime', marker='x', 
+        #                s=50, label="X-ray Center")
         axes[1].set_xlabel("Right Ascension (deg)")
         axes[1].set_ylabel("Declination (deg)")
         axes[1].set_title(f"Resolution: {self.resolution} arcmin, kernel: {self.sigma}")
-        axes[1].legend()
-        fig.colorbar(im, ax=axes[1], label="Count")
+        # axes[1].legend()
+        # fig.colorbar(im, ax=axes[1], label="Count")
         n_red_seq = np.sum(self.red_sequence_mask)
         fig.suptitle(f"Red Sequence Evolution (b = {self.b:.1f}, {n_red_seq} galaxies selected)", 
                     fontsize=16)
@@ -1492,7 +1527,7 @@ class ClusterRedSequenceAnalysis:
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
         
         # Spatial distribution with contours
-        im = ax.imshow(smoothed_for_contours.T[:, ::-1], origin='lower', aspect='auto', cmap='magma',
+        im = ax.imshow(smoothed_for_contours.T[:, ::-1], origin='lower', aspect='equal', cmap='magma',
                       extent=[self.ra_max, self.ra_min, self.dec_min, self.dec_max])
         
         # Draw contours
@@ -1500,7 +1535,7 @@ class ClusterRedSequenceAnalysis:
                        colors=['cyan', 'yellow'], linewidths=2)
         
         # Find galaxies within the highest density contour
-        innermost_contour = cs.collections[-1].get_paths()[0]
+        innermost_contour = cs.get_paths()[-1]
         contour_polygon = Path(innermost_contour.vertices)
         
         # Check which red sequence galaxies are inside this contour
@@ -1522,7 +1557,7 @@ class ClusterRedSequenceAnalysis:
         ax.set_ylabel("Declination (deg)")
         ax.set_title(f"Cluster Members (within {percentiles[-1]}% density contour)")
         ax.legend()
-        fig.colorbar(im, ax=ax, label="Count")
+        #fig.colorbar(im, ax=ax, label="Count")
         
         plt.tight_layout()
         if save_path:

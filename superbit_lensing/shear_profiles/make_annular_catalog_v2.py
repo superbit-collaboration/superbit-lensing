@@ -175,7 +175,7 @@ class AnnularCatalog():
         
         # Columns to fetch from color_mag
         columns_to_add = ['m_b', 'm_b_err', 'm_g', 'm_g_err', 'm_u', 'm_u_err', 
-                        'color_bg', 'color_bg_err', 'color_ub', 'color_ub_err', 'Z_best', 
+                        'color_bg', 'color_bg_err', 'color_ub', 'color_ub_err', 'color_ug', 'color_ug_err', 'Ax_b', 'Ax_g', 'Ax_u', 'Z_best', 
                           'ZERR_best', 'Z_source']
         
         string_columns = ['Z_source']    
