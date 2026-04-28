@@ -1,0 +1,155 @@
+# =============================================================================
+# default_source_selection.yaml
+#
+# Configuration file for superbit_lensing/source_selection/make_background_catalog.py
+#
+# Single-catalog design:
+#   One mega color catalog serves both roles:
+#     Training set  : rows where Z_source is NED or DESI (~5,558 objects)
+#     Full sample   : all 166,976 rows used for object selection
+#
+# Usage:
+#   python -m superbit_lensing.source_selection.make_background_catalog \
+#       -c configs/default_source_selection.yaml
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Input catalog
+# -----------------------------------------------------------------------------
+
+color_catalog: /projects/mccleary_group/superbit/color/FINAL_mega_color_mag_catalog_20260402_114934.fits
+
+
+# -----------------------------------------------------------------------------
+# Output
+# -----------------------------------------------------------------------------
+
+output_dir: /projects/mccleary_group/amit.m/source_selection/results
+
+
+# -----------------------------------------------------------------------------
+# Shapes mode
+# -----------------------------------------------------------------------------
+
+shapes: false
+
+
+# -----------------------------------------------------------------------------
+# Clusters to process
+# -----------------------------------------------------------------------------
+
+clusters:
+  - name: Abell141
+    redshift: 0.230
+
+  - name: Abell1689
+    redshift: 0.180
+
+  - name: Abell2163
+    redshift: 0.200
+
+  - name: Abell2345
+    redshift: 0.180
+
+  - name: Abell2384a
+    redshift: 0.094
+
+  - name: Abell2384b
+    redshift: 0.094
+
+  - name: Abell3365
+    redshift: 0.093
+
+  - name: Abell3411
+    redshift: 0.170
+
+  - name: Abell3526
+    redshift: 0.010
+
+  - name: Abell3571
+    redshift: 0.040
+
+  - name: Abell3667
+    redshift: 0.060
+
+  - name: Abell3716S
+    redshift: 0.045
+
+  - name: Abell3827
+    redshift: 0.100
+
+  - name: AbellS0592
+    redshift: 0.220
+
+  - name: AbellS780
+    redshift: 0.240
+
+  - name: MACSJ0416d1m2403
+    redshift: 0.420
+
+  - name: MACSJ0723d3_7327_JWST
+    redshift: 0.390
+
+  - name: MACSJ1105d7m1014
+    redshift: 0.470
+
+  - name: MACSJ1931d8m2635
+    redshift: 0.350
+
+  - name: MS1008d1m1224
+    redshift: 0.310
+
+  - name: MS2137m2353
+    redshift: 0.310
+
+  - name: PLCKG287d0p32d9
+    redshift: 0.390
+
+  - name: RXCJ1314d4m2515
+    redshift: 0.250
+
+  - name: RXCJ1514d9m1523
+    redshift: 0.220
+
+  - name: RXCJ2003d5m2323
+    redshift: 0.320
+
+  - name: SMACSJ2031d8m4036
+    redshift: 0.330
+
+  - name: SPTCLJ0411
+    redshift: 0.420
+
+  - name: Z20_SPT_CLJ0135m5904
+    redshift: 0.510
+
+
+# -----------------------------------------------------------------------------
+# Pixel mask parameters
+# -----------------------------------------------------------------------------
+
+pixel_size: 0.05
+min_count: 10
+err_thresh: 0.5
+xlim: [-1.5, 1.0]
+ylim: [-1.0, 3.0]
+weighting: true
+
+
+# -----------------------------------------------------------------------------
+# Red sequence
+# -----------------------------------------------------------------------------
+
+with_redsequence: true
+redseq_catalog: /projects/mccleary_group/ysp/redseq/combined_colors_mags.fits
+
+
+# -----------------------------------------------------------------------------
+# Tau / validation settings
+# -----------------------------------------------------------------------------
+
+tau_sweep: true
+purity_threshold: 0.5
+tau_values: [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+n_folds: 5

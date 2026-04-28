@@ -1,0 +1,124 @@
+# =============================================================================
+# default_source_selection.yaml
+#
+# Configuration file for superbit_lensing/source_selection/make_background_catalog.py
+#
+# Usage:
+#   python -m superbit_lensing.source_selection.make_background_catalog \
+#       -c configs/default_source_selection.yaml
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Input catalog
+# -----------------------------------------------------------------------------
+
+# Single mega color catalog (all clusters, with CLUSTER column).
+# Serves two roles:
+#   Training set : rows where Z_best is not NaN (~14% of objects, from
+#                  NED and DESI surveys only)
+#   Full sample  : all rows (used for foreground/background selection)
+#
+# Must contain: color_bg, color_ub, color_bg_err, color_ub_err,
+#               Z_best, Z_source, ra, dec, id, CLUSTER.
+color_catalog: /projects/mccleary_group/superbit/color/FINAL_mega_color_mag_catalog_20260402_114934.fits
+
+# -----------------------------------------------------------------------------
+# Output
+# -----------------------------------------------------------------------------
+
+# Per-cluster subdirectories are created automatically:
+#   {output_dir}/{cluster_name}/{cluster_name}_foreground.fits
+#   {output_dir}/{cluster_name}/{cluster_name}_background.fits
+#   {output_dir}/{cluster_name}/{cluster_name}_pixel_mask.png
+#   {output_dir}/{cluster_name}/{cluster_name}_contamination_vs_density.png  (tau_sweep only)
+output_dir: /projects/mccleary_group/amit.m/source_selection/results
+
+
+# -----------------------------------------------------------------------------
+# Shapes mode
+# -----------------------------------------------------------------------------
+
+# If false (default): color cuts are applied to the color catalog only.
+#   - Foreground catalog: pixel mask selected objects from the color catalog.
+#   - Background catalog: remaining color catalog objects for this cluster.
+#   - No shear columns required. shear_catalog per cluster is ignored.
+#
+# If true: color cuts are applied as above, but foreground objects are then
+#   removed from a separate per-cluster shear catalog (annular output from
+#   make_annular_catalog_v2.py). Shear response is recalculated on the
+#   remaining background objects. Requires shear_catalog per cluster below.
+shapes: false
+
+
+# -----------------------------------------------------------------------------
+# Clusters to process
+# -----------------------------------------------------------------------------
+# Only listed clusters will be processed.
+# name        : must match the CLUSTER column value in the color catalog exactly.
+# redshift    : spectroscopic cluster redshift (z_thresh = redshift + 0.025).
+# shear_catalog: path to the per-cluster annular FITS file. Only required
+#               when shapes: true above.
+
+clusters:
+  - name: Abell3411
+    redshift: 0.145
+    shear_catalog: /scratch/sa.saha/test_data/Abell3411/b/out/Abell3411_b_annular_combined.fits
+
+
+# -----------------------------------------------------------------------------
+# Pixel mask parameters
+# -----------------------------------------------------------------------------
+
+# Size of each pixel in color-color space (B-G vs U-B).
+pixel_size: 0.05
+
+# Minimum number of training objects in a pixel for it to be included
+# in the hard foreground mask.
+min_count: 10
+
+# Maximum allowed color error (B-G or U-B) for a training object.
+err_thresh: 0.5
+
+# Color-space axis limits [min, max] for B-G (x) and U-B (y).
+xlim: [-1.5, 1.0]
+ylim: [-1.0, 3.0]
+
+# If true, use inverse-variance weighting (1/sigma^2) when computing
+# per-pixel foreground/background fractions.
+weighting: true
+
+
+# -----------------------------------------------------------------------------
+# Red sequence
+# -----------------------------------------------------------------------------
+
+# If true, all objects flagged is_red_sequence=True in the RS catalog are
+# excluded from the training set before building the pixel mask.
+with_redsequence: true
+
+# Path to the single mega red sequence catalog (all clusters combined).
+# Must contain CLUSTER and is_red_sequence columns.
+# Clusters not present in this catalog have RS removal silently skipped.
+# Only required when with_redsequence: true.
+redseq_catalog: /projects/mccleary_group/ysp/redseq/combined_colors_mags.fits
+
+
+# -----------------------------------------------------------------------------
+# Tau / validation settings
+# -----------------------------------------------------------------------------
+
+# If true:  sweep over all tau_values, produce a contamination-vs-source-density
+#           plot per cluster, then produce final catalogs at purity_threshold.
+# If false: produce catalogs at purity_threshold and write CV contamination
+#           estimates (plus source density) into the background catalog FITS header.
+tau_sweep: true
+
+# Purity threshold (tau) used for the final foreground/background catalogs.
+purity_threshold: 0.5
+
+# Tau values to sweep over (only used when tau_sweep: true).
+tau_values: [0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]
+
+# Number of stratified k-folds for cross-validation contamination estimates.
+n_folds: 5
