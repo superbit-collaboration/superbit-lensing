@@ -19,13 +19,14 @@
 # -----------------------------------------------------------------------------
 
 color_catalog: /projects/mccleary_group/superbit/color/FINAL_mega_color_mag_catalog_20260402_114934.fits
+union_redseq_into_foreground: false
 
 
 # -----------------------------------------------------------------------------
 # Output
 # -----------------------------------------------------------------------------
 
-output_dir: /projects/mccleary_group/amit.m/source_selection/results
+output_dir: /projects/mccleary_group/amit.m/source_selection/results/run2
 
 
 # -----------------------------------------------------------------------------
@@ -141,7 +142,12 @@ weighting: true
 # Red sequence
 # -----------------------------------------------------------------------------
 
-with_redsequence: true
+# train with redsequence members
+# with_redsequence: true ... the code calls load_and_remove_redseq → RS members are removed from training.
+# with_redsequence: false... that function is not called → RS members stay in training.
+
+with_redsequence: false
+union_specz_into_foreground: true
 redseq_catalog: /projects/mccleary_group/ysp/redseq/combined_colors_mags.fits
 
 

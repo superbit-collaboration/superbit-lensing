@@ -22,6 +22,8 @@ from matplotlib.patches import Patch
 from astropy.table import Table
 from astropy.io import fits
 from superbit_lensing.match import SkyCoordMatcher
+from astropy.table import vstack
+
 
 
 # ---------------------------------------------------------------------------
@@ -403,7 +405,168 @@ def apply_pixel_mask_to_catalog(vote_map_display, x_edges, y_edges,
 # ---------------------------------------------------------------------------
 # Shear response recalculation (only used when shapes=True)
 # ---------------------------------------------------------------------------
+from astropy.table import vstack
 
+
+def union_redseq_into_foreground(foreground_cat, color_cluster_cat,
+                                  redseq_catalog_path, cluster_name,
+                                  match_col='id'):
+    """
+    Add red sequence members for a cluster to the foreground catalog,
+    deduplicated against pixel mask hits.
+
+    Identifies all rows in the RS catalog with target_name == cluster_name
+    and is_red_sequence == True, locates those rows in color_cluster_cat
+    by match_col, and unions them into foreground_cat. Rows already present
+    in foreground_cat (i.e., caught by the pixel mask) are skipped.
+
+    Parameters
+    ----------
+    foreground_cat : astropy.table.Table
+        Pixel-mask-selected foreground catalog from apply_pixel_mask_to_catalog.
+    color_cluster_cat : astropy.table.Table
+        Cluster slice of the full color catalog (catalog[CLUSTER == cluster_name]).
+        Must share schema with foreground_cat (it does by construction).
+    redseq_catalog_path : str
+        Path to the mega RS catalog. Must contain target_name, is_red_sequence,
+        and match_col columns.
+    cluster_name : str
+    match_col : str
+        Column used to identify objects across catalogs. Default 'id'.
+
+    Returns
+    -------
+    foreground_cat : astropy.table.Table
+        Union of pixel mask hits and cluster RS members (deduplicated).
+    n_added : int
+        Number of unique RS members added beyond the pixel mask.
+    """
+    if not os.path.exists(redseq_catalog_path):
+        print(f'  Warning: RS catalog not found: {redseq_catalog_path}')
+        return foreground_cat, 0
+
+    rs_cat = Table.read(redseq_catalog_path)
+
+    required_rs_cols = ['target_name', 'is_red_sequence', match_col]
+    missing = [c for c in required_rs_cols if c not in rs_cat.colnames]
+    if missing:
+        print(f'  Warning: RS catalog missing columns {missing} - skipping union.')
+        return foreground_cat, 0
+
+    if match_col not in color_cluster_cat.colnames:
+        print(f'  Warning: color catalog missing {match_col} - skipping union.')
+        return foreground_cat, 0
+
+    cluster_rs = rs_cat[
+        (rs_cat['target_name'] == cluster_name)
+        & rs_cat['is_red_sequence'].astype(bool)
+    ]
+
+    if len(cluster_rs) == 0:
+        print(f'  No RS members in catalog for {cluster_name} - skipping union.')
+        return foreground_cat, 0
+
+    print(f'  RS members for {cluster_name} in RS catalog: {len(cluster_rs)}')
+
+    rs_in_source_mask = np.isin(color_cluster_cat[match_col], cluster_rs[match_col])
+    rs_in_source      = color_cluster_cat[rs_in_source_mask]
+    n_rs_in_source    = len(rs_in_source)
+    print(f'  RS members present in color catalog: {n_rs_in_source}')
+
+    if n_rs_in_source == 0:
+        return foreground_cat, 0
+
+    if len(foreground_cat) > 0:
+        already_in_fg = np.isin(rs_in_source[match_col], foreground_cat[match_col])
+        new_rs        = rs_in_source[~already_in_fg]
+    else:
+        new_rs = rs_in_source
+
+    n_already = n_rs_in_source - len(new_rs)
+    n_added   = len(new_rs)
+    print(f'  RS already caught by pixel mask: {n_already}')
+    print(f'  Unique RS added to foreground:   {n_added}')
+
+    if n_added == 0:
+        return foreground_cat, 0
+
+    foreground_cat = vstack([foreground_cat, new_rs])
+
+    return foreground_cat, n_added
+
+## ALSO REMOVE SPECZ OBJECTS (to get proper source density estimates)
+def union_specz_foreground_into_foreground(foreground_cat, color_cluster_cat,
+                                            z_thresh,
+                                            redshift_col=TRAIN_REDSHIFT_COL,
+                                            zsource_col=TRAIN_ZSOURCE_COL,
+                                            reliable_sources=('NED', 'DESI'),
+                                            match_col='id'):
+    """
+    Add spec-z confirmed foreground objects to the foreground catalog,
+    deduplicated against pixel mask hits.
+
+    Identifies rows in color_cluster_cat where Z_source is in
+    reliable_sources and Z_best <= z_thresh, then unions them into
+    foreground_cat. Rows already caught by the pixel mask are skipped.
+
+    Parameters
+    ----------
+    foreground_cat : astropy.table.Table
+    color_cluster_cat : astropy.table.Table
+        Cluster slice of the full color catalog. Must contain
+        redshift_col, zsource_col, and match_col.
+    z_thresh : float
+    redshift_col : str
+    zsource_col : str
+    reliable_sources : tuple of str
+    match_col : str
+
+    Returns
+    -------
+    foreground_cat : astropy.table.Table
+    n_added : int
+    """
+    required_cols = [redshift_col, zsource_col, match_col]
+    missing = [c for c in required_cols if c not in color_cluster_cat.colnames]
+    if missing:
+        print(f'  Warning: color catalog missing {missing} - skipping spec-z union.')
+        return foreground_cat, 0
+
+    z_source = np.array([s.strip() if isinstance(s, str) else ''
+                         for s in color_cluster_cat[zsource_col]])
+    z_best   = color_cluster_cat[redshift_col].astype(float)
+
+    reliable_mask = np.isin(z_source, list(reliable_sources))
+    is_foreground = z_best <= z_thresh
+    valid_z       = ~np.isnan(z_best)
+
+    specz_fg_mask = reliable_mask & is_foreground & valid_z
+    specz_fg      = color_cluster_cat[specz_fg_mask]
+    n_specz_fg    = len(specz_fg)
+
+    print(f'  Spec-z confirmed FG in color catalog: {n_specz_fg}')
+
+    if n_specz_fg == 0:
+        return foreground_cat, 0
+
+    if len(foreground_cat) > 0:
+        already_in_fg = np.isin(specz_fg[match_col], foreground_cat[match_col])
+        new_specz     = specz_fg[~already_in_fg]
+    else:
+        new_specz = specz_fg
+
+    n_already = n_specz_fg - len(new_specz)
+    n_added   = len(new_specz)
+    print(f'  Spec-z FG already caught by pixel mask: {n_already}')
+    print(f'  Unique spec-z FG added to foreground:   {n_added}')
+
+    if n_added == 0:
+        return foreground_cat, 0
+
+    foreground_cat = vstack([foreground_cat, new_specz])
+
+    return foreground_cat, n_added
+    
 def calculate_shear_response(catalog, verbose=True):
     """
     Recalculate shear response correction for a filtered (background) catalog.
@@ -524,7 +687,7 @@ def make_background_catalog(source_catalog, foreground_catalog,
 
     background_mask = np.ones(n_total, dtype=bool)
     if len(idx1) > 0:
-        background_mask[idx1] = False
+        background_mask[idx1] =  False
 
     background_catalog = source_catalog[background_mask]
     n_bg = len(background_catalog)

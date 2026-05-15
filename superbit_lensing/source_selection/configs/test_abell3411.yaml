@@ -32,7 +32,7 @@ color_catalog: /projects/mccleary_group/superbit/color/FINAL_mega_color_mag_cata
 #   {output_dir}/{cluster_name}/{cluster_name}_background.fits
 #   {output_dir}/{cluster_name}/{cluster_name}_pixel_mask.png
 #   {output_dir}/{cluster_name}/{cluster_name}_contamination_vs_density.png  (tau_sweep only)
-output_dir: /projects/mccleary_group/amit.m/source_selection/results
+output_dir: /projects/mccleary_group/amit.m/source_selection/results/abell1689_test4_may5
 
 
 # -----------------------------------------------------------------------------
@@ -61,9 +61,9 @@ shapes: false
 #               when shapes: true above.
 
 clusters:
-  - name: Abell3411
-    redshift: 0.145
-    shear_catalog: /scratch/sa.saha/test_data/Abell3411/b/out/Abell3411_b_annular_combined.fits
+  - name: Abell1689
+    redshift: 0.155
+    shear_catalog: /scratch/sa.saha/test_data/Abell3411/b/out/Abell1689_b_annular_combined.fits
 
 
 # -----------------------------------------------------------------------------
@@ -95,13 +95,14 @@ weighting: true
 
 # If true, all objects flagged is_red_sequence=True in the RS catalog are
 # excluded from the training set before building the pixel mask.
-with_redsequence: true
+with_redsequence: false
 
 # Path to the single mega red sequence catalog (all clusters combined).
 # Must contain CLUSTER and is_red_sequence columns.
 # Clusters not present in this catalog have RS removal silently skipped.
 # Only required when with_redsequence: true.
-redseq_catalog: /projects/mccleary_group/ysp/redseq/combined_colors_mags.fits
+redseq_catalog: /projects/mccleary_group/ysp/redseq/Abell1689/Abell1689_coadd_redseq.fits
+union_redseq_into_foreground: true
 
 
 # -----------------------------------------------------------------------------
@@ -115,7 +116,7 @@ redseq_catalog: /projects/mccleary_group/ysp/redseq/combined_colors_mags.fits
 tau_sweep: true
 
 # Purity threshold (tau) used for the final foreground/background catalogs.
-purity_threshold: 0.5
+purity_threshold: 0.6
 
 # Tau values to sweep over (only used when tau_sweep: true).
 tau_values: [0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]

@@ -42,7 +42,9 @@ from .color_cuts import (
     create_pixel_voting_map_purity,
     save_pixel_mask_image,
     apply_pixel_mask_to_catalog,
+    union_redseq_into_foreground,
     make_background_catalog,
+    union_specz_foreground_into_foreground,
     TRAIN_COLOR_BG_COL,
     TRAIN_COLOR_UB_COL,
     TRAIN_COLOR_BG_ERR_COL,
@@ -108,6 +110,7 @@ def process_cluster(cluster_cfg, global_cfg, catalog,
     cluster_name = cluster_cfg['name']
     z_cluster    = float(cluster_cfg['redshift'])
     z_thresh     = round(z_cluster + 0.025, 6)
+    
 
     print(f'\n{"="*60}')
     print(f'Processing {cluster_name}  (z={z_cluster:.3f}, z_thresh={z_thresh:.3f})')
@@ -127,6 +130,10 @@ def process_cluster(cluster_cfg, global_cfg, catalog,
                         for t in global_cfg.get('tau_values', [0.5])]
     n_folds          = int(global_cfg.get('n_folds', 5))
     shapes           = bool(global_cfg.get('shapes', False))
+    union_redseq    = bool(global_cfg.get('union_redseq_into_foreground', False))
+    union_specz     = bool(global_cfg.get('union_specz_into_foreground', False))
+
+
 
     # ---- Output directory ------------------------------------------------
     cluster_outdir = os.path.join(global_cfg['output_dir'], cluster_name)
@@ -245,6 +252,35 @@ def process_cluster(cluster_cfg, global_cfg, catalog,
         purity_threshold=purity_threshold,
         pixel_size=pixel_size,
     )
+    n_pixel_mask = len(foreground_cat)
+
+    if union_redseq:
+        redseq_catalog_path = global_cfg.get('redseq_catalog', None)
+        if redseq_catalog_path is None:
+            print('  Warning: union_redseq_into_foreground=True but redseq_catalog not set.')
+        else:
+            print('\nUnioning RS members into foreground catalog...')
+            cluster_color_mask = catalog[CLUSTER_COL] == cluster_name
+            color_cluster_cat  = catalog[cluster_color_mask]
+            foreground_cat, n_rs_added = union_redseq_into_foreground(
+                foreground_cat, color_cluster_cat,
+                redseq_catalog_path, cluster_name,
+            )
+            print(f'  Pixel mask hits      : {n_pixel_mask}')
+            print(f'  Unique RS added      : {n_rs_added}')
+            print(f'  Total foreground     : {len(foreground_cat)}')
+
+    if union_specz:
+        print('\nUnioning spec-z confirmed FG into foreground catalog...')
+        cluster_color_mask = catalog[CLUSTER_COL] == cluster_name
+        color_cluster_cat  = catalog[cluster_color_mask]
+        n_before_specz = len(foreground_cat)
+        foreground_cat, n_specz_added = union_specz_foreground_into_foreground(
+            foreground_cat, color_cluster_cat, z_thresh,
+        )
+        print(f'  Foreground before spec-z union : {n_before_specz}')
+        print(f'  Unique spec-z FG added          : {n_specz_added}')
+        print(f'  Total foreground after union    : {len(foreground_cat)}')
 
     if len(foreground_cat) == 0:
         print(f'  Warning: empty foreground catalog for {cluster_name}. '
@@ -253,6 +289,9 @@ def process_cluster(cluster_cfg, global_cfg, catalog,
 
     print(f'\nSaving foreground catalog: {fg_path}')
     foreground_cat.write(fg_path, format='fits', overwrite=overwrite)
+
+
+    
 
     # ---- Background catalog ----------------------------------------------
     print('\nBuilding background catalog...')
@@ -273,30 +312,25 @@ def process_cluster(cluster_cfg, global_cfg, catalog,
     density = density_results['DENS_AMIN']
     print(f'Background source density: {density:.3f} objects / arcmin²')
 
-    # ---- CV contamination → FITS header (tau_sweep=False only) ----------
-    if not tau_sweep:
-        print(f'\nRunning {n_folds}-fold CV at tau={purity_threshold:.2f}...')
-        cv_result = run_cv_at_tau(
-            catalog, training_mask, z_thresh,
-            xlim, ylim, pixel_size, purity_threshold, min_count,
-            n_folds=n_folds, weighting=weighting, err_thresh=err_thresh,
-        )
+    
+    # ---- CV contamination → FITS header (always) -------------------------
+    print(f'\nRunning {n_folds}-fold CV at tau={purity_threshold:.2f}...')
+    cv_result = run_cv_at_tau(
+        catalog, training_mask, z_thresh,
+        xlim, ylim, pixel_size, purity_threshold, min_count,
+        n_folds=n_folds, weighting=weighting, err_thresh=err_thresh,
+    )
 
-        print(f'  bg_contam  : {cv_result["bg_contam_mean"]:.3f} '
-              f'± {cv_result["bg_contam_std"]:.3f}')
-        print(f'  fg_contam  : {cv_result["fg_contam_mean"]:.3f} '
-              f'± {cv_result["fg_contam_std"]:.3f}')
-        print(f'  tot_contam : {cv_result["total_contam_mean"]:.3f} '
-              f'± {cv_result["total_contam_std"]:.3f}')
+    print(f'  bg_contam  : {cv_result["bg_contam_mean"]:.3f} '
+        f'± {cv_result["bg_contam_std"]:.3f}')
+    print(f'  fg_contam  : {cv_result["fg_contam_mean"]:.3f} '
+        f'± {cv_result["fg_contam_std"]:.3f}')
+    print(f'  tot_contam : {cv_result["total_contam_mean"]:.3f} '
+        f'± {cv_result["total_contam_std"]:.3f}')
 
-        _write_contamination_to_header(
-            bg_path, cv_result, purity_threshold, n_folds, z_thresh, shapes
-        )
-
-    print(f'\nDone with {cluster_name}.')
-    print(f'  Foreground : {len(foreground_cat):,} objects → {fg_path}')
-    print(f'  Background : {len(background_cat):,} objects → {bg_path}')
-    print(f'  Pixel mask : {mask_path}')
+    _write_contamination_to_header(
+        bg_path, cv_result, purity_threshold, n_folds, z_thresh, shapes
+    )
 
 
 def _write_contamination_to_header(bg_path, cv_result, purity_threshold,
@@ -334,6 +368,7 @@ def _write_contamination_to_header(bg_path, cv_result, purity_threshold,
                            'Mean total misclassification rate from CV')
         hdr['TOT_CSTD'] = (round(cv_result['total_contam_std'],  4),
                            'Std total misclassification across CV folds')
+        hdr['N_SPECZ'] = (n_specz_added, 'Spec-z confirmed FG removed beyond pixel mask')
 
     print(f'  Contamination estimates written to header: {bg_path}')
 
