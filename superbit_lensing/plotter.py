@@ -568,10 +568,18 @@ def plot_kappa_with_coadd(kappa_file, coadd_file, figsize=(10, 10), kappa_vmin=N
         ax.legend(loc='upper right', fontsize='medium')
     plt.show()
 
-def make_rgb_image(u_fits, b_fits, g_fits, stretch='asinh', output_file=None, 
+def make_rgb_image_v2(u_fits, b_fits, g_fits, stretch='asinh', output_file=None, 
                    percentile_limits=(0.5, 99.5),
                    red_boost_factor=1.1, green_supression=0.9, blue_suppression=0.9,
-                   dpi=600, format='png', figsize=(12, 12), catalog=None):
+                   dpi=600, format='png', figsize=(12, 12), catalog=None,
+                   ra_min=None, ra_max=None, dec_min=None, dec_max=None,
+                   xray_fits=None, kappa_fits=None,
+                   xray_alpha=0.45, kappa_alpha=0.35,
+                   xray_smooth_sigma=5, kappa_smooth_sigma=3,
+                   xray_peak_gamma=2.0, kappa_peak_gamma=2.0,
+                   xray_bin_factor=150, kappa_bin_factor=1, 
+                   clip_sigma_xray=20, clip_sigma_kappa=10,
+                   r_inner_kappa=1500, r_outer_kappa=2000,text=None):
     """
     Create an RGB image from three FITS files with enhanced red coloration for galaxies.
     
@@ -643,6 +651,45 @@ def make_rgb_image(u_fits, b_fits, g_fits, stretch='asinh', output_file=None,
         g_data = fits.getdata(g_fits)
     else:
         g_data = g_fits
+        
+        # --- Crop to RA/Dec bounds if provided ---
+    if all(v is not None for v in [ra_min, ra_max, dec_min, dec_max]):
+        from astropy.wcs import WCS as _WCS
+
+        # Build WCS if we haven't already (no catalog case)
+        if 'wcs' not in locals():
+            if isinstance(u_fits, str):
+                header = fits.getheader(u_fits)
+            else:
+                header = u_fits.header.copy()
+            if 'CTYPE1' in header and 'TPV' in header['CTYPE1']:
+                header['CTYPE1'] = header['CTYPE1'].replace('TPV', 'TAN')
+                header['CTYPE2'] = header['CTYPE2'].replace('TPV', 'TAN')
+            wcs = _WCS(header)
+
+        # Convert the four RA/Dec corners to pixel coords
+        corner_ra  = [ra_min, ra_max, ra_min, ra_max]
+        corner_dec = [dec_min, dec_min, dec_max, dec_max]
+        x_pix, y_pix = wcs.all_world2pix(corner_ra, corner_dec, 0)
+
+        # Pixel bounding box (integer, clipped to image)
+        x_lo = int(max(0, np.floor(x_pix.min())))
+        x_hi = int(min(u_data.shape[1], np.ceil(x_pix.max())))
+        y_lo = int(max(0, np.floor(y_pix.min())))
+        y_hi = int(min(u_data.shape[0], np.ceil(y_pix.max())))
+
+        u_data = u_data[y_lo:y_hi, x_lo:x_hi]
+        b_data = b_data[y_lo:y_hi, x_lo:x_hi]
+        g_data = g_data[y_lo:y_hi, x_lo:x_hi]
+
+        # Update WCS reference pixel so catalog overlay still works
+        wcs = wcs.deepcopy()
+        wcs.wcs.crpix[0] -= x_lo
+        wcs.wcs.crpix[1] -= y_lo
+
+        print(f"Cropped to pixel region [{x_lo}:{x_hi}, {y_lo}:{y_hi}]")
+    # --- End crop ---
+
     
     # Create an empty RGB image array
     rgb_image = np.zeros((u_data.shape[0], u_data.shape[1], 3), dtype=np.float32)
@@ -692,13 +739,139 @@ def make_rgb_image(u_fits, b_fits, g_fits, stretch='asinh', output_file=None,
     # Clip values to the range [0, 1]
     rgb_image = np.clip(rgb_image, 0, 1)
     
-    # Create figure with high resolution
+    # --- Overlay X-ray (pink/magenta) and kappa (blue) ---
+    from reproject import reproject_interp
+    from scipy.ndimage import gaussian_filter as gf
+
+    # We need a WCS and the reference header for reprojection
+    if (xray_fits is not None or kappa_fits is not None):
+        if 'wcs' not in locals():
+            if isinstance(u_fits, str):
+                ref_header = fits.getheader(u_fits)
+            else:
+                ref_header = u_fits.header.copy()
+            if 'CTYPE1' in ref_header and 'TPV' in ref_header['CTYPE1']:
+                ref_header['CTYPE1'] = ref_header['CTYPE1'].replace('TPV', 'TAN')
+                ref_header['CTYPE2'] = ref_header['CTYPE2'].replace('TPV', 'TAN')
+            wcs = WCS(ref_header)
+        else:
+            ref_header = wcs.to_header()
+        
+        # Build a minimal target header matching the (possibly cropped) RGB image
+        target_header = ref_header.copy() if isinstance(ref_header, fits.Header) else fits.Header(ref_header)
+        target_header['NAXIS1'] = rgb_image.shape[1]
+        target_header['NAXIS2'] = rgb_image.shape[0]
+
+    def _load_and_reproject(fpath, target_header, target_shape, smooth_sigma,
+                                bin_factor=8, clip_sigma=3, peak_gamma=2.0):
+            """Load a FITS file, reproject, downsample+smooth, emphasize peak."""
+            from astropy.stats import sigma_clip
+            from astropy.nddata import block_reduce
+            from scipy.ndimage import zoom
+
+            with fits.open(fpath) as hdul:
+                for ext in hdul:
+                    if ext.data is not None and ext.data.ndim == 2:
+                        input_hdu = ext
+                        break
+                reprojected, _ = reproject_interp(input_hdu, target_header,
+                                                shape_out=target_shape)
+
+            reprojected = np.nan_to_num(reprojected, nan=0.0)
+            reprojected[reprojected < 0] = 0
+
+            # 1. Sigma-clip point sources / hot pixels
+            clipped = sigma_clip(reprojected, sigma=clip_sigma, maxiters=5, masked=True)
+            clipped = clipped.filled(np.nan)
+
+            # 2. Block-reduce (downsample)
+            if bin_factor > 1:
+                binned = block_reduce(clipped, bin_factor, func=np.nanmean)
+                # 3. Bicubic upsample back to target shape
+                zoom_y = target_shape[0] / binned.shape[0]
+                zoom_x = target_shape[1] / binned.shape[1]
+                binned = np.nan_to_num(binned, nan=0.0)
+                reprojected = zoom(binned, (zoom_y, zoom_x), order=3)
+            
+            # 4. Optional additional Gaussian smooth
+            if smooth_sigma > 0:
+                reprojected = gf(reprojected, sigma=smooth_sigma)
+
+            # 5. Normalize to [0, 1]
+            pos = reprojected[reprojected > 0]
+            vmin = np.percentile(pos, 1) if len(pos) > 0 else 0
+            vmax = np.percentile(pos, 99.5) if len(pos) > 0 else 1
+            reprojected = np.clip((reprojected - vmin) / (vmax - vmin), 0, 1)
+
+            # 6. Power-law to emphasize peak (gamma > 1 suppresses faint outskirts)
+            reprojected = np.power(reprojected, peak_gamma)
+
+            return reprojected
+
+    target_shape = (rgb_image.shape[0], rgb_image.shape[1])
+
+    if xray_fits is not None:
+        xray_map = _load_and_reproject(xray_fits, target_header, target_shape,
+                                        xray_smooth_sigma,
+                                        bin_factor=xray_bin_factor, clip_sigma=clip_sigma_xray,
+                                        peak_gamma=xray_peak_gamma)
+
+
+
+    if kappa_fits is not None:
+        kappa_map = _load_and_reproject(kappa_fits, target_header, target_shape,
+                                         kappa_smooth_sigma,
+                                         bin_factor=kappa_bin_factor, clip_sigma=clip_sigma_kappa,
+                                         peak_gamma=kappa_peak_gamma)
+
+        # Radial mask: fade blue based on distance from the kappa peak
+        peak_y, peak_x = np.unravel_index(np.argmax(kappa_map), kappa_map.shape)
+        yy, xx = np.mgrid[:kappa_map.shape[0], :kappa_map.shape[1]]
+        dist = np.sqrt((xx - peak_x)**2 + (yy - peak_y)**2)
+        
+        # Radius within which blue is fully shown (in pixels)
+        r_inner = r_inner_kappa   # full blue inside this radius
+        r_outer = r_outer_kappa   # zero blue beyond this radius
+
+        taper = np.clip((r_outer - dist) / (r_outer - r_inner), 0, 1)
+        kappa_map *= taper
+
+        blue = np.array([0.2, 0.3, 1.0])
+        for c in range(3):
+            rgb_image[:, :, c] = rgb_image[:, :, c] * (1 - kappa_alpha * kappa_map) \
+                                 + blue[c] * kappa_alpha * kappa_map        
+        pink = np.array([1.0, 0.2, 0.8])
+        for c in range(3):
+            rgb_image[:, :, c] = rgb_image[:, :, c] * (1 - xray_alpha * xray_map) \
+                                 + pink[c] * xray_alpha * xray_map
+
+
+
+    rgb_image = np.clip(rgb_image, 0, 1)
+    # --- End overlay ---
+    
+    # Create figure with WCS axes for RA/Dec
+    if 'wcs' not in locals():
+        if isinstance(u_fits, str):
+            header = fits.getheader(u_fits)
+        else:
+            header = u_fits.header.copy()
+        if 'CTYPE1' in header and 'TPV' in header['CTYPE1']:
+            header['CTYPE1'] = header['CTYPE1'].replace('TPV', 'TAN')
+            header['CTYPE2'] = header['CTYPE2'].replace('TPV', 'TAN')
+        wcs = WCS(header)
+
     fig = plt.figure(figsize=figsize, dpi=dpi)
-    ax = plt.gca()
+    ax = fig.add_subplot(111, projection=wcs)
+    ax.set_xlabel('RA')
+    ax.set_ylabel('Dec')
     
     # Use interpolation='nearest' for astronomical images to preserve details
+    # Gamma stretch to bring out faint structure
+    gamma = 0.6  # <1 brightens faint pixels, try 0.3–0.7
+    rgb_image = np.power(rgb_image, gamma)
     ax.imshow(rgb_image, origin='lower', interpolation='nearest')
-    ax.axis('off')
+    #ax.axis('off')
     
     # Mark catalog objects if catalog is provided
     if catalog is not None and 'wcs' in locals():
@@ -2534,7 +2707,113 @@ class PSFLeakagePanelMaker:
         ax.axhline(0, color="0.4", linestyle="--", linewidth=1, zorder=0)
         ax.set_xlabel(xlab)
         self.make_panel_legend(ax, showe1e2_leg)
+        
+    def make_single_component_panel(
+        self,
+        ax,
+        *,
+        x_psf,
+        e_gal,
+        component_index,
+        method_label,
+        color,
+        marker="o",
+        linestyle="-",
+        linewidth=2,
+        capsize=2,
+        elinewidth=1.2,
+        calib=None,
+        x_log_scale=False,
+        xlab=None,
+    ):
+        e_gal = np.asarray(e_gal)
 
+        alpha, beta, x_bin, y_bin, yerr_bin = self.slope_from_catalog(
+            x=x_psf, y=e_gal,
+            nbin=self.NBIN, min_count=self.MIN_COUNT,
+            weights=self.weights, calibrate=self.CALIBRATE, calib=calib,
+            subtract_global_mean=True,
+            x_center=self.x_center, error_type=self.error_type,
+        )
+
+        N = len(x_psf)
+        jk_size = N // self.njac
+        alpha_jk = []
+        for i in range(self.njac):
+            mask = np.ones(N, dtype=bool)
+            mask[i * jk_size : (i + 1) * jk_size] = False
+            a, _, _, _, _ = self.slope_from_catalog(
+                x_psf[mask], e_gal[mask],
+                nbin=self.NBIN, min_count=self.MIN_COUNT,
+                weights=self.weights[mask], calibrate=self.CALIBRATE,
+                calib=np.asarray(calib)[mask] if calib is not None else None,
+                subtract_global_mean=True,
+                x_center=self.x_center, error_type=self.error_type,
+            )
+            alpha_jk.append(a)
+
+        alpha_jk = np.asarray(alpha_jk)
+        alpha_mean = np.mean(alpha_jk)
+        alpha_err = np.sqrt(
+            (self.njac - 1) / self.njac * np.sum((alpha_jk - alpha_mean) ** 2)
+        )
+
+        xx = np.linspace(np.min(x_bin), np.max(x_bin), 200)
+
+        # data points — no label (handled by proxy legend)
+        ax.errorbar(x_bin, y_bin, yerr=yerr_bin, c=color, fmt=marker,
+                    capsize=capsize, elinewidth=elinewidth, label='_nolegend_')
+
+        # fit line — no label (alpha goes in text box)
+        ax.plot(xx, beta + alpha * xx, linewidth=linewidth, c=color,
+                linestyle=linestyle, label='_nolegend_')
+
+        if x_log_scale:
+            ax.set_xscale("log")
+        if xlab is not None:
+            ax.set_xlabel(xlab)
+        ax.axhline(0, color="0.4", ls="--", lw=1, zorder=0)
+
+        # return alpha info so the caller can build the text box
+        formatted = (f"{alpha:.3f}" if abs(alpha) >= 1e-2
+                    else self.latex_sci(alpha, precision=2))
+        sig = abs(alpha_mean) / alpha_err
+        return component_index, method_label, formatted, sig
+
+
+def pub_rc(fontsize=16, **overrides):
+    """Astronomy-publication-ready matplotlib RC dict.
+
+    Pass to ``plt.rc_context()`` or ``plt.rcParams.update()``.
+    Legend size is ``fontsize - 2``; ``**overrides`` take precedence.
+    """
+    fontsize = int(fontsize)
+    rc = {
+        'font.family':         'serif',
+        'text.usetex':          True,
+        'axes.linewidth':       1.3,
+        'xtick.direction':     'out',
+        'ytick.direction':     'out',
+        'xtick.top':            False,
+        'ytick.right':          False,
+        'xtick.minor.visible':  False,
+        'ytick.minor.visible':  False,
+        'xtick.major.size':     8,
+        'ytick.major.size':     8,
+        'xtick.minor.size':     5,
+        'ytick.minor.size':     5,
+        'xtick.major.width':    1.3,
+        'ytick.major.width':    1.3,
+        'xtick.minor.width':    0.8,
+        'ytick.minor.width':    0.8,
+        'xtick.labelsize':      fontsize,
+        'ytick.labelsize':      fontsize,
+        'axes.labelsize':       fontsize,
+        'axes.titlesize':       fontsize,
+        'legend.fontsize':      fontsize - 2,
+    }
+    rc.update(overrides)
+    return rc
 
 
 
