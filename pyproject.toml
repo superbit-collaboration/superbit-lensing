@@ -57,8 +57,8 @@ dependencies = [
     "psfex @ git+https://github.com/esheldon/psfex.git",
     "ngmix @ git+https://github.com/esheldon/ngmix.git",
     "meds @ git+https://github.com/esheldon/meds.git",
-    dust_extinction,
-    dustmaps
+    "dust_extinction",
+    "dustmaps"
 ]
 
 [project.optional-dependencies]
