@@ -9,6 +9,8 @@ from scipy.ndimage import gaussian_filter
 from astropy.table import Table
 
 from superbit_lensing.utils import get_cluster_info, get_sky_footprint_center_radius
+from superbit_lensing.smpy.utils import save_fits
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 TARGET_LIST = os.path.join(PROJECT_ROOT, 'data', 'SuperBIT_target_list.csv')
@@ -27,16 +29,15 @@ class ClusterRedSequenceAnalysis:
     }
 
     COLOR_LABELS = {
-        'color_bg': r"$b - g$",
-        'color_ug': r"$u - g$",
-        'color_ub': r"$u - b$",
+        'bg': r"$b - g$",
+        'ug': r"$u - g$",
+        'ub': r"$u - b$",
     }
 
     def __init__(
         self, cluster_name, datadir=None, megafilename=None,
         datafilename=None, delz=0.02, color_index='bg', radius_th=-1,
-        cluster_redshift=None, only_specz=True, m_upper_limit=None,
-        m_lower_limit=None, fit_ab=True,
+        cluster_redshift=None, only_specz=True
     ):
         if datafilename is None and datadir is None and megafilename is None:
             raise ValueError(
@@ -57,9 +58,7 @@ class ClusterRedSequenceAnalysis:
         self.radius_th = radius_th
         self.only_specz = only_specz
         self.color_index_col = self.VALID_COLOR_INDICES[color_index]
-        self.m_upper_limit = m_upper_limit
-        self.m_lower_limit = m_lower_limit
-        self.fit_ab = fit_ab
+        self.color_index_key = color_index
 
         # Populated by load_data / downstream methods
         self.ra_center = None
@@ -104,6 +103,13 @@ class ClusterRedSequenceAnalysis:
         )
 
         self.cm_cat = Table.read(self.color_mag_file)
+        ### check is there are keys for the color index column
+        print("Color index column:", self.color_index_col)
+        if self.color_index_col not in self.cm_cat.colnames:
+            raise ValueError(
+                f"Color index column '{self.color_index_col}' not found in catalog. "
+                f"Available columns: {self.cm_cat.colnames}"
+            )
 
         # Cluster centre & redshift
         cluster_data = pd.read_csv(TARGET_LIST)
@@ -116,6 +122,13 @@ class ClusterRedSequenceAnalysis:
             self.ra_center, self.dec_center, self.cluster_redshift = (
                 get_cluster_info(self.cluster_name)
             )
+            
+        # get the center of the focv
+        self.ra_center, self.dec_center, _ = (
+                get_sky_footprint_center_radius(self.cm_cat)
+            )
+        
+        print(f"Cluster center: RA={self.ra_center:.4f} deg, Dec={self.dec_center:.4f} deg")
 
         # Filter valid detections
         valid = (
@@ -187,7 +200,7 @@ class ClusterRedSequenceAnalysis:
     # Red sequence fitting & selection
     # ------------------------------------------------------------------
 
-    def fit_red_sequence_line(self, sigma_clip=2.5, max_iter=5):
+    def fit_red_sequence_line(self, sigma_clip=2., max_iter=5, fixed_intercept=True):
         """Fit a line to the known members in the colour-magnitude diagram.
 
         Parameters
@@ -222,8 +235,18 @@ class ClusterRedSequenceAnalysis:
             if np.sum(mask) < 2:
                 print("Sigma clipping left fewer than 2 points; using last valid fit.")
                 break
+            
+        zp = 29.146
+        weights = 10 ** ((zp - known_m_b[mask]) / 2.5)
 
-        self.a, self.b = np.polyfit(known_m_b[mask], known_color[mask], 1)
+        if fixed_intercept:
+            self.a = 0.0
+            self.b = np.average(known_color[mask], weights=weights)
+        else:
+            coeffs = np.polyfit(known_m_b[mask], known_color[mask], 1, w=weights)
+            self.a = coeffs[0]
+            self.b = coeffs[1]
+            
         n_rejected = len(known_color) - np.sum(mask)
         print(
             f"Fitted red sequence line: color = {self.a:.3f} * m_b + {self.b:.3f} "
@@ -232,7 +255,8 @@ class ClusterRedSequenceAnalysis:
 
     def compute_red_sequence(
         self, a=None, b=None, tolerance=0.1, resolution=0.5,
-        sigma=1.5, save_path=None,
+        sigma=1.5, save_path=None, fixed_intercept=False, density_mode="number", m_upper_limit=None,
+        m_lower_limit=None
     ):
         """
         Compute the red sequence mask.
@@ -251,8 +275,10 @@ class ClusterRedSequenceAnalysis:
         save_path : str, optional
             File path for saving the analysis plot.
         """
+        self.m_lower_limit = m_lower_limit
+        self.m_upper_limit = m_upper_limit
         if a is None or b is None:
-            self.fit_red_sequence_line()
+            self.fit_red_sequence_line(fixed_intercept=fixed_intercept)
         if a is not None:
             self.a = a
         if b is not None:
@@ -277,15 +303,16 @@ class ClusterRedSequenceAnalysis:
 
         self.ra_red = self.cm_cat['ra'][self.red_sequence_mask]
         self.dec_red = self.cm_cat['dec'][self.red_sequence_mask]
+        self.m_b_red = self.cm_cat['m_b'][self.red_sequence_mask]
 
-        self.create_density_map(resolution=resolution, sigma=sigma)
+        self.create_density_map(resolution=resolution, sigma=sigma, mode=density_mode)
         self.plot_red_sequence_analysis(save_path=save_path)
 
     # ------------------------------------------------------------------
     # Density map
     # ------------------------------------------------------------------
 
-    def create_density_map(self, resolution=0.5, sigma=1.5):
+    def create_density_map(self, resolution=0.5, sigma=1.5, mode="number"):
         """
         Create a smoothed density map of red-sequence galaxies.
 
@@ -294,18 +321,80 @@ class ClusterRedSequenceAnalysis:
         resolution : float
             Spatial resolution in arcmin.
         sigma : float
-            Gaussian smoothing kernel size.
+            Gaussian smoothing kernel size in pixels.
+        mode : str
+            'number' for galaxy number density (count / arcmin^2),
+            'luminosity' for luminosity density (flux / arcmin^2).
         """
+        if mode not in ("number", "luminosity"):
+            raise ValueError(f"mode must be 'number' or 'luminosity', got '{mode}'")
+
         self.resolution = resolution
         self.sigma = sigma
+        self.density_mode = mode
 
-        n_bins_ra = int(np.ceil((self.ra_max - self.ra_min) * 60 / resolution))
-        n_bins_dec = int(np.ceil((self.dec_max - self.dec_min) * 60 / resolution))
+        # --- Tangent-plane projection centred on the field ---
+        mean_dec = 0.5 * (self.dec_min + self.dec_max)
+        mean_ra  = 0.5 * (self.ra_min + self.ra_max)
+
+        ra_proj  = (self.ra_red - mean_ra) * np.cos(np.radians(mean_dec)) * 60  # arcmin
+        dec_proj = (self.dec_red - mean_dec) * 60  # arcmin
+
+        ra_proj_min,  ra_proj_max  = ra_proj.min(),  ra_proj.max()
+        dec_proj_min, dec_proj_max = dec_proj.min(), dec_proj.max()
+
+        n_bins_ra  = int(np.ceil((ra_proj_max - ra_proj_min) / resolution))
+        n_bins_dec = int(np.ceil((dec_proj_max - dec_proj_min) / resolution))
+
+        if mode == "luminosity":
+            zp = 29.146
+            weights = 10 ** (-0.4 * (self.m_b_red - zp))
+        else:
+            weights = None
 
         self.hist, self.xedges, self.yedges = np.histogram2d(
-            self.ra_red, self.dec_red, bins=[n_bins_ra, n_bins_dec],
+            ra_proj, dec_proj,
+            bins=[n_bins_ra, n_bins_dec],
+            weights=weights,
         )
+
+        # Pixel area is just resolution^2 — cos(dec) already in the projection
+        pixel_area_arcmin2 = resolution ** 2
+
+        self.density = self.hist / pixel_area_arcmin2
+        self.smoothed_density = gaussian_filter(self.density, sigma=sigma)
         self.smoothed_hist = gaussian_filter(self.hist, sigma=sigma)
+
+        # Store projection info for plotting
+        self._ra_center = mean_ra
+        self._dec_center = mean_dec
+        
+    def save_density_fits(self, save_path, smoothed=True):
+        """
+        Save the current density map as a FITS file with WCS.
+
+        Parameters
+        ----------
+        save_path : str
+            Output FITS file path.
+        smoothed : bool
+            If True, save the smoothed density map; otherwise the raw.
+        """
+        dirname = os.path.dirname(save_path)
+        if dirname and not os.path.exists(dirname):
+            os.makedirs(dirname, exist_ok=True)
+        data = self.smoothed_density if smoothed else self.density
+
+        true_boundaries = {
+            "ra_min":  self.ra_min,
+            "ra_max":  self.ra_max,
+            "dec_min": self.dec_min,
+            "dec_max": self.dec_max,
+        }
+
+        # save_fits expects (ny, nx) — our hist is (n_ra, n_dec),
+        # so transpose to put Dec on axis 0 (FITS row) and RA on axis 1
+        save_fits(data.T[:, ::-1], true_boundaries, save_path)
 
     # ------------------------------------------------------------------
     # Plotting
@@ -320,7 +409,7 @@ class ClusterRedSequenceAnalysis:
                 f'{self.cluster_name}_red_sequence_analysis.png',
             )
 
-        color_label = self.COLOR_LABELS[self.color_index_col]
+        color_label = self.COLOR_LABELS[self.color_index_key]
 
         fig, axes = plt.subplots(1, 2, figsize=(14, 4.5))
 
@@ -374,9 +463,9 @@ class ClusterRedSequenceAnalysis:
         # --- Right: spatial density ---
         ax_spa = axes[1]
 
-        ax_spa.imshow(
-            self.smoothed_hist.T[:, ::-1],
-            origin='lower', aspect='equal', cmap='magma',
+        im = ax_spa.imshow(
+            self.smoothed_density.T[:, ::-1],
+            origin='lower', aspect='equal', cmap='turbo',
             interpolation='bicubic',
             extent=[self.ra_max, self.ra_min, self.dec_min, self.dec_max],
         )
@@ -384,6 +473,17 @@ class ClusterRedSequenceAnalysis:
         ax_spa.yaxis.set_major_locator(MaxNLocator(nbins=4))
         ax_spa.set_xlabel("RA (deg)")
         ax_spa.set_ylabel("Dec (deg)")
+
+        if self.density_mode == "luminosity":
+            cbar_label = r"Luminosity density (counts arcmin$^{-2}$)"
+        else:
+            cbar_label = r"Number density (galaxies arcmin$^{-2}$)"
+
+        divider = make_axes_locatable(ax_spa)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cbar = plt.colorbar(im, cax=cax)
+        cbar.set_label(cbar_label)
+
 
         plt.tight_layout()
         if save_path:

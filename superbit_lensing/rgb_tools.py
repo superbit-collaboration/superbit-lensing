@@ -30,6 +30,8 @@ from astropy.visualization import (
     ImageNormalize, MinMaxInterval,
     SqrtStretch, LogStretch, AsinhStretch,
 )
+from scipy.ndimage import gaussian_filter
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -90,6 +92,14 @@ class RGBConfig:
     text: Optional[str] = None
     text_fontsize: int = 22
     text_color: str = "white"
+    
+    # External kappa contour overlay
+    ext_kappa_fits: Optional[str] = None
+    ext_kappa_err_fits: Optional[str] = None
+    ext_kappa_smooth_sigma: float = 1.0       # in arcsec, converted to pixels internally
+    ext_kappa_contour_levels: Optional[list] = None  # e.g. [1, 1.5, 2.2] for SNR levels
+    ext_kappa_contour_color: str = "white"
+    ext_kappa_show_footprint: bool = True
 
     # ── Presets ───────────────────────────────────────────────────────────
 
@@ -341,6 +351,13 @@ def make_rgb_image(
     text             = p["text"]
     text_fontsize    = p["text_fontsize"]
     text_color       = p["text_color"]
+    
+    ext_kappa_fits        = p["ext_kappa_fits"]
+    ext_kappa_err_fits    = p["ext_kappa_err_fits"]
+    ext_kappa_smooth_sigma = p["ext_kappa_smooth_sigma"]
+    ext_kappa_contour_levels = p["ext_kappa_contour_levels"]
+    ext_kappa_contour_color  = p["ext_kappa_contour_color"]
+    ext_kappa_show_footprint = p["ext_kappa_show_footprint"]
 
     # ── 1. Load band data ────────────────────────────────────────────────
     u_data, _ = _load_data(u_fits)
@@ -453,9 +470,53 @@ def make_rgb_image(
 
     fig = plt.figure(figsize=figsize, dpi=dpi)
     ax = fig.add_subplot(111, projection=wcs)
-    ax.set_xlabel("RA", labelpad=0)
+    ax.set_xlabel("RA", labelpad=0.6)
     ax.set_ylabel("Dec", labelpad=-1)
     ax.imshow(rgb_image, origin="lower", interpolation="nearest")
+
+    # ── External kappa footprint + contours ──────────────────────────
+    if ext_kappa_fits is not None and ext_kappa_contour_levels is not None:
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        from astropy.wcs import WCS as _WCS
+
+        ext_kappa_data = fits.getdata(ext_kappa_fits)
+        ext_kappa_hdr = fits.getheader(ext_kappa_fits)
+        ext_wcs = _WCS(ext_kappa_hdr)
+
+        # Smooth in pixel units: convert arcsec -> pixels
+        pixel_scale_arcsec = np.abs(ext_kappa_hdr.get("CDELT1", ext_kappa_hdr.get("CD1_1", 1))) * 3600
+        sigma_pix = ext_kappa_smooth_sigma / pixel_scale_arcsec
+
+        ext_kappa_data = gaussian_filter(ext_kappa_data, sigma=sigma_pix)
+
+        # If error map provided, contour SNR; otherwise contour kappa directly
+        if ext_kappa_err_fits is not None:
+            ext_err_data = fits.getdata(ext_kappa_err_fits)
+            ext_err_data = gaussian_filter(ext_err_data, sigma=sigma_pix)
+            contour_data = ext_kappa_data / ext_err_data
+        else:
+            contour_data = ext_kappa_data
+
+        if ext_kappa_show_footprint:
+            ny, nx = ext_kappa_data.shape
+            # four corners in pixel coords of the ext kappa map
+            corners_pix = np.array([[0, 0], [nx, 0], [nx, ny], [0, ny], [0, 0]])
+            # convert to world coords
+            corners_world = ext_wcs.all_pix2world(corners_pix[:, 0], corners_pix[:, 1], 0)
+            # plot on the RGB axes
+            ax.plot(
+                corners_world[0], corners_world[1],
+                color="white", linewidth=1.2, linestyle="dashed",
+                transform=ax.get_transform("world"),
+            )
+
+        # Kappa contours
+        ax.contour(
+            contour_data, levels=ext_kappa_contour_levels,
+            colors=ext_kappa_contour_color, linewidths=0.8,
+            transform=ax.get_transform(ext_wcs),
+        )
 
     # ── Text label (upper-right) ─────────────────────────────────────────
     if text is not None:
@@ -496,6 +557,8 @@ def make_rgb_image(
                 print(f"Marked {len(ra_vals)} catalog objects on the image")
         except Exception as e:
             print(f"Warning: catalog overlay failed — {e}")
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
 
     # ── 8. Save or show ──────────────────────────────────────────────────
     if output_file:

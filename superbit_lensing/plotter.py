@@ -26,6 +26,7 @@ from scipy.interpolate import splprep, splev
 from reproject import reproject_interp
 import astropy.units as u
 from astropy.table import Table
+from astropy.cosmology import FlatLambdaCDM
 import random
 import os
 from superbit_lensing.match import SkyCoordMatcher
@@ -2779,6 +2780,165 @@ class PSFLeakagePanelMaker:
                     else self.latex_sci(alpha, precision=2))
         sig = abs(alpha_mean) / alpha_err
         return component_index, method_label, formatted, sig
+
+def plot_rs_wl_overlay(
+    rs_file,
+    wl_file,
+    ra_range=None,
+    dec_range=None,
+    label=None,
+    redshift=None,          # <-- new
+    cmap='magma',
+    contour_start=1.5,
+    contour_step=1,
+    contour_color='white',
+    contour_lw=0.8,
+    upsample_factor=4,
+    ra_tick_spacing=3 * u.arcmin,
+    dec_tick_spacing=2 * u.arcmin,
+    pad=0.1,
+    xlabel=None,
+    ylabel=None,
+    ax=None,
+    figsize=None,
+    outfile=None,
+    dpi=300,
+):
+    """Plot red sequence map with WL SNR contours overlaid.
+
+    Parameters
+    ----------
+    rs_file, wl_file : str
+        Paths to the RS and WL FITS files.
+    ra_range : tuple
+        (ra_min, ra_max) in degrees.
+    dec_range : tuple
+        (dec_min, dec_max) in degrees.
+    label : str, optional
+        Text label (e.g. cluster name) in the upper-right corner.
+    ax : WCSAxes, optional
+        Existing axis to plot on. Created if None.
+
+    Returns
+    -------
+    fig, ax
+    """
+    rs_hdu = fits.open(rs_file)[0]
+    wl_hdu = fits.open(wl_file)[0]
+    wcs_rs = WCS(rs_hdu.header)
+
+    # reproject WL onto RS grid
+    wl_reproj, _ = reproject_interp(wl_hdu, rs_hdu.header)
+
+    # RA/Dec -> pixel bounds
+    if ra_range is not None and dec_range is not None:
+        ra_min, ra_max = ra_range
+        dec_min, dec_max = dec_range
+        px_min, py_min = wcs_rs.world_to_pixel_values(ra_max, dec_min)
+        px_max, py_max = wcs_rs.world_to_pixel_values(ra_min, dec_max)
+
+        ix_min, ix_max = int(np.floor(px_min)), int(np.ceil(px_max))
+        iy_min, iy_max = int(np.floor(py_min)), int(np.ceil(py_max))
+        wl_crop = np.nan_to_num(wl_reproj[iy_min:iy_max, ix_min:ix_max])
+        rs_crop = rs_hdu.data[iy_min:iy_max, ix_min:ix_max]
+    else:
+        wl_crop = np.nan_to_num(wl_reproj)
+        iy_min, ix_min = 0, 0
+        ny, nx = wl_crop.shape
+        px_min, py_min = 0, 0
+        px_max, py_max = nx, ny
+        rs_crop = rs_hdu.data
+        
+    vmin, vmax = np.nanmin(rs_crop), np.nanmax(rs_crop)
+
+        
+    wl_up = zoom(wl_crop, upsample_factor, order=3)
+
+    # contour levels
+    max_snr = np.nanmax(wl_up)
+    levels = np.arange(contour_start, max_snr + contour_step, contour_step)
+
+    # upsampled pixel coordinates in original frame
+    ny_c, nx_c = wl_crop.shape
+    y_up = np.linspace(iy_min, iy_min + ny_c - 1, ny_c * upsample_factor)
+    x_up = np.linspace(ix_min, ix_min + nx_c - 1, nx_c * upsample_factor)
+
+    # plot
+    if ax is None:
+        fig, ax = plt.subplots(
+            subplot_kw={'projection': wcs_rs}, figsize=figsize
+        )
+    else:
+        fig = ax.figure
+
+    ax.imshow(rs_hdu.data, origin='lower', cmap=cmap, interpolation='bicubic', vmin=vmin, vmax=vmax,)
+    ax.contour(
+        x_up, y_up, wl_up,
+        levels=levels, cmap='binary_r', linewidths=contour_lw,
+    )
+
+    ax.set_xlim(px_min + pad, px_max - pad)
+    ax.set_ylim(py_min + pad, py_max - pad)
+    if xlabel is None:
+        xlabel = " "
+    if ylabel is None:
+        ylabel = " "
+        
+    ax.set_xlabel(xlabel, labelpad=0.6)
+    ax.set_ylabel(ylabel, labelpad=-1)
+
+    # tick formatting
+    overlay = ax.coords
+    overlay[0].set_ticks_position('b')
+    overlay[1].set_ticks_position('l')
+    overlay[0].set_ticklabel_position('b')
+    overlay[1].set_ticklabel_position('l')
+    overlay[0].set_ticks(spacing=ra_tick_spacing)
+    overlay[1].set_ticks(spacing=dec_tick_spacing)
+
+    if label is not None:
+        ax.text(
+            0.97, 0.97, label,
+            transform=ax.transAxes, fontsize=25,
+            color='white', fontweight='bold',
+            ha='right', va='top',
+            bbox=dict(
+                boxstyle='round,pad=0.3',
+                facecolor='black', alpha=0.5, edgecolor='none',
+            ),
+        )
+    # ----- 1 Mpc scale bar -----
+    if redshift is not None:
+        cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
+        d_a = cosmo.angular_diameter_distance(redshift)          # Mpc
+        theta_1mpc = (1.0 * u.Mpc / d_a).decompose() * u.rad    # angular size
+        theta_arcmin = theta_1mpc.to(u.arcmin).value
+
+        # pixel scale from the WCS (deg/px along RA axis)
+        px_scale = np.abs(wcs_rs.wcs.cdelt[0]) * 60  # arcmin/px
+        bar_length_px = theta_arcmin / px_scale
+
+        # anchor: bottom-left, 8% in from edges
+        x0 = px_min + 0.08 * (px_max - px_min)
+        y0 = py_min + 0.08 * (py_max - py_min)
+
+        ax.plot(
+            [x0, x0 + bar_length_px], [y0, y0],
+            color='white', lw=2.5, solid_capstyle='butt',
+        )
+        ax.text(
+            x0 + bar_length_px / 2, y0 + 0.02 * (py_max - py_min),
+            '1 Mpc', color='white', fontweight='bold', fontsize=25,
+            ha='center', va='bottom',
+        )
+
+
+
+    if outfile is not None:
+        fig.savefig(outfile, dpi=dpi, bbox_inches='tight')
+
+    return fig, ax
+
 
 
 def pub_rc(fontsize=16, **overrides):

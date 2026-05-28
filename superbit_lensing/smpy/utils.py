@@ -175,7 +175,7 @@ def find_peaks2d(image, threshold=None, ordered=True, mask=None,
     merge = ((map0 > map1) & (map0 > map2) & (map0 > map3) & (map0 > map4) &
              (map0 > map5) & (map0 > map6) & (map0 > map7) & (map0 > map8))
 
-    bordered = np.lib.pad(merge, (1, 1), 'constant', constant_values=(0, 0))
+    bordered = np.pad(merge, (1, 1), 'constant', constant_values=(0, 0))
     peaksmap = image * bordered * mask
     X, Y = np.nonzero(peaksmap > threshold)
 

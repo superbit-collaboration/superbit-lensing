@@ -161,7 +161,7 @@ class ApertureMassSNR:
         self.ncol  = int(np.ceil((self.x_max - self.x_min) / bin_size))
         self.nrow  = int(np.ceil((self.y_max - self.y_min) / bin_size))
 
-    def run(self, n_realizations=200, n_cpus=1, seed=12000):
+    def run(self, n_realizations=200, n_cpus=1, seed=12000, return_kappa_n_noise=True):
         """
         Compute S/N maps.
 
@@ -199,8 +199,10 @@ class ApertureMassSNR:
         noise_map = np.std(M_E_stack, axis=0)
         SNR_E = M_E_real / noise_map
         SNR_B = M_B_real / noise_map
-
-        return SNR_E, SNR_B
+        if return_kappa_n_noise:
+            return SNR_E, SNR_B, M_E_real, noise_map
+        else:
+            return SNR_E, SNR_B
     
 
 class ApertureMassCalculator:
