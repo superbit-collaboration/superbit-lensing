@@ -2567,6 +2567,8 @@ class PSFLeakagePanelMaker:
         calib_for_e2=None,
         x_log_scale=False,
         showe1e2_leg=False,
+        plot_confidence=False,
+        return_data=False,         
     ):
         alpha_full_1, beta_full_1, x_bin, y_bin_1, yerr_bin = self.slope_from_catalog(
             x=x_psf,
@@ -2597,12 +2599,13 @@ class PSFLeakagePanelMaker:
         jk_size = N // self.njac
 
         alpha_jk_1, alpha_jk_2 = [], []
+        beta_jk_1, beta_jk_2 = [], []
 
         for i in range(self.njac):
             mask = np.ones(N, dtype=bool)
             mask[i * jk_size : (i + 1) * jk_size] = False
 
-            a1, _, _, _, _ = self.slope_from_catalog(
+            a1, b1, _, _, _ = self.slope_from_catalog(
                 x_psf[mask],
                 self.e1_gal[mask],
                 nbin=self.NBIN,
@@ -2614,7 +2617,7 @@ class PSFLeakagePanelMaker:
                 x_center=self.x_center,
                 error_type=self.error_type,
             )
-            a2, _, _, _, _ = self.slope_from_catalog(
+            a2, b2, _, _, _ = self.slope_from_catalog(
                 x_psf[mask],
                 self.e2_gal[mask],
                 nbin=self.NBIN,
@@ -2629,9 +2632,14 @@ class PSFLeakagePanelMaker:
 
             alpha_jk_1.append(a1)
             alpha_jk_2.append(a2)
+            beta_jk_1.append(b1)
+            beta_jk_2.append(b2)
+
 
         alpha_jk_1 = np.asarray(alpha_jk_1)
         alpha_jk_2 = np.asarray(alpha_jk_2)
+        beta_jk_1 = np.asarray(beta_jk_1)
+        beta_jk_2 = np.asarray(beta_jk_2)
 
         alpha_mean_1 = np.mean(alpha_jk_1)
         alpha_err_1 = np.sqrt(
@@ -2640,11 +2648,25 @@ class PSFLeakagePanelMaker:
             * np.sum((alpha_jk_1 - alpha_mean_1) ** 2)
         )
 
+        beta_mean_1 = np.mean(beta_jk_1)
+        beta_err_1 = np.sqrt(
+            (self.njac - 1)
+            / self.njac
+            * np.sum((beta_jk_1 - beta_mean_1) ** 2)
+        )
+
         alpha_mean_2 = np.mean(alpha_jk_2)
         alpha_err_2 = np.sqrt(
             (self.njac - 1)
             / self.njac
             * np.sum((alpha_jk_2 - alpha_mean_2) ** 2)
+        )
+
+        beta_mean_2 = np.mean(beta_jk_2)
+        beta_err_2 = np.sqrt(
+            (self.njac - 1)
+            / self.njac
+            * np.sum((beta_jk_2 - beta_mean_2) ** 2)
         )
 
         xx = np.linspace(np.min(x_bin), np.max(x_bin), 200)
@@ -2673,6 +2695,11 @@ class PSFLeakagePanelMaker:
             c=self.color_e1,
             label=rf"$\alpha_1 = {formatted_alpha}\ ({(abs(alpha_mean_1)/alpha_err_1):.2f}\sigma)$",
         )
+        dy_1 = np.sqrt((alpha_err_1 * xx)**2 + beta_err_1**2)
+        if plot_confidence:
+            ax.fill_between(xx, yy_1 - dy_1, yy_1 + dy_1,
+                            color=self.color_e1, alpha=0.15, linewidth=0)
+
 
         ax.errorbar(
             x_bin,
@@ -2696,6 +2723,10 @@ class PSFLeakagePanelMaker:
             c=self.color_e2,
             label=rf"$\alpha_2 = {formatted_alpha}\ ({(abs(alpha_mean_2)/alpha_err_2):.2f}\sigma)$",
         )
+        dy_2 = np.sqrt((alpha_err_2 * xx)**2 + beta_err_2**2)
+        if plot_confidence:
+            ax.fill_between(xx, yy_2 - dy_2, yy_2 + dy_2,
+                            color=self.color_e2, alpha=0.15, linewidth=0)
 
         if x_log_scale:
             if xlab == r"${\rm SNR}$":
@@ -2708,6 +2739,20 @@ class PSFLeakagePanelMaker:
         ax.axhline(0, color="0.4", linestyle="--", linewidth=1, zorder=0)
         ax.set_xlabel(xlab)
         self.make_panel_legend(ax, showe1e2_leg)
+
+        if return_data:
+            return {
+                "x_bin":       x_bin,
+                "y_bin_1":     y_bin_1,
+                "yerr_bin_1":  yerr_bin,
+                "y_bin_2":     y_bin_2,
+                "yerr_bin_2":  yerr_bin_2,
+                "alpha_full_1": alpha_full_1, "alpha_mean_1": alpha_mean_1, "alpha_err_1": alpha_err_1, "beta_full_1": beta_full_1,
+                "alpha_full_2": alpha_full_2, "alpha_mean_2": alpha_mean_2, "alpha_err_2": alpha_err_2, "beta_full_2": beta_full_2,
+                "beta_err_1": beta_err_1, "beta_err_2": beta_err_2
+            }
+
+
         
     def make_single_component_panel(
         self,
@@ -2780,6 +2825,164 @@ class PSFLeakagePanelMaker:
                     else self.latex_sci(alpha, precision=2))
         sig = abs(alpha_mean) / alpha_err
         return component_index, method_label, formatted, sig
+
+def save_all_panels_to_fits(out_fits, panel_data_list, overwrite=True):
+    """
+    panel_data_list : list of dicts returned by make_panel(return_data=True)
+                      paired with a label, e.g.
+                      [("e1psf", data0), ("e2psf", data1), ...]
+    Each panel gets its own BinTableHDU extension (EXTNAME = label).
+    Fit scalars go in the extension header.
+    """
+    hdul = fits.HDUList([fits.PrimaryHDU()])
+
+    for label, d in panel_data_list:
+        tab = Table()
+        tab["x_bin"]      = np.asarray(d["x_bin"],      dtype=float)
+        tab["y_bin_1"]    = np.asarray(d["y_bin_1"],     dtype=float)
+        tab["yerr_bin_1"] = np.asarray(d["yerr_bin_1"],  dtype=float)
+        tab["y_bin_2"]    = np.asarray(d["y_bin_2"],     dtype=float)
+        tab["yerr_bin_2"] = np.asarray(d["yerr_bin_2"],  dtype=float)
+
+        hdu = fits.BinTableHDU(tab, name=label)
+        hdr = hdu.header
+        hdr["AFULL1"] = (float(d["alpha_full_1"]), "best-fit slope e1")
+        hdr["AMEAN1"] = (float(d["alpha_mean_1"]), "jackknife mean e1")
+        hdr["AERR1"]  = (float(d["alpha_err_1"]),  "jackknife 1-sigma e1")
+        hdr["BFULL1"] = (float(d["beta_full_1"]),  "best-fit intercept e1")
+        hdr["AFULL2"] = (float(d["alpha_full_2"]), "best-fit slope e2")
+        hdr["AMEAN2"] = (float(d["alpha_mean_2"]), "jackknife mean e2")
+        hdr["AERR2"]  = (float(d["alpha_err_2"]),  "jackknife 1-sigma e2")
+        hdr["BFULL2"] = (float(d["beta_full_2"]),  "best-fit intercept e2")
+        hdr["BERR1"] = (float(d["beta_err_1"]), "beta_err_1 (jackknife 1-sigma)")
+        hdr["BERR2"] = (float(d["beta_err_2"]), "beta_err_2 (jackknife 1-sigma)")
+
+        hdul.append(hdu)
+
+    hdul.writeto(out_fits, overwrite=overwrite)
+    print(f"[WROTE] {out_fits}  ({len(panel_data_list)} extensions)")
+
+
+def plot_psf_leakage_comparison(
+    fits_with_nfw: str,
+    fits_wo_nfw: str,
+    *,
+    col_nfw="magenta",
+    col_nonfw="teal",
+    label_nfw="NFW",
+    label_nonfw="No NFW",
+    components=(1, 2),        # 1, 2, or (1, 2)
+    save_path=None,
+    plot_confidence=False
+):
+    plt.rcParams.update({
+        "font.size": 13,
+        "axes.labelsize": 16,
+        "axes.titlesize": 16,
+        "legend.fontsize": 13,
+        "xtick.labelsize": 15,
+        "ytick.labelsize": 15,
+        "axes.linewidth": 1.2,
+    })
+
+    all_panels = [
+        dict(
+            hdu="E1PSF",
+            col_key=("y_bin_1", "yerr_bin_1"),
+            alpha_keys=("AFULL1", "BFULL1", "AERR1", "BERR1"),
+            alpha_idx=1,
+            xlabel=r"$e_1^{\rm PSF}$",
+            ylabel=r"$\langle e_1 \rangle$",
+        ),
+        dict(
+            hdu="E2PSF",
+            col_key=("y_bin_2", "yerr_bin_2"),
+            alpha_keys=("AFULL2", "BFULL2", "AERR2", "BERR2"),
+            alpha_idx=2,
+            xlabel=r"$e_2^{\rm PSF}$",
+            ylabel=r"$\langle e_2 \rangle$",
+        ),
+    ]
+
+    # normalise: int -> tuple
+    if isinstance(components, int):
+        components = (components,)
+    panels = [p for p in all_panels if p["alpha_idx"] in components]
+
+    n_panels = len(panels)
+    fig_width = 7.5 * n_panels          # ~7.5 in per panel
+    fig, axes = plt.subplots(1, n_panels, figsize=(fig_width, 5.2))
+    if n_panels == 1:
+        axes = [axes]                   # always iterable
+
+    for ax, p in zip(axes, panels):
+        tab_a = Table.read(fits_with_nfw, hdu=p["hdu"])
+        tab_b = Table.read(fits_wo_nfw,   hdu=p["hdu"])
+
+        ycol, yerrcol = p["col_key"]
+        akey, bkey, errkey, berrkey = p["alpha_keys"]
+        idx = p["alpha_idx"]
+
+        xbin_a      = np.asarray(tab_a["x_bin"])
+        ybin_a      = np.asarray(tab_a[ycol])
+        yerr_a      = np.asarray(tab_a[yerrcol])
+        alpha_a     = tab_a.meta[akey]
+        beta_a      = tab_a.meta[bkey]
+        alpha_err_a = tab_a.meta[errkey]
+        beta_err_a  = tab_a.meta[berrkey]
+
+        xbin_b      = np.asarray(tab_b["x_bin"])
+        ybin_b      = np.asarray(tab_b[ycol])
+        yerr_b      = np.asarray(tab_b[yerrcol])
+        alpha_b     = tab_b.meta[akey]
+        beta_b      = tab_b.meta[bkey]
+        alpha_err_b = tab_b.meta[errkey]
+        beta_err_b  = tab_b.meta[berrkey]
+
+        xx = np.linspace(
+            min(xbin_a.min(), xbin_b.min()),
+            max(xbin_a.max(), xbin_b.max()),
+            1000,
+        )
+
+        dy_a = np.sqrt((alpha_err_a * xx)**2 + beta_err_a**2)
+        dy_b = np.sqrt((alpha_err_b * xx)**2 + beta_err_b**2)
+
+        ax.errorbar(
+            xbin_a, ybin_a, yerr=yerr_a,
+            fmt="o", ms=8, capsize=3, elinewidth=1.9,
+            color=col_nfw, mec=col_nfw, mfc="white",
+            label=rf"{label_nfw}: $\alpha_{idx}={alpha_a:.3f}\ ({abs(alpha_a)/alpha_err_a:.2f}\sigma)$",
+        )
+        ax.errorbar(
+            xbin_b, ybin_b, yerr=yerr_b,
+            fmt="^", ms=8, capsize=3, elinewidth=1.9,
+            color=col_nonfw, mec=col_nonfw, mfc="white",
+            label=rf"{label_nonfw}: $\alpha_{idx}={alpha_b:.3f}\ ({abs(alpha_b)/alpha_err_b:.2f}\sigma)$",
+        )
+
+        ax.plot(xx, alpha_a * xx + beta_a, color=col_nfw,   lw=2.2, ls="--")
+        if plot_confidence:
+            ax.fill_between(xx, alpha_a*xx + beta_a - dy_a,
+                                alpha_a*xx + beta_a + dy_a,
+                            color=col_nfw, alpha=0.15, linewidth=0)
+
+        ax.plot(xx, alpha_b * xx + beta_b, color=col_nonfw, lw=2.2, ls="--")
+        if plot_confidence:
+            ax.fill_between(xx, alpha_b*xx + beta_b - dy_b,
+                                alpha_b*xx + beta_b + dy_b,
+                            color=col_nonfw, alpha=0.15, linewidth=0)
+
+        ax.axhline(0, color="0.3", alpha=0.6, ls=":", lw=1.2)
+        ax.set_xlabel(p["xlabel"])
+        ax.set_ylabel(p["ylabel"])
+        ax.legend(frameon=False, borderpad=0.8, handlelength=2.5)
+
+    plt.tight_layout()
+    if save_path is not None:
+        plt.savefig(save_path, bbox_inches="tight")
+        print(f"[SAVED] {save_path}")
+    plt.show()
 
 def plot_rs_wl_overlay(
     rs_file,
