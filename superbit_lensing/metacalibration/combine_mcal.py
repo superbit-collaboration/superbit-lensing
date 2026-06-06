@@ -6,6 +6,31 @@ from superbit_lensing.utils import separate_catalog_by_regions
 import os
 import ipdb
 
+# hlr -> sigma conversion factor for a 2D Gaussian: sigma = hlr / sqrt(2 ln 2)
+_HLR_TO_SIGMA = 1.0 / np.sqrt(2.0 * np.log(2.0))
+
+
+def _has_col(table, name):
+    """Works for both astropy Tables and FITS_rec / structured arrays."""
+    names = getattr(table, "colnames", None)
+    if names is None:
+        names = table.dtype.names
+    return name in names
+
+
+def _T_from_hlr(table, t):
+    """Compute (T, T_err) from the half-light radius in pars[4], assuming a
+    Gaussian profile: sigma = hlr / sqrt(2 ln2), T = 2 sigma^2."""
+    hlr = np.asarray(table[f"pars_{t}"])[:, 4]
+    hlr_err = np.asarray(table[f"pars_err_{t}"])[:, 4]
+
+    sigma = hlr * _HLR_TO_SIGMA
+    sigma_err = hlr_err * _HLR_TO_SIGMA
+
+    T = 2.0 * sigma**2
+    T_err = 4.0 * sigma * sigma_err  # dT/dsigma = 4 sigma
+    return T, T_err
+
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument('-nrun', type=int, default=50, help='Number of realizations to combine')
@@ -82,24 +107,52 @@ def main(args):
     # Number of realizations
     N = len(filtered_tables)
 
+    # check if the T, T_err columns exist or not (absent for galsimfitter)
+    test_table = filtered_tables[0]
+    has_T = _has_col(test_table, f"T_{types[0]}")
+
+
     for t in types:
         g1_mean = np.median([table[f"g_{t}"][:, 0] for table in filtered_tables], axis=0)
         g2_mean = np.median([table[f"g_{t}"][:, 1] for table in filtered_tables], axis=0)
         mcal_combined[f"g_{t}"] = np.column_stack((g1_mean, g2_mean))
-        mcal_combined[f"T_{t}"] = np.median([table[f"T_{t}"] for table in filtered_tables], axis=0)
         mcal_combined[f"flux_{t}"] = np.median([table[f"flux_{t}"] for table in filtered_tables], axis=0)
 
+        # T / T_err: use stored columns if present, otherwise derive from hlr in pars[4]
+        if has_T:
+            T_list = [table[f"T_{t}"] for table in filtered_tables]
+            T_err_list = [table[f"T_err_{t}"] for table in filtered_tables]
+        else:
+            T_pairs = [_T_from_hlr(table, t) for table in filtered_tables]
+            T_list = [p[0] for p in T_pairs]
+            T_err_list = [p[1] for p in T_pairs]
+
+        mcal_combined[f"T_{t}"] = np.median(T_list, axis=0)
+        mcal_combined[f"T_err_{t}"] = np.median(T_err_list, axis=0)
+
         mcal_combined[f"g_cov_{t}"] = np.median([table[f"g_cov_{t}"] for table in filtered_tables], axis=0)
-        mcal_combined[f"T_err_{t}"] = np.median([table[f"T_err_{t}"] for table in filtered_tables], axis=0)
         mcal_combined[f"flux_err_{t}"] = np.median([table[f"flux_err_{t}"] for table in filtered_tables], axis=0)
         
         # Unweighted average for Tpsf
         mcal_combined[f"Tpsf_{t}"] = np.median([table[f"Tpsf_{t}"] for table in filtered_tables], axis=0) 
         mcal_combined[f"gpsf_{t}"] = np.median([table[f"gpsf_{t}"] for table in filtered_tables], axis=0)
 
-        # Average S/N
-        s2n_avg = np.median([table[f"s2n_{t}"] for table in filtered_tables], axis=0)
-        mcal_combined[f"s2n_{t}"] = s2n_avg
+        # S/N: use s2n_{t} if present, otherwise fall back to s2n_r_{t}
+        if _has_col(test_table, f"s2n_{types[0]}"):
+            s2n_col = f"s2n_{t}"
+            has_s2n_r = False
+        elif _has_col(test_table, f"s2n_r_{types[0]}"):
+            s2n_col = f"s2n_r_{t}"
+            has_s2n_r = True
+        else:
+            raise KeyError(
+                f"Neither 's2n_{types[0]}' nor 's2n_r_{types[0]}' found in table columns. "
+                f"Available columns: {list(getattr(test_table, 'colnames', test_table.dtype.names))}"
+            )
+        mcal_combined[f"s2n_{t}"] = np.median([table[s2n_col] for table in filtered_tables], axis=0)
+
+    if not has_T and has_s2n_r:
+        print("INFO: T/T_err columns absent and s2n_r detected — looks like these mcal tables were produced with GalSimFitter.")
 
     # Convert to an Astropy table and save
     mcal_combined_table = Table(mcal_combined)

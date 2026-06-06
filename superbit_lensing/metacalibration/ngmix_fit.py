@@ -198,7 +198,7 @@ def write_output_table(outfilename, tab, overwrite=False):
 
     return
 
-def mcal_dict2tab(mcal, obsdict, ident):
+def mcal_dict2tab(mcal, obsdict, ident, obslist):
     '''
     mcal is the dict returned by ngmix.get_metacal_result()
 
@@ -225,7 +225,11 @@ def mcal_dict2tab(mcal, obsdict, ident):
         # Get the psf T by averaging over epochs (and eventually bands)
         tpsf_list = []
         gpsf_list = []
-        obs = obsdict[name]
+        
+        if name == "noshear":
+            obs = obslist
+        else:
+            obs = obsdict[name]
 
         for i in range(len(obs)):
             try:
@@ -307,7 +311,7 @@ def mp_fit_one(obslist, prior, rng, psf_model='gauss', gal_model='gauss', mcal_p
         pass
     else:
         raise ValueError('psf_model must be one of emn, coellipn, gauss, or galsim')
-        
+
 
     if psf_model =='galsim':
         guesser = ngmix.guessers.TFluxAndPriorGuesser(rng=rng, T=Tguess, flux=flux_guess, prior=prior)
@@ -409,7 +413,7 @@ def mp_run_fit(i, obj, obslist, prior,
 
         # convert result dict to a formatted table
         # obj here is the "identifying" table
-        mcal_tab = mcal_dict2tab(resdict, obsdict, obj)
+        mcal_tab = mcal_dict2tab(resdict, obsdict, obj, obslist)
 
         end = time.time()
         logprint(f'Fitting and conversion took {end-start} seconds')
