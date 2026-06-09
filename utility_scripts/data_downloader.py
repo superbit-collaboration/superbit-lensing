@@ -8,6 +8,7 @@ from astropy.io import fits
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 TEMPLATE_DIR = os.path.join(PROJECT_ROOT, 'data', 'template')
+starcat_ned_maker = os.path.join(PROJECT_ROOT, "superbit_lensing", "galsim", "starcat_nedmaker.py")
 
 def create_cluster_directory(cluster_name, data_dir="/projects/mccleary_group/superbit/union"):
     """
@@ -98,6 +99,36 @@ def download_data(cluster_name, prelim_dir, username=None):
     # Return to original directory
     os.chdir(original_dir)
     return True
+
+def download_sims(cluster_name, target_dir, band='b', username=None):
+    if username is None:
+        username = input("Enter your username for hen.astro.utoronto.ca: ")
+
+    base = f"{username}@hen.astro.utoronto.ca:/data/analysis/superbit_2023/shape_cats/simulations/{cluster_name}/{band}/cal"
+
+    scp_command = [
+        "scp",
+        f"{base}/*",
+        target_dir,
+    ]
+
+    print(f"Downloading simulation data for '{cluster_name}' (band={band}) from hen.astro.utoronto.ca...")
+    print("You will be prompted for your password.")
+
+    try:
+        subprocess.run(
+            scp_command,
+            shell=False,
+            check=True,
+            stdin=sys.stdin,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+        )
+        print("All downloads completed.")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error downloading data: {e}")
+        return False
 
 
 def filter_fits_files(directory):
@@ -255,37 +286,54 @@ def main():
     parser.add_argument('--username', type=str, help='Username for hen.astro.utoronto.ca')
     parser.add_argument('--data-dir', type=str, default="/projects/mccleary_group/superbit/union",
                         help='Base directory for data (default: /projects/mccleary_group/superbit/union)')
-    
+    parser.add_argument("--is_sim", action='store_true', default=False,
+                        help='Set to indicate they are simulations')
+
     args = parser.parse_args()
-    
+
     try:
-        # Create cluster directory
         print(f"Processing cluster: {args.cluster_name}")
         cluster_dir, prelim_dir = create_cluster_directory(args.cluster_name, args.data_dir)
-        
-        # Download data with username (could be None, will be handled in download_data)
-        if not download_data(args.cluster_name, prelim_dir, args.username):
-            print("Download failed. Exiting.")
-            return 1
-        
-        # Filter FITS files
-        print("Filtering FITS files...")
-        good_dir, bad_dir = filter_fits_files(prelim_dir)
-        
-        # Delete bad files
-        delete_bad_files(bad_dir)
-        
-        # Organize files by band
-        print("Organizing files by band...")
-        organize_by_band(good_dir, cluster_dir, args.cluster_name)
-        
-        print("Remove Preliminary Directory..")
-        shutil.rmtree(prelim_dir)
 
-        print(f"Successfully processed data for cluster: {args.cluster_name}")
-        print(f"Data organized in: {cluster_dir}")
-        
-        return 0
+        if args.is_sim:
+            shutil.rmtree(prelim_dir)
+            if not download_sims(args.cluster_name, os.path.join(cluster_dir, "b", "cal"),
+                                 username=args.username):
+                print("Download failed. Exiting.")
+                return 1
+
+            result = subprocess.run(
+                        ["python", starcat_ned_maker,
+                        args.cluster_name,   # run_name
+                        "b",                 # band
+                        args.data_dir,       # datadir
+                        PROJECT_ROOT],       # codedir
+                        check=True,
+                        stdin=sys.stdin,
+                        stdout=sys.stdout,
+                        stderr=sys.stderr,
+                    )
+            return 0
+
+        else:
+            if not download_data(args.cluster_name, prelim_dir, args.username):
+                print("Download failed. Exiting.")
+                return 1
+
+            print("Filtering FITS files...")
+            good_dir, bad_dir = filter_fits_files(prelim_dir)
+
+            delete_bad_files(bad_dir)
+
+            print("Organizing files by band...")
+            organize_by_band(good_dir, cluster_dir, args.cluster_name)
+
+            print("Remove Preliminary Directory..")
+            shutil.rmtree(prelim_dir)
+
+            print(f"Successfully processed data for cluster: {args.cluster_name}")
+            print(f"Data organized in: {cluster_dir}")
+            return 0
         
     except Exception as e:
         print(f"Error: {e}")

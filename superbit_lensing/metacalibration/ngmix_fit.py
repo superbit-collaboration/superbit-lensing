@@ -174,7 +174,7 @@ class SuperBITNgmixFitter():
             print('Using only multi-epoch obs to do ngmix fitting')
             if self.has_coadd:
                 se_obslist = ngmix.ObsList(meta=deepcopy(obslist._meta))
-                for obs in obslist[1:]:
+                for obs in obslist[:]:
                     se_obslist.append(obs)
                 obslist = se_obslist
             return obslist

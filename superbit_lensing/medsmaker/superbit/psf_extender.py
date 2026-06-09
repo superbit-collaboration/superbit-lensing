@@ -214,6 +214,23 @@ class PSFWrapper(dict):
         self["psf_samp"] = float(hdr["PSF_SAMP"])
         self.psfex_model = DES_PSFEx(self.psf_file, wcs=self.wcs)
 
+    def get_rec_galsim(self, row, col):
+        """
+        Return a PSF galsim object at the requested detector location.
+
+        Notes
+        -----
+        `row, col` are assumed to be 0-indexed image coordinates. We add +1
+        when building the GalSim PositionD to match FITS/WCS convention.
+        """
+        row = float(row)
+        col = float(col)
+
+        img_pos = galsim.PositionD(col + 1.0, row + 1.0)
+        
+        psf_local = self.psfex_model.getPSF(img_pos)
+        return psf_local
+
     def get_rec(self, row, col):
         """
         Return a PSF image (npix x npix) at the requested detector location.

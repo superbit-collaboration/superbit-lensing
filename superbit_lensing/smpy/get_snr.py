@@ -383,7 +383,7 @@ def run(config, plot_kappa=False, plot_error=False, save_fits_flag=False):
     Rs = config["aperture_mass_Rs"] # in image pixels
     bin_size = config["resolution"] * 60 / pixel_scale # convert arcmin to pixels
     snr = ApertureMassSNR(shear_df["g1"], shear_df["g2"], shear_df["weight"], shear_df["x"], shear_df["y"], bin_size=bin_size, Rs=Rs)
-    SNR_E, SNR_B, M_E_real, noise_map = snr.run(n_realizations=config["num_sims"], n_cpus=32, seed=config["seed_sims"], return_kappa_n_noise=True)
+    SNR_E, SNR_B, M_E_real, noise_map = snr.run(n_realizations=config["num_sims"], n_cpus=1, seed=config["seed_sims"], return_kappa_n_noise=True)
 
     
     res_str = f"(Resolution: {config['resolution']:.2f} arcmin, Rs: {(Rs/bin_size):.2f})"

@@ -194,6 +194,8 @@ def main(args):
         
         # Set image catalogs attribute
         #bm.set_image_cats()
+        if science_ending == "sim":
+            std_thresh = 0.15
         kept_exp = bm.filter_files(std_threshold=std_thresh, ellip_threshold=ellip_thresh)
 
         # Build  a PSF model for each image.

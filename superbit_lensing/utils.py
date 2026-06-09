@@ -28,6 +28,7 @@ import pyregion
 import psfex
 import galsim
 import ngmix
+from ngmix.gaussmom import GaussMom
 from ngmix.shape import e1e2_to_g1g2
 from colossus.cosmology import cosmology
 from colossus.halo import concentration, mass_defs
@@ -1878,8 +1879,9 @@ def get_admoms(image: np.ndarray, scale: float, mode: str = "ngmix", seed: int =
     # --- Moment measurement ---
     if mode == "ngmix":
         obs_im = ngmix.Observation(image=image / norm, jacobian=jac)
+        gm = GaussMom(1.2).go(obs_im)
         am = ngmix.admom.AdmomFitter(rng=rng)
-        res = am.go(obs_im, guess=0.5)
+        res = am.go(obs_im, guess=gm["T"])
         e1, e2, T, flag = res["e1"], res["e2"], res["T"], res["flags"]
 
     elif mode == "galsim":
@@ -1931,8 +1933,9 @@ def get_admoms_ngmix_fit(obs: "ngmix.Observation", seed: int = 124, reduced: boo
 
     # --- Measure moments with ngmix ---
     obs_norm = ngmix.Observation(image=image / norm, jacobian=jac)
+    gm = GaussMom(1.2).go(obs_norm)
     am = ngmix.admom.AdmomFitter(rng=rng)
-    res = am.go(obs_norm, guess=0.5)
+    res = am.go(obs_norm, guess=gm["T"])
     e1, e2, T_ngmix = res["e1"], res["e2"], res["T"]
 
     # --- Measure size using GalSim ---

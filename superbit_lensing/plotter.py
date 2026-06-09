@@ -34,6 +34,7 @@ import matplotlib.colors as colors
 from matplotlib.path import Path
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+from matplotlib.ticker import MaxNLocator
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from superbit_lensing.utils import build_clean_tan_wcs, read_ds9_ctr, get_cluster_info, get_admoms, get_galsim_tanwcs, get_sky_footprint_center_radius
 from superbit_lensing.medsmaker.superbit.psf_extender import PSFWrapper
@@ -2873,7 +2874,8 @@ def plot_psf_leakage_comparison(
     label_nonfw="No NFW",
     components=(1, 2),        # 1, 2, or (1, 2)
     save_path=None,
-    plot_confidence=False
+    plot_confidence=False,
+    x_nticks=5,           
 ):
     plt.rcParams.update({
         "font.size": 13,
@@ -2976,6 +2978,7 @@ def plot_psf_leakage_comparison(
         ax.axhline(0, color="0.3", alpha=0.6, ls=":", lw=1.2)
         ax.set_xlabel(p["xlabel"])
         ax.set_ylabel(p["ylabel"])
+        ax.xaxis.set_major_locator(MaxNLocator(x_nticks))
         ax.legend(frameon=False, borderpad=0.8, handlelength=2.5)
 
     plt.tight_layout()
