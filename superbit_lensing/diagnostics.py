@@ -497,6 +497,8 @@ def compute_metacal_quantities(mcal, qual_cuts, mcal_shear, shape_noise=0.14, cl
     if min_admom_sigma is not None:
         noshear_mask &= (mcal['admom_sigma'] > min_admom_sigma)
     if max_gpsf is not None:
+        gpsf = np.hypot(mcal["gpsf_noshear"][:, 1], mcal["gpsf_noshear"][:, 0])
+        # noshear_mask &= (gpsf < max_gpsf)
         noshear_mask &= (mcal["gpsf_noshear"][:, 1]>-max_gpsf) &(mcal["gpsf_noshear"][:, 1]<max_gpsf) & (mcal["gpsf_noshear"][:, 0]>-max_gpsf) &(mcal["gpsf_noshear"][:, 0]<max_gpsf)
     
     noshear_selection = mcal[noshear_mask]

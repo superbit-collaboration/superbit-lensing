@@ -189,7 +189,7 @@ def make_obj(i, obj_type, *args, **kwargs):
     Particularly useful for multiprocessing wrappers
     '''
 
-    logprint = args[-1]
+    logprint = args[-2]
 
     func = None
 
@@ -257,7 +257,7 @@ def combine_objs(make_obj_outputs, full_image, truth_catalog, exp_num):
 
     return full_image, truth_catalog
 
-def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, gal_image_pos=None, obj_index=None):
+def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, exp_num, gal_image_pos=None, obj_index=None):
     """
     Method to make a single galaxy object and return stamp for
     injecting into larger GalSim image
@@ -303,6 +303,10 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, gal
     logprint.debug(f'galaxy z={gal_z} flux={gal_flux} hlr={half_light_radius} ' + \
                    f'sersic_index={n}')
 
+    # if q is higher than 1, invert it
+    if q > 1.0:
+        q = 1 / q
+
     # Sersic class requires index n >= 0.3
     if (n < 0.3):
         n = 0.3
@@ -331,11 +335,16 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, gal
     # half_light_radius = hlr_exp_for_matching_moment(half_light_radius, n)
     # ====================================================================
 
-    # gal = galsim.Exponential(flux=gal_flux, half_light_radius=half_light_radius)
-    gal = galsim.Sersic(n = n,
-                        flux = gal_flux,
-                        half_light_radius = half_light_radius)
-    # gal  = galsim.Gaussian(sigma=sigma, flux=gal_flux)
+    if sbparams.gal_model == 'sersic':
+        gal = galsim.Sersic(n = n,
+                            flux = gal_flux,
+                            half_light_radius = half_light_radius)
+    elif sbparams.gal_model == 'exp':
+        gal = galsim.Exponential(flux=gal_flux, half_light_radius=half_light_radius)
+    elif sbparams.gal_model == 'gauss':
+        gal  = galsim.Gaussian(flux=gal_flux, half_light_radius=half_light_radius)
+    else:
+        raise ValueError(f"gal_model should be either sersic, exp or gauss, but given {sbparams.gal_model}")
 
     gal = gal.shear(q = q, beta = phi)
     logprint.debug('created galaxy')
@@ -372,32 +381,42 @@ def make_a_galaxy(ud, wcs, affine, cosmos_cat, nfw, psf, sbparams, logprint, gal
     stamp.setCenter(image_pos.x,image_pos.y)
     logprint.debug('drew & centered galaxy!')
     galaxy_truth=truth()
-    galaxy_truth.cosmos_index = cosmos_cat[index]['NUMBER']
-    galaxy_truth.ra=ra.deg; galaxy_truth.dec=dec.deg
-    galaxy_truth.x=image_pos.x; galaxy_truth.y=image_pos.y
-    galaxy_truth.g1=g1; galaxy_truth.g2=g2
-    galaxy_truth.kappa = kappa
-    galaxy_truth.cosmos_g1 = g1_cosmos; galaxy_truth.cosmos_g2 = g2_cosmos
-    galaxy_truth.mu = mu; galaxy_truth.z = gal_z
-    galaxy_truth.flux = stamp.added_flux
-    galaxy_truth.mag_bit_b = cosmos_cat[index]['mag_b']
-    galaxy_truth.mag_bit_g = cosmos_cat[index]['mag_g']
-    galaxy_truth.mag_bit_u = cosmos_cat[index]['mag_u']
-    galaxy_truth.n = n; galaxy_truth.hlr = half_light_radius
-    #galaxy_truth.inclination = inclination.deg # storing in degrees for human readability
-    galaxy_truth.scale_h_over_r = q
     galaxy_truth.obj_class = 'gal'
-    g1_th, g2_th, mu_th, theta_th, flip_th = utils.g_from_gal_jac(gal)
-    galaxy_truth.theory_g1 = g1_th
-    galaxy_truth.theory_g2 = g2_th
-    logprint.debug('created truth values')
+    if exp_num == 1:
+        galaxy_truth.cosmos_index = cosmos_cat[index]['NUMBER']
+        galaxy_truth.ra=ra.deg; galaxy_truth.dec=dec.deg
+        galaxy_truth.x=image_pos.x; galaxy_truth.y=image_pos.y
+        galaxy_truth.g1=g1; galaxy_truth.g2=g2
+        galaxy_truth.kappa = kappa
+        galaxy_truth.cosmos_g1 = g1_cosmos; galaxy_truth.cosmos_g2 = g2_cosmos
+        galaxy_truth.mu = mu; galaxy_truth.z = gal_z
+        galaxy_truth.flux = stamp.added_flux
+        galaxy_truth.mag_bit_b = cosmos_cat[index]['mag_b']
+        galaxy_truth.mag_bit_g = cosmos_cat[index]['mag_g']
+        galaxy_truth.mag_bit_u = cosmos_cat[index]['mag_u']
+        galaxy_truth.n = n; galaxy_truth.hlr = half_light_radius
+        #galaxy_truth.inclination = inclination.deg # storing in degrees for human readability
+        galaxy_truth.scale_h_over_r = q
+        g1_th, g2_th, mu_th, theta_th, flip_th = utils.g_from_gal_jac(gal)
+        galaxy_truth.theory_g1 = g1_th
+        galaxy_truth.theory_g2 = g2_th
+        logprint.debug('created truth values')
 
-    calculate_admoms_with_timeout(gal, wcs, image_pos, galaxy_truth, sbparams, timeout_seconds=10)
+        try:
+            resdict = utils.get_admoms_ngmix_fit(utils.gso_to_ngmix_obs(gal, wcs.local(image_pos)))
+            galaxy_truth.admom_g1 = resdict['e1']
+            galaxy_truth.admom_g2 = resdict['e2']
+            galaxy_truth.admom_flag = 1 if resdict['flags'] == 0 else 0
+            galaxy_truth.admom_sigma = np.sqrt(resdict['T']/2)
+        except Exception as e:
+            logprint(f"admom failed: {e}")
+
+        # calculate_admoms_with_timeout(gal, wcs, image_pos, galaxy_truth, sbparams, timeout_seconds=10)
 
     logprint.debug('stamp made, moving to next galaxy')
     return stamp, galaxy_truth
 
-def make_cluster_galaxy(ud, wcs, affine, centerpix, cluster_cat, psf, sbparams, logprint, obj_index=None):
+def make_cluster_galaxy(ud, wcs, affine, centerpix, cluster_cat, psf, sbparams, logprint, exp_num, obj_index=None):
     """
     Method to make a single galaxy object and return stamp for
     injecting into larger GalSim image
@@ -474,7 +493,7 @@ def make_cluster_galaxy(ud, wcs, affine, centerpix, cluster_cat, psf, sbparams, 
     return cluster_stamp, cluster_galaxy_truth
 
 
-def make_a_star(ud, pud, k, wcs, affine, psf, sbparams, logprint, star_image_pos=None, obj_index=None):
+def make_a_star(ud, pud, k, wcs, affine, psf, sbparams, logprint, exp_num, star_image_pos=None, obj_index=None):
     """
     makes a star-like object for injection into larger image.
     """
@@ -537,27 +556,28 @@ def make_a_star(ud, pud, k, wcs, affine, psf, sbparams, logprint, star_image_pos
     star_stamp.setCenter(image_pos.x, image_pos.y)
 
     star_truth = truth()
-    star_truth.ra = ra.deg; star_truth.dec = dec.deg
-    star_truth.x = image_pos.x; star_truth.y = image_pos.y
-    star_truth.galsim_flux = star_flux
     star_truth.obj_class = 'star'
+    if exp_num == 1:
+        star_truth.ra = ra.deg; star_truth.dec = dec.deg
+        star_truth.x = image_pos.x; star_truth.y = image_pos.y
+        star_truth.galsim_flux = star_flux
 
-    try:
-        star_truth.fwhm = star.calculateFWHM()
-    except galsim.errors.GalSimError:
-        logprint.debug('fwhm calculation failed')
-        star_truth.fwhm =- 9999.0
+        # try:
+        #     star_truth.fwhm = star.calculateFWHM()
+        # except galsim.errors.GalSimError:
+        #     logprint.debug('fwhm calculation failed')
+        #     star_truth.fwhm =- 9999.0
 
-    try:
-        admoms = galsim.hsm.FindAdaptiveMom(star_stamp)
-        star_truth.admom_g1 = admoms.observed_shape.g1
-        star_truth.admom_g2 = admoms.observed_shape.g2
-        star_truth.admom_sigma = admoms.moments_sigma * sbparams.pixel_scale
-        #galaxy_truth.mom_size=stamp.FindAdaptiveMom().moments_sigma
-        star_truth.admom_flag = 0 #Always Zero for stars
-    except galsim.errors.GalSimError:
-        logprint.debug('sigma calculation failed')
-        star_truth.mom_size=-9999.
+        # try:
+        #     admoms = galsim.hsm.FindAdaptiveMom(star_stamp)
+        #     star_truth.admom_g1 = admoms.observed_shape.g1
+        #     star_truth.admom_g2 = admoms.observed_shape.g2
+        #     star_truth.admom_sigma = admoms.moments_sigma * sbparams.pixel_scale
+        #     #galaxy_truth.mom_size=stamp.FindAdaptiveMom().moments_sigma
+        #     star_truth.admom_flag = 0 #Always Zero for stars
+        # except galsim.errors.GalSimError:
+        #     logprint.debug('sigma calculation failed')
+        #     star_truth.mom_size=-9999.
 
     return star_stamp, star_truth
 
@@ -711,6 +731,8 @@ class SuperBITParameters:
                 self.outdir = str(value)
             elif option == "emp_psf_path":
                 self.emp_psf_path = str(value)
+            elif option == "gal_model":
+                self.gal_model = str(value)
             elif option == "data_dir":
                 self.data_dir = str(value)
             elif option == "master_seed":
@@ -1336,6 +1358,8 @@ def main(args):
         full_image.wcs = wcs
 
         psf_idx = min(i-1, len(all_psf_files) - 1)
+        if i - 1 >= len(all_psf_files):
+            logprint(f"[WARNING] PSF index {i-1} out of range ({len(all_psf_files)} files); reusing {all_psf_files[-1]}")
         psf_file = all_psf_files[psf_idx]
         psf = galsim.des.DES_PSFEx(psf_file, wcs=wcs)
 
@@ -1373,7 +1397,8 @@ def main(args):
                           nfw,
                           psf,
                           sbparams,
-                          logprint
+                          logprint,
+                          i
                           ] for k in range(ncores))
                         ),
                     full_image,
@@ -1402,7 +1427,8 @@ def main(args):
                                                 nfw=nfw,
                                                 psf=psf,
                                                 sbparams=sbparams,
-                                                logprint=logprint
+                                                logprint=logprint,
+                                                exp_num=i
                                                 )
                     # Find the overlapping bounds:
                     bounds = stamp.bounds & full_image.bounds
@@ -1450,7 +1476,8 @@ def main(args):
                           cluster_cat,
                           psf,
                           sbparams,
-                          logprint
+                          logprint,
+                          i
                           ] for k in range(ncores))
                         ),
                     full_image,
@@ -1478,7 +1505,8 @@ def main(args):
                                                             cluster_cat=cluster_cat,
                                                             psf=psf,
                                                             sbparams=sbparams,
-                                                            logprint=logprint)
+                                                            logprint=logprint,
+                                                            exp_num=i)
                     # Find the overlapping bounds:
                     bounds = cluster_stamp.bounds & full_image.bounds
 
@@ -1524,7 +1552,8 @@ def main(args):
                           affine,
                           psf,
                           sbparams,
-                          logprint
+                          logprint,
+                          i
                           ] for k in range(sbparams.ncores))
                         ),
                     full_image,
@@ -1550,7 +1579,8 @@ def main(args):
                                             psf=psf,
                                             sbparams=sbparams,
                                             logprint=logprint,
-                                            star_image_pos=star_image_pos
+                                            star_image_pos=None,
+                                            exp_num=i
                                             )
                 bounds = star_stamp.bounds & full_image.bounds
 
@@ -1623,7 +1653,7 @@ def main(args):
                 raise e
 
             # Write truth catalog to file after all exposures
-            if i == sbparams.nexp:
+            if i == 1:
                 try:
                     truth_catalog.write(truth_file_name)
                     logprint(f'Wrote truth to {truth_file_name}')

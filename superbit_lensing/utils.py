@@ -1939,19 +1939,51 @@ def get_admoms_ngmix_fit(obs: "ngmix.Observation", seed: int = 124, reduced: boo
     e1, e2, T_ngmix = res["e1"], res["e2"], res["T"]
 
     # --- Measure size using GalSim ---
-    gal_image = galsim.Image(image / norm, scale=scale)
-    admoms = galsim.hsm.FindAdaptiveMom(gal_image)
-    sigma = admoms.moments_sigma * scale
-    T_galsim = 2 * sigma**2
+    # gal_image = galsim.Image(image / norm, wcs=jac.get_galsim_wcs())
+    # admoms = galsim.hsm.FindAdaptiveMom(gal_image)
+    # sigma = admoms.moments_sigma * scale
+    # T_galsim = 2 * sigma**2
 
-    # --- Set flag based on both results ---
-    flag = 0 if (admoms.moments_status == 0 and res["flags"] == 0) else 1
+    # # --- Set flag based on both results ---
+    # flag = 0 if (admoms.moments_status == 0 and res["flags"] == 0) else 1
 
-    # --- Convert to reduced shear if requested ---
-    if reduced:
-        e1, e2 = e1e2_to_g1g2(e1, e2)
+    # # --- Convert to reduced shear if requested ---
+    # if reduced:
+    #     e1, e2 = e1e2_to_g1g2(e1, e2)
 
-    return {"e1": e1, "e2": e2, "T": T_galsim, "flags": flag}
+    return {"e1": e1, "e2": e2, "T": T_ngmix, "flags": res["flags"]}
+
+def gso_to_ngmix_obs(gso, wcs, noise_sigma=1e-6):
+
+    if not isinstance(wcs, galsim.JacobianWCS):
+        raise ValueError("wcs has to be a galsim.JacobianWCS class")
+
+    # Draw the image using the local WCS
+    image = gso.drawImage(wcs=wcs)
+
+    # Image array and its centre (0-indexed)
+    arr = image.array
+    nrow, ncol = arr.shape
+    row_center = (nrow - 1) / 2.0
+    col_center = (ncol - 1) / 2.0
+
+    # Build ngmix Jacobian from the local WCS, centred on the image centre
+    ngmix_jac = ngmix.Jacobian(
+        x=col_center,
+        y=row_center,
+        wcs = wcs
+    )
+
+    # Flat weight map
+    weight = np.ones_like(arr) / noise_sigma**2
+
+    obs = ngmix.Observation(
+        image=arr,
+        weight=weight,
+        jacobian=ngmix_jac,
+    )
+
+    return obs
 
 def get_admoms_of_best_fit_em5_image(image: np.ndarray, scale: float, reduced: bool = True, seed: int = 124, em_pars: dict = DEFAULT_EM_PARS) -> dict:
     rng = np.random.RandomState(seed)
@@ -2671,7 +2703,6 @@ def grid_stars_between_galaxies(Nstars, g_cols, g_rows, g_dx, g_dy, margin, W, H
     such that stars are always at the geometric centers of four galaxies,
     while being approximately equidistant from each other.
     """
-    print("New Implementation")
     # Define the galaxy coordinate axes
     gal_xs = np.linspace(margin + g_dx/2, W - margin - g_dx/2, g_cols)
     gal_ys = np.linspace(margin + g_dy/2, H - margin - g_dy/2, g_rows)
