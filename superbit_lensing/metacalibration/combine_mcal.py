@@ -38,6 +38,7 @@ def parse_args():
     parser.add_argument('-run_name', type=str, required=True, help='Cluster Name')
     parser.add_argument('-band', type=str, required=True, help='Band name')
     parser.add_argument('-outdir', type=str, help='Output directory')
+    parser.add_argument('--file_ending', type=str, default='fits', help='File ending for mcal files (default: fits)')
     parser.add_argument('--isolate_stars', type=lambda x: x.lower() == 'true', default=True, help='Flag to isolate stars (default: True)')
     parser.add_argument('--isolate_redseq', type=lambda x: x.lower() == 'true', default=True, help='Flag to isolate red-seq galaxies (default: False)')
     return parser.parse_args()
@@ -58,7 +59,7 @@ def main(args):
     os.makedirs(outdir, exist_ok=True)
 
     # Generate file paths
-    mcal_files = [f"{data_dir}/{run_name}/{band}/arr/run{i}/{run_name}_{band}_mcal.fits" for i in range(1, nrun+1)]
+    mcal_files = [f"{data_dir}/{run_name}/{band}/arr/run{i}/{run_name}_{band}_mcal.{args.file_ending}" for i in range(1, nrun+1)]
 
     # Check which files exist
     existing_files = [f for f in mcal_files if os.path.exists(f)]
@@ -162,7 +163,7 @@ def main(args):
     if os.path.exists(mask_file):
         print(f"Using star mask file: {mask_file}")
         junks_mcal, mcal_combined_table, reg_mask = separate_catalog_by_regions(mask_file, mcal_combined_table)
-        junks_mcal.write(f"{outdir}/{run_name}_{band}_mcal_junks.fits", format="fits", overwrite=True)
+        junks_mcal.write(f"{outdir}/{run_name}_{band}_mcal_junks.{args.file_ending}", format="fits", overwrite=True)
     else:
         print(f"WARNING: Star mask file '{mask_file}' not found, skipping the discarding process.")
 
@@ -198,8 +199,8 @@ def main(args):
 
         filtered_mcal = mcal_combined_table[~mask]
         mcal_combined_table = filtered_mcal
-        mcal_discard.write(f"{outdir}/{run_name}_{band}_mcal_stars.fits", format="fits", overwrite=True)
-        print(f"Stars Mcal saved to {outdir}/{run_name}_{band}_mcal_stars.fits")
+        mcal_discard.write(f"{outdir}/{run_name}_{band}_mcal_stars.{args.file_ending}", format="fits", overwrite=True)
+        print(f"Stars Mcal saved to {outdir}/{run_name}_{band}_mcal_stars.{args.file_ending}")
 
     if args.isolate_redseq:
         base_path = os.path.join(data_dir, run_name, band)
@@ -227,12 +228,12 @@ def main(args):
 
             filtered_mcal = mcal_combined_table[~mask]
             mcal_combined_table = filtered_mcal
-            mcal_discard.write(f"{outdir}/{run_name}_{band}_mcal_redseq.fits", format="fits", overwrite=True)
-            print(f"Red Seq Galaxies Mcal saved to {outdir}/{run_name}_{band}_mcal_redseq.fits")            
+            mcal_discard.write(f"{outdir}/{run_name}_{band}_mcal_redseq.{args.file_ending}", format="fits", overwrite=True)
+            print(f"Red Seq Galaxies Mcal saved to {outdir}/{run_name}_{band}_mcal_redseq.{args.file_ending}")            
         else:
             print(f"WARNING: Red Seq Galaxy catalog '{red_seq_file}' not found, skipping the discarding process.")
 
-    mcal_combined_table.write(f"{outdir}/{run_name}_{band}_mcal_combined.fits", format="fits", overwrite=True)
+    mcal_combined_table.write(f"{outdir}/{run_name}_{band}_mcal_combined.{args.file_ending}", format="fits", overwrite=True)
 
     return 0
 
