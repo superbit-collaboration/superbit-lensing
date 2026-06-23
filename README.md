@@ -35,7 +35,7 @@ conda activate sblens
 
 `make install` automatically runs `post_installation.py`, which will prompt you to configure your data and simulation paths and download the required PSF files and catalogs.
 
-> **Apple Silicon note:** `astromatic-scamp=2.14.0` is not currently published on conda-forge for `osx-arm64`, so `make install` skips that package on Apple Silicon and prints a warning. SCAMP-dependent workflows will require a separate SCAMP installation on a supported platform.
+> **Apple Silicon note:** `astromatic-scamp` is not currently published on conda-forge for `osx-arm64`, so `make install` skips that package on Apple Silicon and prints a warning. SCAMP-dependent workflows will require a separate SCAMP installation on a supported conda platform such as `linux-64` or `osx-64`.
 
 ## Questions / issues
 
