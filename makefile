@@ -63,9 +63,9 @@ conda-deps: env
 		"astromatic-source-extractor=2.28.0" \
 		"astromatic-swarp=2.38.0" \
 		-y && \
-	SCAMP_PLATFORM="$$(conda info --json | python -c 'import json, sys; print(json.load(sys.stdin)["subdir"])')" && \
+	SCAMP_PLATFORM="$$(conda info --json | awk -F '\"' '/"subdir"/ {print $$4; exit}')" && \
 	if [ "$$SCAMP_PLATFORM" = "osx-arm64" ]; then \
-		printf "$(YELLOW)Skipping astromatic-scamp=$(SCAMP_VERSION) on $$SCAMP_PLATFORM because conda-forge does not publish that package for this platform. Install SCAMP separately on a supported conda platform such as linux-64 or osx-64 if you need SCAMP-dependent workflows.$(NC)\n"; \
+		printf "$(YELLOW)Skipping astromatic-scamp=$(SCAMP_VERSION) on $$SCAMP_PLATFORM because conda-forge does not publish that package for this platform.\nInstall SCAMP separately on a supported conda platform such as linux-64 or osx-64 if you need SCAMP-dependent workflows.$(NC)\n"; \
 	else \
 		conda install -c conda-forge "astromatic-scamp=$(SCAMP_VERSION)" -y; \
 	fi
