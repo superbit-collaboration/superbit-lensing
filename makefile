@@ -65,7 +65,7 @@ conda-deps: env
 			"astromatic-swarp=2.38.0" \
 			-y && \
 		command -v python3 > /dev/null || { printf "$(RED)Error: python3 not found. Required for platform detection.$(NC)\n"; exit 1; }; \
-		SCAMP_PLATFORM="$$(conda info --json | python3 -c 'import json, sys; print(json.load(sys.stdin)["subdir"])')" && \
+		SCAMP_PLATFORM="$$(conda info --json | python3 -c 'import json, os, platform, sys; info = json.load(sys.stdin); subdir = os.environ.get("CONDA_SUBDIR") or info.get("subdir"); platform_name = info.get("platform"); machine = platform.machine().lower(); bits = info.get("bits"); fallback = {("osx", "arm64"): "osx-arm64", ("osx", "aarch64"): "osx-arm64", ("osx", "x86_64"): "osx-64", ("osx", "amd64"): "osx-64", ("linux", "x86_64"): "linux-64", ("linux", "amd64"): "linux-64", ("linux", "aarch64"): "linux-aarch64", ("linux", "arm64"): "linux-aarch64", ("linux", "ppc64le"): "linux-ppc64le", ("linux", "s390x"): "linux-s390x", ("win", "x86_64"): "win-64", ("win", "amd64"): "win-64"}; print(subdir or fallback.get((platform_name, machine)) or ("win-32" if platform_name == "win" and bits == 32 else ""))')" && \
 		[ -n "$$SCAMP_PLATFORM" ] || { printf "$(RED)Error: failed to detect the conda platform for SCAMP installation. Ensure conda is properly installed and configured.$(NC)\n"; exit 1; }; \
 		if [ "$$SCAMP_PLATFORM" = "osx-arm64" ]; then \
 			printf "$(YELLOW)Skipping astromatic-scamp=$(SCAMP_VERSION) on $$SCAMP_PLATFORM because conda-forge does not publish that package for this platform.$(NC)\n"; \
