@@ -64,14 +64,14 @@ conda-deps: env
 			"astromatic-source-extractor=2.28.0" \
 			"astromatic-swarp=2.38.0" \
 			-y && \
-		command -v python3 > /dev/null || { printf "$(RED)Error: python3 is required to detect the conda platform for SCAMP installation.$(NC)\n"; exit 1; }; \
+		command -v python3 > /dev/null || { printf "$(RED)Error: python3 from the active conda environment or system PATH is required to detect the conda platform for SCAMP installation.$(NC)\n"; exit 1; }; \
 		SCAMP_PLATFORM="$$(conda info --json | python3 -c 'import json, sys; print(json.load(sys.stdin)["subdir"])')" && \
 		[ -n "$$SCAMP_PLATFORM" ] || { printf "$(RED)Error: failed to detect the conda platform for SCAMP installation.$(NC)\n"; exit 1; }; \
 		if [ "$$SCAMP_PLATFORM" = "osx-arm64" ]; then \
 			printf "$(YELLOW)Skipping astromatic-scamp=$(SCAMP_VERSION) on $$SCAMP_PLATFORM because conda-forge does not publish that package for this platform.$(NC)\n"; \
 			printf "$(YELLOW)Install SCAMP separately on a supported conda platform such as linux-64 or osx-64 if you need SCAMP-dependent workflows.$(NC)\n"; \
 		else \
-			conda install -n $(ENV_NAME) -c conda-forge "astromatic-scamp=$(SCAMP_VERSION)" -y; \
+			conda install -c conda-forge "astromatic-scamp=$(SCAMP_VERSION)" -y; \
 		fi; \
 	}
 
