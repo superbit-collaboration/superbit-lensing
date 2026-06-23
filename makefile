@@ -89,10 +89,10 @@ git-deps: pip-deps
 	@printf "$(GREEN)Installing git dependencies...$(NC)\n"
 	@eval "$$(conda shell.bash hook)" && \
 	conda activate $(ENV_NAME) && \
-	( $(PIP) install git+https://github.com/esheldon/ngmix.git \
-	&& $(PIP) install git+https://github.com/esheldon/meds.git \
-	&& $(PIP) install git+https://github.com/esheldon/psfex.git \
-	|| CC=gcc CXX=c++ FC=gfortran $(PIP) install --no-cache-dir \
+	( $(PIP) install git+https://github.com/esheldon/ngmix.git --no-build-isolation \
+	&& $(PIP) install git+https://github.com/esheldon/meds.git --no-build-isolation \
+	&& $(PIP) install git+https://github.com/esheldon/psfex.git --no-build-isolation \
+	|| CC=gcc CXX=c++ FC=gfortran $(PIP) install --no-cache-dir --no-build-isolation \
 		git+https://github.com/esheldon/ngmix.git \
 		git+https://github.com/esheldon/meds.git \
 		git+https://github.com/esheldon/psfex.git )

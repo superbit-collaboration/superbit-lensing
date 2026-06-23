@@ -257,7 +257,7 @@ def download_catalogs(datadir):
     print("\nNote: You will be prompted for your hen password.")
 
     # Use rsync for better handling of directories and resume capability
-    cmd = ["rsync", "-avz", "--progress"] + source.split() + [destination]
+    cmd = ["rsync", "-az", "--info=progress2"] + source.split() + [destination]
 
     try:
         print("\nStarting download...")
@@ -350,8 +350,8 @@ def download_sim_data(username, sim_path):
     print(f"To: {destination}")
     print("\nNote: You will be prompted for your hen password.")
 
-    # Use rsync for directories and resume capability
-    cmd = ["rsync", "-avz", "--progress", source, destination]
+    # -a archive, -z compress, --info=progress2 = single overall progress bar
+    cmd = ["rsync", "-az", "--info=progress2", source, destination]
 
     try:
         print("\nStarting download of sim_utils...")
