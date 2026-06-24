@@ -473,11 +473,11 @@ def make_rgb_image(
     ax.set_xlabel("RA", labelpad=0.6)
     ax.set_ylabel("Dec", labelpad=-1)
     ax.imshow(rgb_image, origin="lower", interpolation="nearest")
-
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
     # ── External kappa footprint + contours ──────────────────────────
     if ext_kappa_fits is not None and ext_kappa_contour_levels is not None:
-        xlim = ax.get_xlim()
-        ylim = ax.get_ylim()
+
         from astropy.wcs import WCS as _WCS
 
         ext_kappa_data = fits.getdata(ext_kappa_fits)
