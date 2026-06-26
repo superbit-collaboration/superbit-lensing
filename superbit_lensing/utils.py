@@ -2484,8 +2484,42 @@ class ClusterShearCorrelation:
             
         return self.corr
 
+def clean_se_catalog(catalog_file, output_file=None):
+    """
+    Clean a SExtractor catalog: save to PrimaryHDU and drop the VIGNET column.
+
+    Parameters
+    ----------
+    catalog_file : str
+        Path to input SExtractor FITS catalog.
+    output_file : str, optional
+        Output path. Defaults to overwriting the input file.
+    """
+    if output_file is None:
+        output_file = catalog_file
+
+
+    with fits.open(catalog_file) as hdul:
+        cat = hdul[2].data
+
+        new_cols = []
+        col_defs = cat.columns
+
+        for col in col_defs:
+            if col.name == "VIGNET":
+                continue
+            new_cols.append(fits.Column(name=col.name, format=col.format, array=cat[col.name]))
+
+        new_hdu = fits.BinTableHDU.from_columns(new_cols, header=hdul[2].header)
+
+        new_table = fits.BinTableHDU.from_columns(new_cols, nrows=len(cat))
+        new_hdul = fits.HDUList([hdul[0], new_hdu])
+        new_hdul.writeto(output_file, overwrite=True)
+    print(f"[INFO] Cleaned catalog saved to {output_file}")
+
+
 def run_sextractor_coadd(image_file, config_dir=DEFAULT_CONFIG_DIR, cat_dir=None, 
-                         weight_file=None, back_type='AUTO'):
+                         weight_file=None, back_type='AUTO', cleanup=True, update_hdu=True, add_admom=True):
     """
     Run Source Extractor on a coadd image.
 
@@ -2511,6 +2545,7 @@ def run_sextractor_coadd(image_file, config_dir=DEFAULT_CONFIG_DIR, cat_dir=None
     if cat_dir is None:
         cat_dir = dirname
 
+    os.makedirs(cat_dir, exist_ok=True)
     # --- Catalog name ---
     cat_name = os.path.basename(image_file).replace('.fits', '_cat.fits')
     cat_file = os.path.join(cat_dir, cat_name)
@@ -2551,6 +2586,20 @@ def run_sextractor_coadd(image_file, config_dir=DEFAULT_CONFIG_DIR, cat_dir=None
     os.system(cmd)
 
     print(f"[INFO] Catalog created: {cat_file}")
+
+    if add_admom:
+        print(f'[INFO] adding admom measurements (this might take a few minutes) ....')
+        cat = add_admom_columns(cat_file, bkg_name)
+
+    if cleanup:
+        print(f"[INFO] cleaning up diagnostics files")
+        for f in (bkg_name, seg_name, rms_name):
+            if os.path.exists(f):
+                os.remove(f)
+                print(f"[INFO] removed {f}")
+    if update_hdu:
+        clean_se_catalog(cat_file)
+    
     return cat_file
 
 
