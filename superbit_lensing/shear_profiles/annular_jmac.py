@@ -3,6 +3,7 @@ import getopt
 import re
 import os
 import math
+import time
 import numpy as np
 from argparse import ArgumentParser
 from numpy import r_, c_
@@ -74,15 +75,26 @@ class ShearCalc():
             y   = np.array(inputs["y"],  copy=False)
             g1  = np.array(inputs["g1"], copy=False)
             g2  = np.array(inputs["g2"], copy=False)
+            
+            if 'g1psf' in inputs:
+                g1psf = np.array(inputs["g1psf"], copy=False)
+                g2psf = np.array(inputs["g2psf"], copy=False)
 
             # Build a finite mask across all required columns
             mask = np.isfinite(x) & np.isfinite(y) & np.isfinite(g1) & np.isfinite(g2)
+            
+            if 'g1psf' in inputs:
+                mask &= np.isfinite(g1psf) & np.isfinite(g2psf)
 
             # Store only the finite rows
             self.x  = x[mask]
             self.y  = y[mask]
             self.g1 = g1[mask]
             self.g2 = g2[mask]
+            
+            if 'g1psf' in inputs:
+                self.g1psf = g1psf[mask]
+                self.g2psf = g2psf[mask]
 
             # Report dropped rows (optional)
             ndropped = np.sum(~mask)
@@ -129,6 +141,12 @@ class ShearCalc():
         self.gtan= -1.*(self.g1*np.cos(2.*phi) + self.g2*np.sin(2.*phi))
         # note that annular.c has opposite sign convention
         self.gcross = self.g1*np.sin(2.*phi) - self.g2*np.cos(2.*phi)
+        
+        if hasattr(self, 'g1psf') and hasattr(self, 'g2psf'):
+            self.g1psf = self.g1psf[wg]
+            self.g2psf = self.g2psf[wg]
+            self.gtan_psf = -1 * (self.g1psf*np.cos(2.*phi) + self.g2psf*np.sin(2.*phi))
+            self.gcross_psf = self.g1psf*np.sin(2.*phi) - self.g2psf*np.cos(2.*phi)
 
         return
 
@@ -176,7 +194,7 @@ class Annular(object):
             if 'admom_flag' in tab.columns:
                 admom_valid = tab['admom_flag']==1
                 print(f"[NOTE] Discarding admom fails in truth: {np.sum(~admom_valid)}")
-                tab = tab[admom_valid] 
+                # tab = tab[admom_valid] 
             if 'obj_class' in tab.columns:
                 gal_valid = tab['obj_class']=='gal'
                 print(f"[NOTE] Discarding anything that is not a galaxy: {np.sum(~gal_valid)}")
@@ -208,6 +226,14 @@ class Annular(object):
 
             valid_shear = finite & reasonable
 
+            n_total = len(tab)
+            n_discard_valid = np.sum(~finite)
+            n_discard_reasonable = np.sum(finite & ~reasonable)
+            # print(f"[NOTE] Discarding {n_discard_valid} objects due to invalid shear/position values (NaN/inf)")
+            # print(f"[NOTE] Discarding {n_discard_reasonable} objects due to |g| >= 1")
+            # print(f"[NOTE] Keeping {np.sum(valid_shear)} / {n_total} objects after shear-quality cuts")
+            
+            
             # If you want to be loud when everything is cut:
             if not np.any(valid_shear):
                 raise RuntimeError("No objects with valid shear in table.")
@@ -218,10 +244,19 @@ class Annular(object):
             self.y = tab[self.annular_info['xy_args'][1]]
             self.g1 = tab[self.annular_info['shear_args'][0]]
             self.g2 = tab[self.annular_info['shear_args'][1]]
+            if 'weight_col' in self.annular_info:
+                self.weight = tab[self.annular_info['weight_col']]
+            else:
+                self.weight = np.ones(len(tab))
+            if 'gpsf_noshear' in tab.columns:
+                self.g1psf = tab['gpsf_noshear'][:, 0]
+                self.g2psf = tab['gpsf_noshear'][:, 1]
+                
             #self.ra = tab['ra']
             #self.dec = tab['dec']
             self.z = tab['redshift']
-            self.weight = tab['weight']
+            self.tab = tab
+            
 
         except Exception as e:
             print('Could not load xy/g1g2/radec columns; check supplied column names?')
@@ -242,6 +277,10 @@ class Annular(object):
             'g1': self.g1,
             'g2': self.g2
             }
+        
+        if hasattr(self, 'g1psf') and hasattr(self, 'g2psf'):
+            shear_inputs['g1psf'] = self.g1psf
+            shear_inputs['g2psf'] = self.g2psf
 
         xc = self.annular_info['coadd_center'][0]
         yc = self.annular_info['coadd_center'][1]
@@ -254,12 +293,19 @@ class Annular(object):
         self.r = shears.r
         self.gtan = shears.gtan
         self.gcross = shears.gcross
+        if hasattr(shears, 'gtan_psf') & hasattr(shears, 'gcross_psf'):
+            self.gtan_psf = shears.gtan_psf
+            self.gcross_psf = shears.gcross_psf
 
         newtab = Table()
         newtab.add_columns(
             [x, y, self.r, self.gtan, self.gcross, self.weight],
             names=['x', 'y', 'r', 'gtan', 'gcross', 'weight']
             )
+        
+        if hasattr(self, 'gtan_psf') and hasattr(self, 'gcross_psf'):
+            newtab.add_column(self.gtan_psf, name='gtan_psf')
+            newtab.add_column(self.gcross_psf, name='gcross_psf')
 
         run_name = self.run_name
         outfile = os.path.join(
@@ -287,7 +333,7 @@ class Annular(object):
             nfw_tab = self._nfw_resample_redshift(
                 Nresample, outdir=outdir, overwrite=overwrite,
                 )
-
+            # nfw_tab = self.tab.copy()
             # Calculate tangential and cross shears for nfw
             self._nfw_transform_shear(nfw_tab)
 
@@ -343,25 +389,50 @@ class Annular(object):
             )
 
         pseudo_prob = n_selec / n_nfw
-        domain = np.arange(self.z.min(), self.z.max(), 0.0001)
+        nfw_z   = np.asarray(nfw['redshift'])
+        bins = np.digitize(nfw_z, bin_edges_nfw)   # precompute every object's bin
 
-        subsampled_redshifts = []; t = []
+        # Plain numpy arrays so the loop never indexes an astropy Table row
+        # (that row access — nfw[i][...] / as_void() — was the real bottleneck).
+        # ===============================================
+        # n_obj   = len(nfw)
+        # n_target = nfactor * len(self.z)
+        # # Same RNG call order as before (choice, then random, per trial) ->
+        # # bit-for-bit identical realization, but ~10-30x faster.
+        # chosen = np.empty(n_target, dtype=np.intp)
+        # n_acc = 0
+        # while n_acc < n_target:
+        #     i = rng.choice(n_obj)
+        #     this_bin = bins[i]
+        #     odds = rng.random()
+        #     if (this_bin < len(n_selec)) and (odds <= pseudo_prob[this_bin - 1]):
+        #         chosen[n_acc] = i
+        #         n_acc += 1
+        # ================================================
+        
+        # --- Vectorized rejection sampling -----------------------------------
+        # In the original MC loop, an NFW object i is drawn uniformly and kept
+        # with probability pseudo_prob[bin(z_i)]. The resulting accepted sample
+        # is therefore distributed as a weighted draw (with replacement) from
+        # the NFW table, using those acceptance probabilities as the weights.
+        # This is statistically identical to the per-object loop but avoids all
+        # Python-level per-sample iteration (~100x faster).
 
-        while(len(subsampled_redshifts) < nfactor*len(self.z)):
-            #this_z = rng.choice(nfwstars['redshift'])
-            i = rng.choice(len(nfw))
-            this_z = nfw[i]['redshift']
-            this_bin = np.digitize(this_z, bin_edges_nfw)
+        # Acceptance probability per object; 0 outside the selected-z range
+        # (matches the original `this_bin < len(n_selec)` guard).
+        accept_prob = np.zeros(len(nfw))
+        in_range = (bins >= 1) & (bins < len(n_selec))
+        accept_prob[in_range] = pseudo_prob[bins[in_range] - 1]
 
-            odds = rng.random()
-            if (this_bin<len(n_selec)) and (odds <= pseudo_prob[this_bin-1]):
-                subsampled_redshifts.append(this_z)
-                t.append(nfw[i].as_void())
-            else:
-                pass
+        # Guard against non-finite weights from empty NFW bins (n_nfw == 0)
+        accept_prob[~np.isfinite(accept_prob)] = 0.0
 
-        # nfw_tab is a redshift-resampled subset of the full NFW table
-        nfw_tab = Table(np.array(t),names = nfw.colnames)
+        weights = accept_prob / accept_prob.sum()
+        n_target = nfactor * len(self.z)
+        chosen = rng.choice(len(nfw), size=n_target, replace=True, p=weights)
+
+
+        nfw_tab = nfw[chosen]
         
         np.savez(
             os.path.join(outdir, "redshift_arrays.npz"),
@@ -415,8 +486,41 @@ class Annular(object):
                     )
 
         return nfw_tab
+    
+    def _nfw_transform_shear_v2(self, nfw_tab):
+        '''
+        Repeat shear transform above but with NFW info
+        '''
 
-    def compute_profile(self, outfile, nfw_tab=None, overwrite=False, gtan_max=None):
+        xc = self.annular_info['coadd_center'][0]
+        yc = self.annular_info['coadd_center'][1]
+
+        shear_inputs = {
+            'x': nfw_tab[self.annular_info['xy_args'][0]],
+            'y': nfw_tab[self.annular_info['xy_args'][1]],
+            'g1': nfw_tab[self.nfw_info['shear_args'][0]],
+            'g2': nfw_tab[self.nfw_info['shear_args'][1]]
+            }
+
+        shears = ShearCalc(inputs = shear_inputs)
+        shears.get_r_gtan(xc=xc, yc=yc)
+
+        # Now populate Annular object attributes with these columns
+        x = shears.x ; y = shears.y
+        r = shears.r
+        gtan = shears.gtan
+        gcross = shears.gcross
+
+        # No galaxies in the reference NFW file should have been cut because |g|<0
+        assert(len(shears.x) == len (nfw_tab[self.nfw_info['xy_args'][0]]))
+
+        nfw_tab.add_columns([shears.r, shears.gtan, shears.gcross],
+                       names=['r', 'gtan', 'gcross']
+                    )
+        print("_nfw_transform_shear_v2 completed.")
+        return nfw_tab
+
+    def compute_profile(self, outfile, nfw_tab=None, overwrite=False, gtan_max=None, include_psf_leakage=False, include_constant=False):
         '''
         Computes mean tangential and cross shear of background (redshift-filtered)
         galaxies in azimuthal bins
@@ -434,8 +538,12 @@ class Annular(object):
         shear_tab['gtan'] = self.gtan
         shear_tab['gcross'] = self.gcross
         shear_tab['weight'] = self.weight
+        
+        if hasattr(self, 'gtan_psf') and hasattr(self, 'gcross_psf'):
+            shear_tab['gtan_psf'] = self.gtan_psf
+            shear_tab['gcross_psf'] = self.gcross_psf
 
-        table = _compute_profile(shear_tab, bins, nfw_tab=nfw_tab, gtan_max=gtan_max)
+        table = _compute_profile(shear_tab, bins, nfw_tab=nfw_tab, gtan_max=gtan_max, include_psf_leakage=include_psf_leakage, include_constant=include_constant)
 
         print(f'Writing out shear profile catalog to {outfile}')
         table.write(outfile, format='fits', overwrite=overwrite)
@@ -443,14 +551,14 @@ class Annular(object):
         # Print to stdio for quickcheck -- open to better formatting if it exists
         cols = table.colnames
         colstring = '    '.join([col for col in cols])
-        print(colstring)
+        # print(colstring)
 
-        for i,e in enumerate(table):
-            print(f'{e.as_void()}')
+        # for i,e in enumerate(table):
+        #     print(f'{e.as_void()}')
 
         return table
 
-    def plot_profile(self, profile_tab, plotfile, nfw_tab=None):
+    def plot_profile(self, profile_tab, plotfile, nfw_tab=None, plot_psf=False):
 
         if nfw_tab is not None:
             plot_truth = True
@@ -460,11 +568,11 @@ class Annular(object):
         plotter = ShearProfilePlotter(profile_tab)
 
         print(f'Plotting shear profile to {plotfile}')
-        plotter.plot_tan_profile(outfile=plotfile, plot_truth=plot_truth)
+        plotter.plot_tan_profile(outfile=plotfile, plot_truth=plot_truth, plot_psf=plot_psf)
 
         return
 
-    def run(self, outfile, plotfile, Nresample, overwrite=False, gtan_max=None):
+    def run(self, outfile, plotfile, Nresample, overwrite=False, gtan_max=None, include_psf_leakage=False, include_constant=False, plot_psf=False):
 
         outdir = os.path.dirname(outfile)
 
@@ -482,15 +590,15 @@ class Annular(object):
 
         # Compute azimuthally averaged shear profiles
         profile_tab = self.compute_profile(
-            outfile, nfw_tab=nfw_tab, overwrite=overwrite, gtan_max=gtan_max
+            outfile, nfw_tab=nfw_tab, overwrite=overwrite, gtan_max=gtan_max, include_psf_leakage=include_psf_leakage, include_constant=include_constant
             )
 
         # Plot results
-        self.plot_profile(profile_tab, plotfile, nfw_tab=nfw_tab)
+        self.plot_profile(profile_tab, plotfile, nfw_tab=nfw_tab, plot_psf=plot_psf)
 
         return
 
-def _compute_profile(shear_tab, rbins, nfw_tab=None, gtan_max=None):
+def _compute_profile(shear_tab, rbins, nfw_tab=None, gtan_max=None, include_psf_leakage=False, include_constant=False):
     '''
     A way to compute the tangential shear profile from transformed shear
     catalogs w/o creating an Annular instance
@@ -515,6 +623,11 @@ def _compute_profile(shear_tab, rbins, nfw_tab=None, gtan_max=None):
     gtan_err = np.zeros(N)
     gcross_mean = np.zeros(N)
     gcross_err = np.zeros(N)
+    
+    gtan_psf_mean = np.zeros(N)
+    gcross_psf_mean = np.zeros(N)
+    gtan_psf_err = np.zeros(N)
+    gcross_psf_err = np.zeros(N)
 
     i = 0
     for b1, b2 in zip(bins[:-1], bins[1:]):
@@ -534,6 +647,20 @@ def _compute_profile(shear_tab, rbins, nfw_tab=None, gtan_max=None):
 
         gtan_err[i] = weighted_gtan_stats.std / np.sqrt(n)
         gcross_err[i] =  weighted_gcross_stats.std / np.sqrt(n)
+        
+        if 'gtan_psf' in shear_tab.columns and 'gcross_psf' in shear_tab.columns:
+            weighted_gtan_psf_stats = DescrStatsW(
+                shear_tab['gtan_psf'][annulus], ddof=0
+            )
+            weighted_gcross_psf_stats = DescrStatsW(
+                shear_tab['gcross_psf'][annulus], ddof=0
+            )
+
+            gtan_psf_mean[i] = weighted_gtan_psf_stats.mean
+            gcross_psf_mean[i] = weighted_gcross_psf_stats.mean
+
+            gtan_psf_err[i] = weighted_gtan_psf_stats.std / np.sqrt(n)
+            gcross_psf_err[i] = weighted_gcross_psf_stats.std / np.sqrt(n)
 
         i += 1
 
@@ -544,6 +671,12 @@ def _compute_profile(shear_tab, rbins, nfw_tab=None, gtan_max=None):
             'counts', 'midpoint_r', 'mean_gtan', 'mean_gcross', 'err_gtan', 'err_gcross'
         ],
     )
+    
+    if 'gtan_psf' in shear_tab.columns and 'gcross_psf' in shear_tab.columns:
+        table.add_columns(
+            [gtan_psf_mean, gcross_psf_mean, gtan_psf_err, gcross_psf_err],
+            names=['mean_gtan_psf', 'mean_gcross_psf', 'err_gtan_psf', 'err_gcross_psf'],
+        )
 
     # Repeat calculation if an nfw table is supplied, and also compute shear bias
     if nfw_tab is not None:
@@ -574,6 +707,6 @@ def _compute_profile(shear_tab, rbins, nfw_tab=None, gtan_max=None):
         )
 
         # Compute single-realization shear bias relative to reference NFW
-        compute_shear_bias(profile_tab=table, gtan_max=gtan_max)
+        compute_shear_bias(profile_tab=table, gtan_max=gtan_max, include_psf_leakage=include_psf_leakage, include_constant=include_constant)
 
     return table

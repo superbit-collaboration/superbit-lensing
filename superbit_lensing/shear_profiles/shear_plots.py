@@ -41,22 +41,27 @@ class ShearProfilePlotter(object):
             # in arcsec
             return angular_radius
 
-    def get_alpha(self):
+    def get_zeta_alpha(self):
         '''
         For a singe realization, just grab from cat metadata
         '''
-
+        zeta = self.cat.meta['zeta']
+        sig_zeta = self.cat.meta['sig_zeta']
         alpha = self.cat.meta['alpha']
         sig_alpha = self.cat.meta['sig_alpha']
+        c = self.cat.meta['c']
+        sig_c = self.cat.meta['sig_c']
         r_at_gtan_max = self.cat.meta['r_gtan_max']
+        alpha_cross = self.cat.meta['alpha_cross']
+        sig_alpha_cross = self.cat.meta['sig_alpha_cross']
 
-        return alpha, sig_alpha, r_at_gtan_max
+        return zeta, sig_zeta, alpha, sig_alpha, c, sig_c, alpha_cross, sig_alpha_cross, r_at_gtan_max
 
     def plot_tan_profile(self, title=None, label='Lensing sample galaxies',
                          rbounds=(5, 750), show=False, outfile=None,
                          nfw_label=None, smoothing=False, plot_truth=True,
                          fill_between=True, xlim=None, ylim=None,
-                         shear_cut=False):
+                         shear_cut=False, plot_psf=False):
         '''
         xlim/ylim: list of tuples
             A list of len 2 containing the xlim/ylim boundaries for both plots;
@@ -83,6 +88,12 @@ class ShearProfilePlotter(object):
         gcross = cat['mean_gcross']
         gtan_err = cat['err_gtan']
         gcross_err = cat['err_gcross']
+        
+        if 'mean_gtan_psf' in cat.columns:
+            gtan_psf = cat['mean_gtan_psf']
+            gcross_psf = cat['mean_gcross_psf']
+            gtan_psf_err = cat['err_gtan_psf']
+            gcross_psf_err = cat['err_gcross_psf']
 
         if plot_truth is True:
             try:
@@ -133,17 +144,26 @@ class ShearProfilePlotter(object):
             true_label = 'Reference NFW'
             axs[0].plot(true_radius, true_gtan, '-r', label=true_label)
 
-            alpha, sig_alpha, r_at_gtan_max = self.get_alpha()
+            zeta, sig_zeta, alpha, sig_alpha, c, sig_c, alpha_cross, sig_alpha_cross, r_at_gtan_max = self.get_zeta_alpha()
             if r_at_gtan_max is not None:
                 arcmin_gtan_max = self.get_angular_radius(r_at_gtan_max, arcmin=True)
                 axs[0].axvspan(0, arcmin_gtan_max, color='grey', alpha=0.3, zorder=0, label=f'r ≤ {arcmin_gtan_max:.2f} arcmin')
+                
+            txt = r'$\hat{\zeta}=%.4f~\sigma_{\hat{\zeta}}=%.4f$' % (zeta, sig_zeta)
+            if (~np.isnan(alpha)) & (~np.isnan(sig_alpha)):
+                txt += '\n' + (r'$\hat{\alpha}=%.4f~\sigma_{\hat{\alpha}}=%.4f$' % (alpha, sig_alpha))
+            if (~np.isnan(c)) & (~np.isnan(sig_c)):
+                txt += '\n' + (r'$\hat{c}=%.4f~\sigma_{\hat{c}}=%.4f$' % (c, sig_c))
 
-            txt = str(r'$\hat{\alpha}=%.4f~\sigma_{\hat{\alpha}}=%.4f$' % (alpha, sig_alpha))
             ann = axs[0].annotate(
-                txt, xy=[0.12,0.9], xycoords='axes fraction', fontsize=15,
+                txt, xy=[0.4,0.7], xycoords='axes fraction', fontsize=15,
                 bbox=dict(facecolor='white', edgecolor='cornflowerblue',
                           alpha=0.8,boxstyle='round,pad=0.3')
                 )
+            
+        if plot_psf:
+            if 'mean_gtan_psf' in cat.columns:
+                axs[0].errorbar(radius, gtan_psf, yerr=gtan_psf_err, fmt='-o', color='magenta', label='PSF-shear')
 
         # reference line
         axs[0].axhline(y=0, c="black", alpha=0.4, linestyle='--')
@@ -186,20 +206,29 @@ class ShearProfilePlotter(object):
         axs[-1].set_ylabel(r'$g_{\times}(\theta)$', fontsize=16)
         axs[-1].tick_params(which='major', width=1.3, length=8)
         axs[-1].tick_params(which='minor', width=0.8, length=4)
+        if plot_psf:
+            if 'mean_gcross_psf' in cat.columns:
+                axs[-1].errorbar(radius, gcross_psf, yerr=gcross_psf_err, fmt='-o', color='magenta', label='PSF-shear')
+            
         axs[-1].legend(fontsize=15, loc='upper right')
-
+        txt = fr'$\alpha_{{\times}} = {alpha_cross:.5f} ± {sig_alpha_cross:.5f}$'
+        if plot_psf:
+            axs[-1].annotate(                txt, xy=[0.1,0.1], xycoords='axes fraction', fontsize=15,
+                    bbox=dict(facecolor='white', edgecolor='cornflowerblue',
+                            alpha=0.8,boxstyle='round,pad=0.3')
+                )
         # shear cut region
         if shear_cut is True:
             axs[-1].axvspan(0, rmin+slop, facecolor='k', alpha=0.1)
 
         if xlim is not None:
-            for i in range(2):
+            for i in range(len(axs)):
                 xl = xlim[i]
-                axes[i].set_xlim(xl[0], xl[1])
+                axs[i].set_xlim(xl[0], xl[1])
         if ylim is not None:
-            for i in range(2):
+            for i in range(len(axs)):
                 yl = ylim[i]
-                axes[i].set_ylim(yl[0], yl[1])
+                axs[i].set_ylim(yl[0], yl[1])
 
         if title is None:
             axs[0].set_title(title, fontsize=16)
