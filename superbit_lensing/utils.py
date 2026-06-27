@@ -1947,9 +1947,9 @@ def get_admoms_ngmix_fit(obs: "ngmix.Observation", seed: int = 124, reduced: boo
     # # --- Set flag based on both results ---
     # flag = 0 if (admoms.moments_status == 0 and res["flags"] == 0) else 1
 
-    # # --- Convert to reduced shear if requested ---
-    # if reduced:
-    #     e1, e2 = e1e2_to_g1g2(e1, e2)
+    # --- Convert to reduced shear if requested ---
+    if reduced:
+        e1, e2 = e1e2_to_g1g2(e1, e2)
 
     return {"e1": e1, "e2": e2, "T": T_ngmix, "flags": res["flags"]}
 

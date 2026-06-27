@@ -7,21 +7,22 @@ export cluster_redshift="0.296"
 export detection_band="b"
 
 # Define directories
-export DATADIR="/scratch/sa.saha/test_data"
-export CODEDIR="/projects/mccleary_group/saha/codes/superbit-lensing"
+export DATADIR="/n23data1/saha/data"
+export CODEDIR="/home/saysaha/codes/superbit-lensing"
 export OUTDIR="${DATADIR}/${cluster_name}/${band_name}/out"
 
 # Define ngmix parameters
 export ngmix_nruns=1 
 export PSF_MODEL="em5"
 export GAL_MODEL="gauss"
+export reconv_psf='dilate'
 
 # Seeds
 export psf_seed=33876300
 export base_ngmix_seed=701428540
 
 # Set Conda environment
-export CONDA_ENV="bit_v3"
+export CONDA_ENV="bit"
 
 # Ensure the conda command is available
 source ~/.bashrc

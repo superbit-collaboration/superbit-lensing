@@ -17,6 +17,50 @@ from make_redshift_cat_sims import make_redshift_catalog
 from superbit_lensing import utils
 from superbit_lensing.match import SkyCoordMatcher
 
+MINIMAL_TYPES = ['noshear', '1p', '1m', '2p', '2m']
+DILATE_TYPES = ['noshear', '1p', '1m', '2p', '2m', '1p_psf', '1m_psf', '2p_psf', '2m_psf']
+
+DEFAULT_MCAL_PARS = {'psf': 'dilate', 'mcal_shear': 0.01, 'types' : DILATE_TYPES}
+AZGAUSS_MCAL_PARS = {'psf': 'azgauss', 'mcal_shear': 0.01, 'types' : MINIMAL_TYPES}
+
+# Shear steps that map onto the rows/columns of the 2x2 metacal matrices:
+# step '1' -> column 0 (g1), step '2' -> column 1 (g2)
+_SHEAR_STEPS = ('1', '2')
+
+
+def mcal_response(tab, mcal_shear, suffix=''):
+    """Per-object 2x2 mcal response, R[i, j, n] for component i, shear step j,
+    object n. Pass suffix='_psf' for the PSF response."""
+    R = np.array([
+        [(tab[f'g_{step}p{suffix}'][:, i] - tab[f'g_{step}m{suffix}'][:, i]) / (2. * mcal_shear)
+         for step in _SHEAR_STEPS]
+        for i in range(2)
+    ])
+    return R
+
+
+def mcal_additive_bias(tab, suffix=''):
+    """Per-object additive bias, c[i, n] for component i. The diagonal step
+    (i -> step i+1) is used, matching the standard mcal convention."""
+    c = np.array([
+        (tab[f'g_{step}p{suffix}'][:, i] + tab[f'g_{step}m{suffix}'][:, i]) / 2.
+        - tab['g_noshear'][:, i]
+        for i, step in enumerate(_SHEAR_STEPS)
+    ])
+    return c
+
+
+def mcal_selection_response(selections, mcal_shear):
+    """2x2 selection-bias response from the per-step selected catalogs,
+    R_S[i, j] for component i and shear step j."""
+    R = np.empty((2, 2))
+    for j, step in enumerate(_SHEAR_STEPS):
+        # The plus/minus selections contain different objects, so the mean of
+        # each must be taken before differencing.
+        gp = np.mean(selections[f'{step}p']['g_noshear'], axis=0)
+        gm = np.mean(selections[f'{step}m']['g_noshear'], axis=0)
+        R[:, j] = (gp - gm) / (2. * mcal_shear)
+    return R
 
 def parse_args():
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -39,22 +83,10 @@ def parse_args():
                         help='Detection bandpass [default: b]')
     parser.add_argument('-cluster_redshift', type=str, default=None,
                         help='Redshift of cluster')
-    parser.add_argument('-redshift_cat', type=str, default=None,
-                        help='File containing redshifts')
-    parser.add_argument('-nfw_file', type=str, default=None,
-                        help='Theory NFW shear catalog')
-    parser.add_argument('-Nresample', type=int, default=10,
-                        help='The number of NFW redshift resamples to compute')
-    parser.add_argument('-rmin', type=float, default=100,
-                        help='Starting radius value (in pixels)')
-    parser.add_argument('-rmax', type=float, default=5200,
-                        help='Ending radius value (in pixels)')
-    parser.add_argument('-nfw_seed', type=int, default=None,
-                        help='Seed for nfw redshift resampling')
-    parser.add_argument('-nbins', type=int, default=18,
-                        help='Number of radial bins')
-    parser.add_argument('--center', type=str, default='image',
-                    help='Center type for shear profile calculation; image or xray')
+    parser.add_argument('-reconv_psf', type=str, default='dilate',
+                        help='Reconvolution psf kernel (default: dilate)')
+    parser.add_argument('--psf_correction', action='store_true', default=False,
+                        help='Apply PSF correction')
     parser.add_argument('--overwrite', action='store_true', default=False,
                         help='Set to overwrite output files')
     parser.add_argument('--vb', action='store_true', default=False,
@@ -71,7 +103,7 @@ class AnnularCatalog():
     SExtractor catalog (set in option in main)
     """
 
-    def __init__(self, cat_info, annular_info, config):
+    def __init__(self, cat_info, config):
         """
         cat_info: dict
             A dictionary that must contain the paths for the SExtractor
@@ -83,22 +115,19 @@ class AnnularCatalog():
         """
 
         self.cat_info = cat_info
-        self.annular_info = annular_info
         self.config = config
         self.detect_cat = cat_info['detect_cat']
+        self.data_dir = cat_info['data_dir']
         self.mcal_file = cat_info['mcal_file']
         self.outfile = cat_info['mcal_selected']
         self.outdir = cat_info['outdir']
         self.run_name = cat_info['run_name']
+        self.detection_band = cat_info['detection_band']
         self.redshift_cat = cat_info['redshift_cat']
         self.cluster_redshift = cat_info['cluster_redshift']
-        self.nfw_file = cat_info['nfw_file']
-        self.Nresample = cat_info['Nresample']
+        self.mcal_pars = cat_info['mcal_pars']
+        self.psf_correction = cat_info['psf_correction']
 
-        self.rmin = annular_info['rmin']
-        self.rmax = annular_info['rmax']
-        self.nbins = annular_info['nbins']
-        self.coadd_center = annular_info['coadd_center']
 
         if self.outdir is not None:
             self.outfile = os.path.join(self.outdir, self.outfile)
@@ -319,12 +348,15 @@ class AnnularCatalog():
         mcal_shear = self.config['mcal_shear']
         shape_noise = self.config['shape_noise']
 
+        has_psf = self.mcal_pars['psf'] == 'dilate'
+
         # Define individual selection cuts
         min_Tpsf = qual_cuts['min_Tpsf']
         max_sn = qual_cuts['max_sn']
         min_sn = qual_cuts['min_sn']
         min_T = qual_cuts['min_T']
         max_T = qual_cuts['max_T']
+        
 
         if self.cluster_redshift != None:
             # Add in a little bit of a safety margin -- maybe a bad call for simulated data?
@@ -340,107 +372,65 @@ class AnnularCatalog():
 
         mcal = self.joined_gals
 
-        noshear_selection = mcal[
-            (mcal['T_noshear'] >= min_Tpsf * mcal['Tpsf_noshear'])\
-            & (mcal['T_noshear'] < max_T) \
-            & (mcal['T_noshear'] >= min_T) \
-            & (mcal['s2n_noshear'] > min_sn) \
-            & (mcal['s2n_noshear'] < max_sn) \
-            #& (mcal['redshift'] > min_redshift)
-        ]
+        shear_keys = [f"g_{suffix}" for suffix in self.mcal_pars['types']]
 
-        selection_1p = mcal[
-            (mcal['T_1p'] >= min_Tpsf * mcal['Tpsf_1p']) \
-            & (mcal['T_1p'] <= max_T) \
-            & (mcal['T_1p'] >= min_T) \
-            & (mcal['s2n_1p'] > min_sn) \
-            & (mcal['s2n_1p'] < max_sn) \
-            & (mcal['redshift'] > min_redshift)
-        ]
+        finite = np.ones(len(mcal), dtype=bool)
+        for key in shear_keys:
+            finite &= np.isfinite(mcal[key][:, 0]) & np.isfinite(mcal[key][:, 1])
 
-        selection_1m = mcal[
-            (mcal['T_1m'] >= min_Tpsf * mcal['Tpsf_1m']) \
-            & (mcal['T_1m'] <= max_T) \
-            & (mcal['T_1m'] >= min_T) \
-            & (mcal['s2n_1m'] > min_sn) \
-            & (mcal['s2n_1m'] < max_sn) \
-            & (mcal['redshift'] > min_redshift)
-        ]
+        mcal = mcal[finite]
 
-        selection_2p = mcal[
-            (mcal['T_2p'] >= min_Tpsf * mcal['Tpsf_2p']) \
-            & (mcal['T_2p'] <= max_T) \
-            & (mcal['T_2p'] >= min_T) \
-            & (mcal['s2n_2p'] > min_sn) \
-            & (mcal['s2n_2p'] < max_sn) \
-            & (mcal['redshift'] > min_redshift)
-        ]
+        def apply_cuts(suffix):
+            return mcal[
+                (mcal[f'T_{suffix}'] >= min_Tpsf * mcal[f'Tpsf_{suffix}']) \
+                & (mcal[f'T_{suffix}'] <= max_T) \
+                & (mcal[f'T_{suffix}'] >= min_T) \
+                & (mcal[f's2n_{suffix}'] > min_sn) \
+                & (mcal[f's2n_{suffix}'] < max_sn) \
+                & (mcal['redshift'] > min_redshift)
+            ]
 
-        selection_2m = mcal[
-            (mcal['T_2m'] >= min_Tpsf*mcal['Tpsf_2m']) \
-            & (mcal['T_2m'] <= max_T) \
-            & (mcal['T_2m'] >= min_T) \
-            & (mcal['s2n_2m'] > min_sn) \
-            & (mcal['s2n_2m'] < max_sn) \
-            & (mcal['redshift'] > min_redshift)
-        ]
+        noshear_selection = apply_cuts('noshear')
+        selection_1p = apply_cuts('1p')
+        selection_1m = apply_cuts('1m')
+        selection_2p = apply_cuts('2p')
+        selection_2m = apply_cuts('2m')
 
         # assuming delta_shear in ngmix_fit is 0.01
-        r11_gamma = (np.mean(noshear_selection['g_1p'][:,0]) -
-                    np.mean(noshear_selection['g_1m'][:,0])) / (2.*mcal_shear)
-        r22_gamma = (np.mean(noshear_selection['g_2p'][:,1]) -
-                    np.mean(noshear_selection['g_2m'][:,1])) / (2.*mcal_shear)
-        r12_gamma = (np.mean(noshear_selection['g_2p'][:, 0]) -
-                    np.mean(noshear_selection['g_2m'][:, 0])) / (2.*mcal_shear)
-        r21_gamma = (np.mean(noshear_selection['g_1p'][:, 1]) -
-                    np.mean(noshear_selection['g_1m'][:, 1])) / (2.*mcal_shear)
+        selections = {'1p': selection_1p, '1m': selection_1m,
+                      '2p': selection_2p, '2m': selection_2m}
 
         # assuming delta_shear in ngmix_fit is 0.01
-        r11_S = (np.mean(selection_1p['g_noshear'][:,0]) -
-                np.mean(selection_1m['g_noshear'][:,0])) / (2.*mcal_shear)
-        r22_S = (np.mean(selection_2p['g_noshear'][:,1]) -
-                np.mean(selection_2m['g_noshear'][:,1])) / (2.*mcal_shear)
-        r12_S = (np.mean(selection_2p['g_noshear'][:, 0]) -
-                np.mean(selection_2m['g_noshear'][:, 0])) / (2.*mcal_shear)
-        r21_S = (np.mean(selection_1p['g_noshear'][:, 1]) -
-                np.mean(selection_1m['g_noshear'][:, 1])) / (2.*mcal_shear)
+        # Mean responses (mean over objects of the per-object response)
+        R_gamma = np.mean(mcal_response(noshear_selection, mcal_shear), axis=2)
+        R_S = mcal_selection_response(selections, mcal_shear)
 
-        c1_psf = np.mean((noshear_selection['g_1p_psf'][:,0] + noshear_selection['g_1m_psf'][:,0])/2 - noshear_selection['g_noshear'][:,0])
-        c2_psf = np.mean((noshear_selection['g_2p_psf'][:, 1] + noshear_selection['g_2m_psf'][:, 1])/2 - noshear_selection['g_noshear'][:, 1])
-        c1_gamma = np.mean((noshear_selection['g_1p'][:,0] + noshear_selection['g_1m'][:,0])/2 - noshear_selection['g_noshear'][:,0])
-        c2_gamma = np.mean((noshear_selection['g_2p'][:, 1] + noshear_selection['g_2m'][:, 1])/2 - noshear_selection['g_noshear'][:, 1])
+        # Mean additive biases
+        c_gamma = np.mean(mcal_additive_bias(noshear_selection), axis=1)
 
-        # Gamma response matrix
-        R_gamma = np.array([
-            [r11_gamma, r12_gamma],
-            [r21_gamma, r22_gamma]
-        ])
-
-        # Selection response matrix
-        R_S = np.array([
-            [r11_S, r12_S],
-            [r21_S, r22_S]
-        ])
-
+        # Selection-response diagonal terms stored later as value-added columns
+        r11_S, r22_S = R_S[0, 0], R_S[1, 1]
+        
         # Compute the final response matrix
         R = R_gamma + R_S
-        R_inv = np.linalg.inv(R)
+        R_inv = np.linalg.inv(R)        
+        c_total =  c_gamma
+        
+        if has_psf:
+            R_psf = np.mean(mcal_response(noshear_selection, mcal_shear, suffix='_psf'), axis=2)
+            c_psf = np.mean(mcal_additive_bias(noshear_selection, suffix='_psf'), axis=1)
+            c_total = c_total + c_psf
 
-        # PSF additive bias
-        c_psf = np.array([c1_psf, c2_psf])
-
-        # Gamma correction vector
-        c_gamma = np.array([c1_gamma, c2_gamma])
-
-        c_total = c_psf + c_gamma
 
         print("Gamma Response Matrix (R_gamma):")
         print(R_gamma)
         print("\nSelection Bias Response Matrix (R_S):")
         print(R_S)
-
-        print("\nPSF Correction Vector (c_psf):")
-        print(c_psf)
+        if has_psf:
+            print("\nPSF Response Matrix (R_psf):")
+            print(R_psf)
+            print("\nPSF Correction Vector (c_psf):")
+            print(c_psf)
 
         print("\nGamma Correction Vector (c_gamma):")
         print(c_gamma)
@@ -459,40 +449,35 @@ class AnnularCatalog():
         tot_covar = shape_noise + corrected_cov[:, 0, 0] + corrected_cov[:, 1, 1]
         weight = 1. / tot_covar
 
+        # Per-object response and bias terms (rows = component, cols = shear step)
+        (r11, r12), (r21, r22) = mcal_response(noshear_selection, mcal_shear)
+        c1_gamma, c2_gamma = mcal_additive_bias(noshear_selection)
+
+        # Size response
+        rT_1 = ( noshear_selection['T_1p'] - noshear_selection['T_1m'] ) / (2.*mcal_shear)
+        rT_2 = ( noshear_selection['T_2p'] - noshear_selection['T_2m'] ) / (2.*mcal_shear)
+
+        # Assemble the value-added columns; PSF terms only for the 'dilate' kernel
+        value_added = {
+            'r11': r11, 'r12': r12, 'r21': r21, 'r22': r22,
+            'c1': c1_gamma, 'c2': c2_gamma,
+            'rT_1': rT_1, 'rT_2': rT_2,
+        }
+        if has_psf:
+            (r11_psf, r12_psf), (r21_psf, r22_psf) = \
+                mcal_response(noshear_selection, mcal_shear, suffix='_psf')
+            c1_psf, c2_psf = mcal_additive_bias(noshear_selection, suffix='_psf')
+            value_added.update({
+                'r11_psf': r11_psf, 'r12_psf': r12_psf,
+                'r21_psf': r21_psf, 'r22_psf': r22_psf,
+                'c1_psf': c1_psf, 'c2_psf': c2_psf,
+            })
+
         try:
-            # Shear response terms
-            r11 = ( noshear_selection['g_1p'][:,0] - noshear_selection['g_1m'][:,0] ) / (2.*mcal_shear)
-            r12 = ( noshear_selection['g_2p'][:,0] - noshear_selection['g_2m'][:,0] ) / (2.*mcal_shear)
-            r21 = ( noshear_selection['g_1p'][:,1] - noshear_selection['g_1m'][:,1] ) / (2.*mcal_shear)
-            r22 = ( noshear_selection['g_2p'][:,1] - noshear_selection['g_2m'][:,1] ) / (2.*mcal_shear)
-
-            # PSF shear response terms
-            r11_psf = (noshear_selection['g_1p_psf'][:, 0] - noshear_selection['g_1m_psf'][:, 0]) / (2. * mcal_shear)
-            r12_psf = (noshear_selection['g_2p_psf'][:, 0] - noshear_selection['g_2m_psf'][:, 0]) / (2. * mcal_shear)
-            r21_psf = (noshear_selection['g_1p_psf'][:, 1] - noshear_selection['g_1m_psf'][:, 1]) / (2. * mcal_shear)
-            r22_psf = (noshear_selection['g_2p_psf'][:, 1] - noshear_selection['g_2m_psf'][:, 1]) / (2. * mcal_shear)
-
-            # Additive biases
-            c1_psf = ( (noshear_selection['g_1p_psf'][:,0] + noshear_selection['g_1m_psf'][:,0])/2 - noshear_selection['g_noshear'][:,0])
-            c2_psf = ((noshear_selection['g_2p_psf'][:, 1] + noshear_selection['g_2m_psf'][:, 1])/2 - noshear_selection['g_noshear'][:, 1])
-            c1_gamma = ((noshear_selection['g_1p'][:, 0] + noshear_selection['g_1m'][:, 0])/2 - noshear_selection['g_noshear'][:, 0])
-            c2_gamma = ((noshear_selection['g_2p'][:, 1] + noshear_selection['g_2m'][:, 1])/2 - noshear_selection['g_noshear'][:, 1])
-
-            # Size response
-            rT_1 = ( noshear_selection['T_1p'] - noshear_selection['T_1m'] ) / (2.*mcal_shear)
-            rT_2 = ( noshear_selection['T_2p'] - noshear_selection['T_2m'] ) / (2.*mcal_shear)
-
             #---------------------------------
             # Now add value-adds to table
             self.selected.add_columns(
-                [r11, r12, r21, r22,
-                r11_psf, r12_psf, r21_psf, r22_psf,
-                c1_gamma, c2_gamma, c1_psf, c2_psf,
-                rT_1, rT_2],
-                names=['r11', 'r12', 'r21', 'r22',
-                    'r11_psf', 'r12_psf', 'r21_psf', 'r22_psf',
-                    'c1', 'c2', 'c1_psf', 'c2_psf',
-                    'rT_1', 'rT_2']
+                list(value_added.values()), names=list(value_added.keys())
             )
 
         except ValueError as e:
@@ -543,20 +528,6 @@ class AnnularCatalog():
         # source selection; saves table to self.outfile
         self.make_table(overwrite=overwrite)
 
-    
-def get_xray_center(run_name, csv_path='superbit-lensing/data/catalogs/superbit_xray_centers.csv'):
-    """
-    Get X-ray center coordinates from CSV file
-    """
-    try:
-        centers = Table.read(csv_path)
-        mask = centers['Name'] == run_name
-        if not any(mask):
-            raise ValueError(f"No X-ray center found for cluster {run_name}")
-        return centers['RA'][mask][0], centers['Dec'][mask][0]
-    except Exception as e:
-        print(f"Error reading X-ray centers: {e}")
-        raise
 
 def main(args):
 
@@ -567,59 +538,27 @@ def main(args):
     outdir = args.outdir
     config_yaml = args.config
     cluster_redshift = args.cluster_redshift
+    reconv_psf = args.reconv_psf
+    psf_correction = args.psf_correction
     detection_band = args.detection_band
-    redshift_cat = args.redshift_cat
-    nfw_file = args.nfw_file
-    Nresample = args.Nresample
-    rmin = args.rmin
-    rmax = args.rmax
-    nfw_seed = args.nfw_seed
-    nbins = args.nbins
     overwrite = args.overwrite
     vb = args.vb
+    
+    if reconv_psf=='dilate':
+        mcal_pars = DEFAULT_MCAL_PARS
+    elif reconv_psf=='azgauss':
+        mcal_pars = AZGAUSS_MCAL_PARS
+    else:
+        raise ValueError("Invalid reconv_psf value. Use 'dilate' or 'azgauss'.")
 
     # Load config file
     config = utils.read_yaml(config_yaml)
-
-    # Define position args
-    xy_cols = ['XWIN_IMAGE_se', 'YWIN_IMAGE_se']
-    shear_args = ['g1_Rinv', 'g2_Rinv']
 
     ## Get center of galaxy cluster for fitting
     ## Throw error if image can't be read in
     detect_cat = os.path.join(data_dir, target_name, detection_band,
         f'coadd/{target_name}_coadd_{detection_band}_cat.fits'
     )
-    detect_im = os.path.join(data_dir, target_name, detection_band,
-        f'coadd/{target_name}_coadd_{detection_band}.fits'
-    )
-    print(f'using detection catalog {detect_cat}')
-    print(f'using detection image {detect_im}')
-
-    if args.center == 'image':
-        try:
-            assert os.path.exists(detect_im) is True
-            hdr = fits.getheader(detect_im)
-            #This is the image center:
-            xcen = hdr['CRPIX1']; ycen = hdr['CRPIX2']
-            coadd_center = [xcen, ycen]
-            print(f'Read image data and setting image center to ({xcen},{ycen})')
-        except Exception as e:
-            print('\n\n\nNo coadd image center found, cannot calculate tangential shear\n\n.')
-            raise e
-    else:  # xray center
-        try:
-            ra, dec = get_xray_center(target_name)
-            # Convert RA/Dec to pixel coordinates using WCS from image header
-            hdr = fits.getheader(detect_im)
-            wcs = WCS(hdr)
-            xcen, ycen = wcs.all_world2pix(ra, dec, 0)
-            coadd_center = [xcen, ycen]
-            print(f'Using X-ray center at RA,Dec = ({ra},{dec})')
-            print(f'Converted to pixel coordinates: ({xcen},{ycen})')
-        except Exception as e:
-            print('\n\n\nError getting X-ray center coordinates\n\n.')
-            raise e
 
     ## Make dummy redshift catalog -- should be a flag!
     print("Making redshift catalog")
@@ -627,10 +566,6 @@ def main(args):
         datadir=data_dir, target=target_name,
         band=detection_band, detect_cat_path=detect_cat
     )
-
-
-    if nfw_seed is None:
-        nfw_seed = utils.generate_seeds(1)
 
     ## n.b outfile is the name of the metacalibrated &
     ## quality-selected galaxy catalog
@@ -640,26 +575,16 @@ def main(args):
         'detect_cat': detect_cat,
         'mcal_file': mcal_file,
         'run_name': target_name,
+        'detection_band': detection_band,
         'mcal_selected': outfile,
         'outdir': outdir,
         'redshift_cat': redshift_cat,
         'cluster_redshift': cluster_redshift,
-        'nfw_file': nfw_file,
-        'Nresample': Nresample,
-        'nfw_seed': nfw_seed,
-        'band': detection_band
+        'mcal_pars': mcal_pars,
+        'psf_correction': psf_correction
         }
 
-    annular_info = {
-        'rmin': rmin,
-        'rmax': rmax,
-        'nbins': nbins,
-        'coadd_center': coadd_center,
-        'xy_args': xy_cols,
-        'shear_args': shear_args
-        }
-
-    annular_cat = AnnularCatalog(cat_info, annular_info, config)
+    annular_cat = AnnularCatalog(cat_info, config)
 
     # run everything
     annular_cat.run(overwrite=overwrite, vb=vb)

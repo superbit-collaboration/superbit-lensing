@@ -3,7 +3,7 @@
 #SBATCH -N 1
 #SBATCH -n 18
 #SBATCH --mem=180G
-#SBATCH --partition=short
+#SBATCH --partition=pscomp
 #SBATCH -J ngmix1
 #SBATCH -v
 #SBATCH -o logs/ngmixout.log
@@ -32,6 +32,7 @@ python $CODEDIR/superbit_lensing/metacalibration/ngmix_fit.py \
 -seed=701428541 \
 -psf_model=$PSF_MODEL \
 -gal_model=$GAL_MODEL \
+-reconv_psf=$reconv_psf \
 --overwrite \
 $OUTDIR/${cluster_name}_${band_name}_meds.fits \
 $ARRAROUTDIR/${cluster_name}_${band_name}_mcal.fits 

@@ -14,7 +14,11 @@ import superbit_lensing.utils as utils
 
 import ipdb
 
-DEFAULT_MCAL_PARS = {'psf': 'dilate', 'mcal_shear': 0.01, 'types' : ['noshear', '1p', '1m', '2p', '2m', '1p_psf', '1m_psf', '2p_psf', '2m_psf']}
+MINIMAL_TYPES = ['noshear', '1p', '1m', '2p', '2m']
+DILATE_TYPES = ['noshear', '1p', '1m', '2p', '2m', '1p_psf', '1m_psf', '2p_psf', '2m_psf']
+
+DEFAULT_MCAL_PARS = {'psf': 'dilate', 'mcal_shear': 0.01, 'types' : DILATE_TYPES}
+AZGAUSS_MCAL_PARS = {'psf': 'azgauss', 'mcal_shear': 0.01, 'types' : MINIMAL_TYPES}
 
 def parse_args():
     parser = ArgumentParser()
@@ -37,6 +41,8 @@ def parse_args():
                         help='PSF model to use')
     parser.add_argument('-gal_model', type=str, default='gauss',
                         help='Galaxy model to use')
+    parser.add_argument('-reconv_psf', type=str, default='dilate',
+                        help='reconvolution PSF Kernel (default dilate)')
     parser.add_argument('--plot', action='store_true', default=False,
                         help='Set to make diagnstic plots')
     parser.add_argument('--use_coadd', action='store_true', default=False,
@@ -198,7 +204,7 @@ def write_output_table(outfilename, tab, overwrite=False):
 
     return
 
-def mcal_dict2tab(mcal, obsdict, ident, obslist):
+def mcal_dict2tab(mcal, obsdict, ident, obslist, mcal_pars):
     '''
     mcal is the dict returned by ngmix.get_metacal_result()
 
@@ -210,7 +216,7 @@ def mcal_dict2tab(mcal, obsdict, ident, obslist):
     for key, val in ident.items():
         ident[key] = np.array([val])
 
-    tab_names = ['noshear', '1p', '1m', '2p', '2m', '1p_psf', '1m_psf', '2p_psf', '2m_psf']
+    tab_names = mcal_pars['types']
     for name in tab_names:
         tab = mcal[name]
 
@@ -253,19 +259,9 @@ def mcal_dict2tab(mcal, obsdict, ident, obslist):
 
     id_tab = Table(data=ident)
 
-    tab_noshear = Table(mcal['noshear'])
-    tab_1p = Table(mcal['1p'])
-    tab_1m = Table(mcal['1m'])
-    tab_2p = Table(mcal['2p'])
-    tab_2m = Table(mcal['2m'])
-    tab_1p_psf = Table(mcal['1p_psf'])
-    tab_1m_psf = Table(mcal['1m_psf'])
-    tab_2p_psf = Table(mcal['2p_psf'])
-    tab_2m_psf = Table(mcal['2m_psf'])
+    mcal_tabs = [Table(mcal[name]) for name in tab_names]
 
-    join_tab = hstack([id_tab, hstack([tab_noshear, tab_1p, tab_1m, tab_2p, tab_2m,
-                                       tab_1p_psf, tab_1m_psf, tab_2p_psf, tab_2m_psf],
-                                      table_names=tab_names)])
+    join_tab = hstack([id_tab, hstack(mcal_tabs, table_names=tab_names)])
 
     return join_tab
 
@@ -413,7 +409,7 @@ def mp_run_fit(i, obj, obslist, prior,
 
         # convert result dict to a formatted table
         # obj here is the "identifying" table
-        mcal_tab = mcal_dict2tab(resdict, obsdict, obj, obslist)
+        mcal_tab = mcal_dict2tab(resdict, obsdict, obj, obslist, mcal_pars)
 
         end = time.time()
         logprint(f'Fitting and conversion took {end-start} seconds')
@@ -448,11 +444,17 @@ def main():
     seed = args.seed
     psf_model = args.psf_model
     gal_model = args.gal_model
+    reconv_psf = args.reconv_psf
     overwrite = args.overwrite
     use_coadd = args.use_coadd
     use_coadd_only = args.use_coadd_only
     rng  = np.random.RandomState(seed)
-    mcal_pars= DEFAULT_MCAL_PARS
+    if reconv_psf=='dilate':
+        mcal_pars= DEFAULT_MCAL_PARS
+    elif reconv_psf=='azgauss':
+        mcal_pars= AZGAUSS_MCAL_PARS
+    else:
+        raise ValueError("Invalid reconv_psf value. Must be 'dilate' or 'azgauss'.")
 
     if outdir is None:
         outdir = os.getcwd()

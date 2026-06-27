@@ -6,6 +6,12 @@ from superbit_lensing.utils import separate_catalog_by_regions
 import os
 import ipdb
 
+MINIMAL_TYPES = ['noshear', '1p', '1m', '2p', '2m']
+DILATE_TYPES = ['noshear', '1p', '1m', '2p', '2m', '1p_psf', '1m_psf', '2p_psf', '2m_psf']
+
+DEFAULT_MCAL_PARS = {'psf': 'dilate', 'mcal_shear': 0.01, 'types' : DILATE_TYPES}
+AZGAUSS_MCAL_PARS = {'psf': 'azgauss', 'mcal_shear': 0.01, 'types' : MINIMAL_TYPES}
+
 # hlr -> sigma conversion factor for a 2D Gaussian: sigma = hlr / sqrt(2 ln 2)
 _HLR_TO_SIGMA = 1.0 / np.sqrt(2.0 * np.log(2.0))
 
@@ -37,6 +43,8 @@ def parse_args():
     parser.add_argument('-data_dir', type=str, required=True, help='Path to cluster data')
     parser.add_argument('-run_name', type=str, required=True, help='Cluster Name')
     parser.add_argument('-band', type=str, required=True, help='Band name')
+    parser.add_argument('-reconv_psf', type=str, default='dilate',
+                        help='Reconvolution psf kernel (default: dilate)')
     parser.add_argument('-outdir', type=str, help='Output directory')
     parser.add_argument('--file_ending', type=str, default='fits', help='File ending for mcal files (default: fits)')
     parser.add_argument('--isolate_stars', type=lambda x: x.lower() == 'true', default=True, help='Flag to isolate stars (default: True)')
@@ -53,6 +61,7 @@ def main(args):
     data_dir = args.data_dir
     run_name = args.run_name
     band = args.band
+    reconv_psf = args.reconv_psf
     outdir = args.outdir if args.outdir else f"{data_dir}{run_name}/{band}/out"
 
     # Ensure output directory exists
@@ -103,7 +112,10 @@ def main(args):
     mcal_combined["ncutout"] = filtered_tables[0]["ncutout"]
 
     # Metacalibration types
-    types = ["noshear", "1p", "1m", "2p", "2m", "1p_psf", "1m_psf", "2p_psf", "2m_psf"]
+    if reconv_psf == 'dilate':
+        types = DILATE_TYPES
+    else:
+        types = MINIMAL_TYPES
 
     # Number of realizations
     N = len(filtered_tables)
