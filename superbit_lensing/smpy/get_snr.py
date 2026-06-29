@@ -281,7 +281,7 @@ def run(config, plot_kappa=False, plot_error=False, save_fits_flag=False):
             threshold=config.get("kmap_threshold"),
             center_cl=center_cl, box_boundary=box_boundary,
             save_path=os.path.join(config["output_path"], "ks",
-                                   f"kappa_{cluster_band}.png"),
+                                   f"kappa_ks_e_{config['cluster']}.png"),
             **contour_kwargs,
         )
         plot_convergence(
@@ -291,7 +291,7 @@ def run(config, plot_kappa=False, plot_error=False, save_fits_flag=False):
             vmax=config["kmap_vmax"], vmin=config["kmap_vmin"],
             center_cl=center_cl, box_boundary=box_boundary,
             save_path=os.path.join(config["output_path"], "ks",
-                                   f"kappa_b_{cluster_band}.png"),
+                                   f"kappa_ks_b_{config['cluster']}.png"),
         )
 
     # --- Optional: save convergence FITS -------------------------------------
@@ -321,9 +321,8 @@ def run(config, plot_kappa=False, plot_error=False, save_fits_flag=False):
 
     ke_stack = np.stack(shuff_ke, axis=0)
     kb_stack = np.stack(shuff_kb, axis=0)
-
-    _, std_map, snr_map, ke_smoothed = compute_snr(
-        og_kappa_e, ke_stack, kernel, flip_ra=flip_ra)
+    signal_e, signal_b, std_map, std_b, snr_map, snr_map_b, smoothed_e, smoothed_b = compute_snr(
+        og_kappa_e, og_kappa_b, ke_stack, kb_stack,kernel, flip_ra=flip_ra)
 
     # --- Optional: save noise FITS + realisations ----------------------------
     if save_fits_flag:
@@ -365,7 +364,19 @@ def run(config, plot_kappa=False, plot_error=False, save_fits_flag=False):
         threshold=config["threshold"],
         center_cl=center_cl,
         save_path=os.path.join(config["output_path"], "ks",
-                               f"snr_{config['cluster']}.png"),
+                               f"snr_ks_e_{config['cluster']}.png"),
+        **contour_kwargs,
+    )
+
+    plot_convergence(
+        snr_map_b, boundaries, true_boundaries, config,
+        invert_map=False,
+        title=(f" KS B modes SNR: {config['cluster']} {res_str}"),
+        vmax=config["vmax"], vmin=config["vmin"],
+        threshold=config["threshold"],
+        center_cl=center_cl,
+        save_path=os.path.join(config["output_path"], "ks",
+                               f"snr_ks_b_{config['cluster']}.png"),
         **contour_kwargs,
     )
     
@@ -386,7 +397,7 @@ def run(config, plot_kappa=False, plot_error=False, save_fits_flag=False):
     SNR_E, SNR_B, M_E_real, noise_map = snr.run(n_realizations=config["num_sims"], n_cpus=1, seed=config["seed_sims"], return_kappa_n_noise=True)
 
     
-    res_str = f"(Resolution: {config['resolution']:.2f} arcmin, Rs: {(Rs/bin_size):.2f})"
+    res_str = f"(Resolution: {config['resolution']:.2f} arcmin, Rs: {(Rs):.2f})"
     
     plot_convergence(
         SNR_E, boundaries, true_boundaries, config,
@@ -396,7 +407,7 @@ def run(config, plot_kappa=False, plot_error=False, save_fits_flag=False):
         threshold=config["threshold"],
         center_cl=center_cl,
         save_path=os.path.join(config["output_path"], "aperture_mass",
-                               f"snr_aperture_mass_{config['cluster']}.png"),
+                               f"snr_am_e_{config['cluster']}.png"),
         **contour_kwargs,
     )
     
@@ -408,7 +419,7 @@ def run(config, plot_kappa=False, plot_error=False, save_fits_flag=False):
         threshold=config["threshold"],
         center_cl=center_cl,
         save_path=os.path.join(config["output_path"], "aperture_mass",
-                               f"M_B_aperture_mass_{config['cluster']}.png"),
+                               f"snr_am_b_{config['cluster']}.png"),
         **contour_kwargs,
     )
     

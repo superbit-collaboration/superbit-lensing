@@ -502,7 +502,7 @@ def shear_grids_for_shuffled_dfs(list_of_dfs, coord1_col, coord2_col,
 # ---------------------------------------------------------------------------
 #  Smoothing + SNR helper
 # ---------------------------------------------------------------------------
-def compute_snr(og_kappa_e, shuffled_kappa_stack, kernel, flip_ra=False):
+def compute_snr(og_kappa_e, og_kappa_b, ke_stack, kb_stack, kernel, flip_ra=False):
     """
     Smooth the signal and every noise realisation, then return
     ``(smoothed_signal, std_map, snr_map, smoothed_noise_stack)``.
@@ -513,19 +513,26 @@ def compute_snr(og_kappa_e, shuffled_kappa_stack, kernel, flip_ra=False):
         If ``True`` each noise realisation is flipped along the RA axis
         (needed for the ``ra-dec`` gridding branch).
     """
-    signal = gaussian_filter(og_kappa_e, kernel)
+    signal_e = gaussian_filter(og_kappa_e, kernel)
+    signal_b = gaussian_filter(og_kappa_b, kernel)
 
-    n = shuffled_kappa_stack.shape[0]
-    smoothed = np.empty_like(shuffled_kappa_stack)
+    n = ke_stack.shape[0]
+    smoothed_e = np.empty_like(ke_stack)
+    smoothed_b = np.empty_like(kb_stack)
     for i in range(n):
-        frame = shuffled_kappa_stack[i]
+        frame_e = ke_stack[i]
+        frame_b = kb_stack[i]
         if flip_ra:
-            frame = frame[:, ::-1]
-        smoothed[i] = gaussian_filter(frame, kernel)
+            frame_e = frame_e[:, ::-1]
+            frame_b = frame_b[:, ::-1]
+        smoothed_e[i] = gaussian_filter(frame_e, kernel)
+        smoothed_b[i] = gaussian_filter(frame_b, kernel)
 
-    std = np.std(smoothed, axis=0)
-    snr = signal / std
-    return signal, std, snr, smoothed
+    std_e = np.std(smoothed_e, axis=0)
+    std_b = np.std(smoothed_b, axis=0)
+    snr_e = signal_e / std_e
+    snr_b = signal_b / std_b
+    return signal_e, signal_b, std_e, std_b, snr_e, snr_b, smoothed_e, smoothed_b
 
 
 # ---------------------------------------------------------------------------

@@ -235,7 +235,7 @@ def run(cfg):
         ]
 
     # 5. Metacalibration selection + shear responsivity
-    selected, R_S, c_total, mean_g1, mean_g2 = compute_R_S(
+    selected, R_S, c_gamma, mean_g1, mean_g2, R_PSF = compute_R_S(
         mcal=tab,
         qual_cuts=cfg['qual_cuts'],
         mcal_shear=cfg['mcal_shear'],

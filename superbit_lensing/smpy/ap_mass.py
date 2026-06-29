@@ -151,7 +151,7 @@ class ApertureMassSNR:
         self.e_amp  = np.sqrt(self.g1**2 + self.g2**2)
 
         self.bin_size = float(bin_size)
-        self.Rs       = float(Rs) / self.bin_size   # bin units
+        self.Rs       = float(Rs) # / self.bin_size   # bin units
 
         # grid setup
         self.x_min, self.x_max = self.x.min(), self.x.max()
