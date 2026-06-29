@@ -23,6 +23,7 @@ def main():
     PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     pipeline_runner_pth = os.path.join(PROJECT_ROOT, "superbit_lensing", "smpy", "run_pipeline.py")
     alias_key = "run_smpy"
+    alias_starter = f"alias run_smpy="
     
     alias_exists = False
     if os.path.exists(rc_file):
@@ -45,7 +46,7 @@ def main():
             for line in lines:
                 stripped = line.strip()
                 
-                if stripped.startswith(alias_key):
+                if stripped.startswith(alias_starter) or stripped.startswith("# Alias for running the smpy pipeline"):
                     continue
 
                 f.write(line)
