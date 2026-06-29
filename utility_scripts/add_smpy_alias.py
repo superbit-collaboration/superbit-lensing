@@ -1,5 +1,22 @@
 import os
-from ..post_installation import get_shell_config_file
+
+def get_shell_config_file():
+    """Determine the appropriate shell configuration file."""
+    shell = os.getenv('SHELL', '/bin/bash')
+    home_dir = os.path.expanduser('~')
+    
+    if 'zsh' in shell:
+        rc_file = os.path.join(home_dir, '.zshrc')
+    elif 'bash' in shell:
+        # Prefer .bashrc if it exists, otherwise use .bash_profile
+        if os.path.exists(os.path.join(home_dir, '.bashrc')):
+            rc_file = os.path.join(home_dir, '.bashrc')
+        else:
+            rc_file = os.path.join(home_dir, '.bash_profile')
+    else:
+        rc_file = os.path.join(home_dir, '.profile')  # Fallback for other shells
+    
+    return rc_file
 
 def main():
     rc_file = get_shell_config_file()
