@@ -55,5 +55,10 @@ def main():
         f.write(f"\n# Alias for running the smpy pipeline\n")
         f.write(f"alias {alias_key}='python {pipeline_runner_pth}'\n")
         
+    # Provide feedback to the user
+    print(f"\nAvailable command: run_smpy config.yaml")
+    print("\nReload your shell or run:")
+    print(f"  source {rc_file}")
+        
 if __name__ == "__main__":
     main()
