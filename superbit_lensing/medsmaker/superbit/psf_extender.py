@@ -230,6 +230,22 @@ class PSFWrapper(dict):
         
         psf_local = self.psfex_model.getPSF(img_pos)
         return psf_local
+    
+    def get_local_wcs(self, row, col):
+        """
+        Return a local WCS at the requested detector location.
+
+        Notes
+        -----
+        `row, col` are assumed to be 0-indexed image coordinates. We add +1
+        when building the GalSim PositionD to match FITS/WCS convention.
+        """
+        row = float(row)
+        col = float(col)
+
+        img_pos = galsim.PositionD(col + 1.0, row + 1.0)
+        wcs_loc = self.wcs.local(img_pos)
+        return wcs_loc
 
     def get_rec(self, row, col):
         """

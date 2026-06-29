@@ -308,7 +308,7 @@ class AnnularCatalog():
 
         self.selected.write(self.outfile, format='fits', overwrite=overwrite)
 
-        truthfile = f"{cat_info['data_dir']}/{self.run_name}/{cat_info['band']}/cal/{self.run_name}_truth_{cat_info['band']}.fits"
+        truthfile = f"{cat_info['data_dir']}/{self.run_name}/{cat_info['detection_band']}/cal/{self.run_name}_truth_{cat_info['detection_band']}.fits"
 
         truth = Table.read(truthfile)
         
@@ -387,7 +387,7 @@ class AnnularCatalog():
                 & (mcal[f'T_{suffix}'] >= min_T) \
                 & (mcal[f's2n_{suffix}'] > min_sn) \
                 & (mcal[f's2n_{suffix}'] < max_sn) \
-                & (mcal['redshift'] > min_redshift)
+                # & (mcal['redshift'] > min_redshift)
             ]
 
         noshear_selection = apply_cuts('noshear')

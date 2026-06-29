@@ -620,7 +620,7 @@ def compute_metacal_quantities(mcal, qual_cuts, mcal_shear, shape_noise=0.14, cl
     # Correction vectors
     c_psf = np.array([c1_psf, c2_psf])
     c_gamma = np.array([c1_gamma, c2_gamma])
-    c_total = c_psf + c_gamma
+    c_total =  c_gamma # + c_psf
 
     # Print diagnostics
     print("Gamma Response Matrix (R_gamma):")
@@ -717,6 +717,8 @@ def compute_R_S(
     cluster_redshift=None,
     overwrite_calibration=True,
     R_diagonal=True,
+    PFS_response_correction=True,
+    shape_noise=0.14
 ):
     """
     Compute metacalibration response matrices and apply shear calibration.
@@ -778,6 +780,7 @@ def compute_R_S(
     admom_flag = qual_cuts.get('admom_flag', None)
     min_admom_sigma = qual_cuts.get('min_admom_sigma', None)
     max_gpsf = qual_cuts.get('max_gpsf', None)
+    max_Tpsf = qual_cuts.get('max_Tpsf', None)
 
     if cluster_redshift is not None:
         min_redshift = float(cluster_redshift) + 0.025
@@ -830,8 +833,11 @@ def compute_R_S(
             (gpsf[:, 0] > -max_gpsf) & (gpsf[:, 0] < max_gpsf)
             & (gpsf[:, 1] > -max_gpsf) & (gpsf[:, 1] < max_gpsf)
         )
+    if max_Tpsf is not None:
+        noshear_mask &= (mcal['Tpsf_noshear'] < max_Tpsf)
 
     noshear_selection = mcal[noshear_mask]
+    print(f'\n{len(noshear_selection)} objects passed selection criteria')
 
     # ------------------------------------------------------------------ #
     #  Sheared-variant selections (1p, 1m, 2p, 2m)
@@ -849,9 +855,20 @@ def compute_R_S(
     r12_gamma = np.mean(noshear_selection['r12'])
     r21_gamma = np.mean(noshear_selection['r21'])
 
+    r11_psf = np.mean(noshear_selection['r11_psf'])
+    r22_psf = np.mean(noshear_selection['r22_psf'])
+    r12_psf = np.mean(noshear_selection['r12_psf'])
+    r21_psf = np.mean(noshear_selection['r21_psf'])
+
+
     R_gamma = np.array([
         [r11_gamma, r12_gamma],
         [r21_gamma, r22_gamma],
+    ])
+    
+    R_PSF = np.array([
+        [r11_psf, r12_psf],
+        [r21_psf, r22_psf],
     ])
 
     # ------------------------------------------------------------------ #
@@ -924,7 +941,6 @@ def compute_R_S(
 
     c_psf = np.array([c1_psf, c2_psf])
     c_gamma = np.array([c1_gamma, c2_gamma])
-    c_total = c_psf + c_gamma
 
     # ------------------------------------------------------------------ #
     #  Diagnostics
@@ -937,19 +953,20 @@ def compute_R_S(
     print(R)
     print("\nSelection Response Uncertainty:")
     print(err_R_S)
-    print("\nPSF Correction Vector (c_psf):")
-    print(c_psf)
+    # print("\nPSF Correction Vector (c_psf):")
+    # print(c_psf)
     print("\nGamma Correction Vector (c_gamma):")
     print(c_gamma)
-    print("\nTotal Correction Vector (c_total = c_psf + c_gamma):")
-    print(c_total)
-    print(f"\n{len(noshear_selection)} objects passed selection criteria")
+
 
     # ------------------------------------------------------------------ #
     #  Mean ellipticity diagnostic
     # ------------------------------------------------------------------ #
     g1_noshear = noshear_selection['g_noshear'][:, 0]
     g2_noshear = noshear_selection['g_noshear'][:, 1]
+    
+    g1psf_noshear = noshear_selection['gpsf_noshear'][:, 0]
+    g2psf_noshear = noshear_selection['gpsf_noshear'][:, 1]
 
     mean_g1 = np.mean(g1_noshear)
     mean_g2 = np.mean(g2_noshear)
@@ -993,22 +1010,128 @@ def compute_R_S(
     # Transform the per-galaxy covariance through R_inv
     g_cov_noshear = selected['g_cov_noshear']
     corrected_cov = np.einsum('ij,njk,lk->nil', R_inv, g_cov_noshear, R_inv)
-
+    tot_covar = shape_noise + corrected_cov[:, 0, 0] + corrected_cov[:, 1, 1]
+    weight = 1. / tot_covar
     # Subtract additive bias, then divide by response
-    g_biased = selected['g_noshear'] - c_total  # (n, 2)
+    g_biased = selected['g_noshear'] - c_gamma  # (n, 2)
+    
+    if PFS_response_correction:
+        
+        if R_diagonal:
+            g_psf_correction = np.empty_like(g_biased)  # FIX: was np.array_like (doesn't exist)
+            g_psf_correction[:, 0] = g1psf_noshear * R_PSF[0, 0]
+            g_psf_correction[:, 1] = g2psf_noshear * R_PSF[1, 1]
+        else:
+            g_psf_correction = np.einsum('ij,nj->ni', R_PSF, noshear_selection['gpsf_noshear'])  # (n, 2)
+        
+        g_biased = g_biased - g_psf_correction
 
     if R_diagonal:
         g_corrected = np.empty_like(g_biased)  # FIX: was np.array_like (doesn't exist)
         g_corrected[:, 0] = g_biased[:, 0] / R[0, 0]
         g_corrected[:, 1] = g_biased[:, 1] / R[1, 1]
     else:
+        print("Using non-diagonal R_inv")
         g_corrected = np.einsum('ij,nj->ni', R_inv, g_biased)  # (n, 2)
 
     if overwrite_calibration:
         selected['g1_Rinv'] = g_corrected[:, 0]
         selected['g2_Rinv'] = g_corrected[:, 1]
+    selected['g1_noshear'] = g1_noshear
+    selected['g2_noshear'] = g2_noshear
+    selected['g1_uncl'] = g_biased[:, 0]
+    selected['g2_uncl'] = g_biased[:, 1]
     selected['g_cov_Rinv'] = corrected_cov
     selected['R11_S'] = r11_S
     selected['R22_S'] = r22_S
+    selected['weight'] = weight
 
-    return selected, R_S, c_total, mean_g1, mean_g2
+    return selected, R_S, c_gamma, mean_g1, mean_g2, R_PSF
+
+
+def process_catalog(cat, bin_by='snr', n_bins = 25):
+    valid = np.isfinite(cat['r11']) & np.isfinite(cat['r22']) & np.isfinite(cat['r12']) & np.isfinite(cat['r21'])
+    cat = cat[valid]
+    
+    # Choose binning variable
+    if bin_by == 'snr':
+        #bin_var = cat["SNR_WIN"]
+        bin_var = cat["s2n_noshear"]
+    else:  # bin by T
+        bin_var = cat["T_noshear"]/cat["Tpsf_noshear"]
+        #bin_var = 2*(cat["FLUX_RADIUS"]*0.141)**2
+    
+    r11 = cat['r11']
+    r12 = cat['r12']
+    r21 = cat['r21']
+    r22 = cat['r22']
+    
+    r11_psf = cat['r11_psf']
+    r12_psf = cat['r12_psf']
+    r21_psf = cat['r21_psf']
+    r22_psf = cat['r22_psf']
+    
+    # Method 1: Equal number of objects per bin (quantile-based)
+    percentiles = np.linspace(0, 100, n_bins + 1)
+    bin_edges = np.percentile(bin_var, percentiles)
+    
+    # Find which bin each data point belongs to
+    bin_indices = np.digitize(bin_var, bin_edges)
+    
+    # Calculate mean and standard error for each bin
+    r11_mean, r11_err = [], []
+    r12_mean, r12_err = [], []
+    r21_mean, r21_err = [], []
+    r22_mean, r22_err = [], []
+    r11_psf_mean, r11_psf_err = [], []
+    r12_psf_mean, r12_psf_err = [], []
+    r21_psf_mean, r21_psf_err = [], []
+    r22_psf_mean, r22_psf_err = [], []
+    bin_mean = []
+    
+    for i in range(1, len(bin_edges)):
+        mask = bin_indices == i
+        n_points = np.sum(mask)
+        
+        if n_points > 0:
+            # Mean values
+            r11_mean.append(np.median(r11[mask]))
+            r12_mean.append(np.median(r12[mask]))
+            r21_mean.append(np.median(r21[mask]))
+            r22_mean.append(np.median(r22[mask]))
+            r11_psf_mean.append(np.median(r11_psf[mask]))
+            r12_psf_mean.append(np.median(r12_psf[mask]))
+            r21_psf_mean.append(np.median(r21_psf[mask]))
+            r22_psf_mean.append(np.median(r22_psf[mask]))
+            bin_mean.append(np.median(bin_var[mask]))
+            
+            # Standard error = std / sqrt(n)
+            r11_err.append(np.std(r11[mask]) / np.sqrt(n_points))
+            r12_err.append(np.std(r12[mask]) / np.sqrt(n_points))
+            r21_err.append(np.std(r21[mask]) / np.sqrt(n_points))
+            r22_err.append(np.std(r22[mask]) / np.sqrt(n_points))
+            r11_psf_err.append(np.std(r11_psf[mask]) / np.sqrt(n_points))
+            r12_psf_err.append(np.std(r12_psf[mask]) / np.sqrt(n_points))
+            r21_psf_err.append(np.std(r21_psf[mask]) / np.sqrt(n_points))
+            r22_psf_err.append(np.std(r22_psf[mask]) / np.sqrt(n_points))
+            
+    # Convert to arrays
+    return {'valid': valid,
+        'r11_mean': np.array(r11_mean),
+        'r12_mean': np.array(r12_mean),
+        'r21_mean': np.array(r21_mean),
+        'r22_mean': np.array(r22_mean),
+        'r11_err': np.array(r11_err),
+        'r12_err': np.array(r12_err),
+        'r21_err': np.array(r21_err),
+        'r22_err': np.array(r22_err),
+        'r11_psf_mean': np.array(r11_psf_mean),
+        'r12_psf_mean': np.array(r12_psf_mean),
+        'r21_psf_mean': np.array(r21_psf_mean),
+        'r22_psf_mean': np.array(r22_psf_mean),
+        'r11_psf_err': np.array(r11_psf_err),
+        'r12_psf_err': np.array(r12_psf_err),
+        'r21_psf_err': np.array(r21_psf_err),
+        'r22_psf_err': np.array(r22_psf_err),
+        'bin_mean': np.array(bin_mean)
+    }
