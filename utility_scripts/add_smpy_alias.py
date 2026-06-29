@@ -21,7 +21,7 @@ def get_shell_config_file():
 def main():
     rc_file = get_shell_config_file()
     PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    pipeline_runner_pth = os.path.join(PROJECT_ROOT, "smpy", "run_pipeline.py")
+    pipeline_runner_pth = os.path.join(PROJECT_ROOT, "superbit_lensing", "smpy", "run_pipeline.py")
     alias_key = "run_smpy"
     
     alias_exists = False
