@@ -452,8 +452,8 @@ def calibrate_catalog(catalog, grid, R_S, mean_g1, mean_g2, suffix, psf_correcti
     c1_col = assign_weights(catalog, x_bins, y_bins, grid['C1'])
     c2_col = assign_weights(catalog, x_bins, y_bins, grid['C2'])
 
-    g1_noshear = catalog['g_noshear'][:, 0] #- c1_col #- mean_g1
-    g2_noshear = catalog['g_noshear'][:, 1] #- c2_col #- mean_g2
+    g1_noshear = catalog['g_noshear'][:, 0] - c1_col #- mean_g1
+    g2_noshear = catalog['g_noshear'][:, 1] - c2_col #- mean_g2
 
     if psf_correction:
         if R_PSF is not None:

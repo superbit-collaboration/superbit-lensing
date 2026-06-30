@@ -2656,7 +2656,9 @@ def update_astromatic_solution(image_path, config_dir=DEFAULT_CONFIG_DIR,
                             image_file=image_path,
                             config_dir=config_dir,
                             cat_dir=cat_dir,
-                            weight_file=weight_file
+                            weight_file=weight_file,
+                            update_hdu=False, 
+                            add_admom=False
                         )
 
         if not os.path.exists(catalog_path):
