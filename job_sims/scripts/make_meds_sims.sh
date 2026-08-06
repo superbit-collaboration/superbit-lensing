@@ -1,8 +1,8 @@
 #!/bin/sh
 #SBATCH -t 13:59:59
 #SBATCH -N 1
-#SBATCH -n 2
-#SBATCH --mem=180G
+#SBATCH -n 1
+#SBATCH --mem=120G
 #SBATCH --partition=short
 #SBATCH -J meds
 #SBATCH -v

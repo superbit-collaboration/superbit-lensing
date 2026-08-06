@@ -1,9 +1,9 @@
 #!/bin/sh
-#SBATCH -t 23:59:59
+#SBATCH -t 12:59:59
 #SBATCH -N 1
 #SBATCH -n 18
 #SBATCH --mem=180G
-#SBATCH --partition=pscomp
+#SBATCH --partition=short
 #SBATCH -J ngmix1
 #SBATCH -v
 #SBATCH -o logs/ngmixout.log
@@ -26,6 +26,15 @@ export ARRAROUTDIR="/projects/mccleary_group/saha/data/Abell3411/b/arr/run1"
 # Ensure ARRAROUTDIR exists
 mkdir -p $ARRAROUTDIR
 
+# Build the output filename: if file_ending is set (e.g. from config.sh),
+# append it before .fits; otherwise fall back to the plain name.
+if [[ -z "${file_ending:-}" ]]; then
+    OUTPUT_FILE="$ARRAROUTDIR/${cluster_name}_${band_name}_mcal.fits"
+else
+    OUTPUT_FILE="$ARRAROUTDIR/${cluster_name}_${band_name}_mcal.${file_ending}.fits"
+fi
+echo "Output file: $OUTPUT_FILE"
+
 python $CODEDIR/superbit_lensing/metacalibration/ngmix_fit.py \
 -outdir=$ARRAROUTDIR \
 -n 18 \
@@ -35,7 +44,7 @@ python $CODEDIR/superbit_lensing/metacalibration/ngmix_fit.py \
 -reconv_psf=$reconv_psf \
 --overwrite \
 $OUTDIR/${cluster_name}_${band_name}_meds.fits \
-$ARRAROUTDIR/${cluster_name}_${band_name}_mcal.fits 
+$OUTPUT_FILE
 
 # Record end time
 end=$(date +%s)

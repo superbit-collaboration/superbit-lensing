@@ -7,6 +7,7 @@ from scipy.stats import binned_statistic_2d
 from matplotlib.ticker import LogLocator, ScalarFormatter
 from matplotlib.colors import LogNorm
 from scipy.ndimage import gaussian_filter
+from superbit_lensing.plotter import PSFLeakagePanelMaker
 
 MINIMAL_TYPES = ['noshear', '1p', '1m', '2p', '2m']
 DILATE_TYPES = ['noshear', '1p', '1m', '2p', '2m', '1p_psf', '1m_psf', '2p_psf', '2m_psf']
@@ -497,12 +498,18 @@ def calibrate_catalog(catalog, grid, R_S, mean_g1, mean_g2, suffix, psf_correcti
     if psf_correction:
         r11_psf_col = assign_weights(catalog, x_bins, y_bins, grid['R11_psf'])
         r22_psf_col = assign_weights(catalog, x_bins, y_bins, grid['R22_psf'])
+        paneler = PSFLeakagePanelMaker(e1_gal=g1_noshear, e2_gal=g2_noshear, e1_psf=catalog['gpsf_noshear'][:,0], e2_psf=catalog['gpsf_noshear'][:,1], r11_psf=catalog['r11_psf'], r22_psf=catalog['r22_psf'], weights = catalog['weight'], NBIN=10, MIN_COUNT=20)
+        
+        
         if R_PSF is not None:
             g1_noshear = g1_noshear - R_PSF[0,0] * catalog['gpsf_noshear'][:,0]
             g2_noshear = g2_noshear - R_PSF[1,1] * catalog['gpsf_noshear'][:,1]
         else:
             g1_noshear = g1_noshear - r11_psf_col * catalog['gpsf_noshear'][:,0]
             g2_noshear = g2_noshear - r22_psf_col * catalog['gpsf_noshear'][:,1]
+            print("PSF correction applied using PSFLeakagePanelMaker.")
+            g1_noshear_1 = paneler.e1_gal
+            g2_noshear_1 = paneler.e2_gal
 
     g1_cal = np.divide(
         g1_noshear, r11_col,
@@ -512,8 +519,28 @@ def calibrate_catalog(catalog, grid, R_S, mean_g1, mean_g2, suffix, psf_correcti
         g2_noshear, r22_col,
         out=np.zeros_like(g2_noshear), where=r22_col != 0,
     )
+    
+    if R_PSF is not None:
+        g1_cal_1 = np.divide(
+            g1_noshear_1, r11_col,
+            out=np.zeros_like(g1_noshear_1), where=r11_col != 0,
+        )
+        g2_cal_1 = np.divide(
+            g2_noshear_1, r22_col,
+            out=np.zeros_like(g2_noshear_1), where=r22_col != 0,
+        )
+    
 
     catalog[f"w_{suffix}"] = weight_col
     catalog[f"w_inv_{suffix}"] = inv_weight_col
-    catalog[f"g1_cal_{suffix}"] = g1_cal
-    catalog[f"g2_cal_{suffix}"] = g2_cal
+    if (f"g1_cal_{suffix}" in catalog.colnames) & (f"g2_cal_{suffix}" in catalog.colnames):
+        # raise ValueError(f"Column g1_cal_{suffix} and g2_cal_{suffix} already exist in catalog. Choose a different suffix.")
+        catalog[f"g1_cal_{suffix}_psf_corr"] = g1_cal
+        catalog[f"g2_cal_{suffix}_psf_corr"] = g2_cal
+        catalog[f"g1_cal_{suffix}_psf_corr_v2"] = g1_cal_1
+        catalog[f"g2_cal_{suffix}_psf_corr_v2"] = g2_cal_1
+    else:
+        catalog[f"g1_cal_{suffix}"] = g1_cal
+        catalog[f"g2_cal_{suffix}"] = g2_cal
+    catalog[f'g1_uncl_{suffix}'] = g1_noshear
+    catalog[f'g2_uncl_{suffix}'] = g2_noshear

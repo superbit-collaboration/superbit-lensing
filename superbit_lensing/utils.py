@@ -501,7 +501,7 @@ def extract_ra_dec(data):
             return data[ra_col], data[dec_col]
     raise KeyError("No suitable RA/Dec columns found in the data.")
 
-def analyze_mcal_fits(file_path, hdu=None, verbose=True, update_header=False):
+def analyze_mcal_fits(file_path, hdu=None, verbose=True, update_header=False, weight_col='weight'):
     """
     Analyze a FITS file containing astronomical data with RA/Dec coordinates.
     
@@ -524,22 +524,25 @@ def analyze_mcal_fits(file_path, hdu=None, verbose=True, update_header=False):
     import os.path
     
     # Input validation
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
-    
-    # Read the FITS file
-    try:
-        if hdu is not None:
-            data = Table.read(file_path, format='fits', hdu=hdu)
-        else:
-            try:
-                data = Table.read(file_path, format='fits')
-            except Exception:
-                data = Table.read(file_path, format='fits', hdu=2)
-                if verbose:
-                    print("Using HDU=2 for FITS reading")
-    except Exception as e:
-        raise IOError(f"Failed to read FITS file: {e}")
+    if isinstance(file_path, Table):
+        data = file_path
+    elif isinstance(file_path, str):
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+        try:
+            if hdu is not None:
+                data = Table.read(file_path, format='fits', hdu=hdu)
+            else:
+                try:
+                    data = Table.read(file_path, format='fits')
+                except Exception:
+                    data = Table.read(file_path, format='fits', hdu=2)
+                    if verbose:
+                        print("Using HDU=2 for FITS reading")
+        except Exception as e:
+            raise IOError(f"Failed to read FITS file: {e}")        
+    else:
+        raise TypeError("file_path should be a string path to a FITS file, or an astropy Table.")
     
     # Known column names for RA and Dec
     ra_column_names = ['ra', 'ra_mcal', 'ALPHAWIN_J2000', 'RA']
@@ -611,7 +614,13 @@ def analyze_mcal_fits(file_path, hdu=None, verbose=True, update_header=False):
     # Compute object density
     num_objects = len(central_data)
     density_per_arcmin2 = num_objects / area_arcmin2 if area_arcmin2 > 0 else 0
+    if weight_col in central_data.colnames:
+        weights = central_data[weight_col]
+    else:
+        print(f"Warning: Weight column '{weight_col}' not found. Using uniform weights.")
+        weights = np.ones(num_objects)
     # Calculate recommended pixel size for convergence maps
+    neff = weighted_neff_h12(weights, area_arcmin2)
     min_objects_per_pixel = 5
     pixel_size_arcmin = np.sqrt(min_objects_per_pixel / density_per_arcmin2) if density_per_arcmin2 > 0 else np.inf    
     # Prepare results dictionary
@@ -627,6 +636,7 @@ def analyze_mcal_fits(file_path, hdu=None, verbose=True, update_header=False):
         print(f"Total number of objects in middle 50%: {num_objects}")
         print(f"Survey area (middle 50%): {area_arcmin2:.2f} arcmin²")
         print(f"Density: {density_per_arcmin2:.2f} objects per arcmin²")
+        print(f"Effective number density (n_eff): {neff:.2f} objects per arcmin²")
         print(f"Recommended pixel size for convergence map (≥5 objects/pixel): {pixel_size_arcmin:.2f} arcmin")
         print(f"Expected objects per pixel: {density_per_arcmin2 * pixel_size_arcmin * pixel_size_arcmin:.2f}")
     
@@ -646,6 +656,7 @@ def analyze_mcal_fits(file_path, hdu=None, verbose=True, update_header=False):
         "N_OBJ_50P": num_objects,
         "AREA_AMIN": area_arcmin2,
         "DENS_AMIN": density_per_arcmin2,
+        "NEFF": neff,
         "TOT_OBJS": len(data),
         "recommended_pixel_size_arcmin": pixel_size_arcmin,
     }
@@ -689,6 +700,29 @@ def analyze_mcal_fits(file_path, hdu=None, verbose=True, update_header=False):
             print(f"Updated FITS header in {file_path} with analysis metadata")
     
     return results
+
+def weighted_neff_h12(weights: np.ndarray, area: float) -> float:
+    """
+    H12 effective number density:
+        n_eff = (1/A) * ( (sum w)^2 / (sum w^2) )
+    """
+    if area is None or not np.isfinite(area) or area <= 0:
+        return np.nan
+
+    w = np.asarray(weights, dtype=float)
+    good = np.isfinite(w)
+    if not np.any(good):
+        return 0.0
+
+    w = w[good]
+    sw = np.sum(w)
+    sw2 = np.sum(w * w)
+
+    if sw2 <= 0 or not np.isfinite(sw) or not np.isfinite(sw2):
+        return 0.0
+
+    return (sw * sw) / (area * sw2)
+
 
 def get_sky_footprint_center_radius(data_table, buffer_fraction=0.05):
     """

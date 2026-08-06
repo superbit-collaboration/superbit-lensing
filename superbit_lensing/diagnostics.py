@@ -9,6 +9,7 @@ import time
 
 from .match import MatchedTruthCatalog
 import superbit_lensing.utils as utils
+from superbit_lensing.plotter import PSFLeakagePanelMaker
 
 import ipdb
 
@@ -755,7 +756,7 @@ def compute_metacal_quantities(mcal, qual_cuts, mcal_shear, shape_noise=0.14, cl
 def compute_R_S(
     mcal,
     qual_cuts,
-    mcal_shear,
+    mcal_shear=0.01,
     cluster_redshift=None,
     overwrite_calibration=True,
     R_diagonal=True,
@@ -955,6 +956,10 @@ def compute_R_S(
     # print(c_psf)
     print("\nGamma Correction Vector (c_gamma):")
     print(c_gamma)
+    
+    if has_psf:
+        print("\nPSF Response Matrix (R_PSF):")
+        print(R_PSF)
 
 
     # ------------------------------------------------------------------ #
@@ -1011,7 +1016,7 @@ def compute_R_S(
     tot_covar = shape_noise + corrected_cov[:, 0, 0] + corrected_cov[:, 1, 1]
     weight = 1. / tot_covar
     # Subtract additive bias, then divide by response
-    g_biased = selected['g_noshear'] - c_gamma  # (n, 2)
+    g_biased = selected['g_noshear'] #- c_gamma  # (n, 2)
     
     if PFS_response_correction & has_psf:
         if R_diagonal:
@@ -1021,6 +1026,10 @@ def compute_R_S(
         else:
             g_psf_correction = np.einsum('ij,nj->ni', R_PSF, noshear_selection['gpsf_noshear'])  # (n, 2)
         
+        # paneler = PSFLeakagePanelMaker(e1_gal = selected["g_noshear"][:,0], e2_gal=selected["g_noshear"][:,1], e1_psf=selected['gpsf_noshear'][:,0], e2_psf=selected['gpsf_noshear'][:,1], r11_psf=selected['r11_psf'], r22_psf=selected['r22_psf'], weights = weight, NBIN=10, MIN_COUNT=20)
+        # g1_biased = paneler.e1_gal
+        # g2_biased = paneler.e2_gal
+        # g_biased = np.column_stack((g1_biased, g2_biased))
         g_biased = g_biased - g_psf_correction
 
     if R_diagonal:

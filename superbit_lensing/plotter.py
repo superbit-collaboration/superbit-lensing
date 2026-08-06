@@ -17,6 +17,7 @@ from astropy.visualization import ZScaleInterval
 import matplotlib.patches as patches
 import matplotlib.ticker as mticker
 from matplotlib.patches import Circle
+from matplotlib.lines import Line2D
 
 from astropy.visualization import (MinMaxInterval, SqrtStretch, 
                                   AsinhStretch, LogStretch,
@@ -2343,6 +2344,10 @@ class PSFLeakagePanelMaker:
         *,
         e1_gal,
         e2_gal,
+        e1_psf,
+        e2_psf,
+        r11_psf,
+        r22_psf,
         weights=None,
         NBIN=10,
         MIN_COUNT=20,
@@ -2352,10 +2357,12 @@ class PSFLeakagePanelMaker:
         error_type="sem",
         color_e1="#3B4CC0",
         color_e2="#B40426",
+        correct_psf_leakage=True
     ):
         # ---- store inputs / config (no logic change) ----
         self.e1_gal = np.asarray(e1_gal)
         self.e2_gal = np.asarray(e2_gal)
+
         if weights is not None:
             self.weights = np.asarray(weights)
         else:
@@ -2367,10 +2374,57 @@ class PSFLeakagePanelMaker:
 
         self.x_center = x_center
         self.error_type = error_type
-
+        if correct_psf_leakage:
+            self.e1_gal = self.correct_psf_leakage(e1_psf, e2_psf, r11_psf, r22_psf, self.NBIN, self.MIN_COUNT, self.weights)[0]
+            self.e2_gal = self.correct_psf_leakage(e1_psf, e2_psf, r11_psf, r22_psf, self.NBIN, self.MIN_COUNT, self.weights)[1]
         self.color_e1 = color_e1
         self.color_e2 = color_e2
+        
+    def correct_psf_leakage(self, e1_psf, e2_psf, r11_psf, r22_psf, nbin, min_count, weights):
+        """
+        Correct the galaxy ellipticities for PSF leakage using the provided PSF
+        ellipticities and responsivities.
+        """
+        _, r11_binned,_,_, e1psf_edges  = self.percentile_binned_mean(
+            e1_psf,
+            r11_psf,
+            nbin=nbin,
+            min_count=min_count,
+            weights=weights,
+            calibrate=False,
+            calib=None,
+            subtract_global_mean=False,
+            x_center=self.x_center,
+            error_type=self.error_type,
+        )
+        
+        _, r22_binned, _, _, e2psf_edges = self.percentile_binned_mean(
+            e2_psf,
+            r22_psf,
+            nbin=nbin,
+            min_count=min_count,
+            weights=weights,
+            calibrate=False,
+            calib=None,
+            subtract_global_mean=False,
+            x_center=self.x_center,
+            error_type=self.error_type,
+        )
+        
+        assert len(r11_binned) == self.NBIN, (
+            f"r11_binned has {len(r11_binned)} entries, expected {self.NBIN} — "
+            "a bin was likely dropped by min_count, so edge-based indexing is unsafe."
+        )
+        assert len(r22_binned) == self.NBIN, "same issue for r22_binned"
 
+        r11_col = r11_binned[np.clip(np.digitize(e1_psf, e1psf_edges[1:-1]), 0, len(r11_binned) - 1)]
+        r22_col = r22_binned[np.clip(np.digitize(e2_psf, e2psf_edges[1:-1]), 0, len(r22_binned) - 1)]
+        
+        e1_gal_corrected = self.e1_gal - r11_col * e1_psf
+        e2_gal_corrected = self.e2_gal - r22_col * e2_psf
+        
+        return e1_gal_corrected, e2_gal_corrected
+    
     # ---------------------------------------------------------------------
     # (moved as-is) core stats helpers
     # ---------------------------------------------------------------------
@@ -2440,14 +2494,16 @@ class PSFLeakagePanelMaker:
             yvals = y[mbin]
 
             if w is None:
-                yb = np.mean(yvals)
+                # yb = np.mean(yvals)
+                yb = np.median(yvals)
                 if error_type == "sem":
                     yerr = np.std(yvals, ddof=1) / np.sqrt(n)
                 else:
                     yerr = np.std(yvals, ddof=1)
             else:
                 wvals = w[mbin]
-                yb = np.average(yvals, weights=wvals)
+                # yb = np.average(yvals, weights=wvals)
+                yb = weighted_median(yvals, weights=wvals)
                 yerr = np.sqrt(np.average((yvals - yb) ** 2, weights=wvals)) / np.sqrt(
                     n
                 )
@@ -2485,6 +2541,7 @@ class PSFLeakagePanelMaker:
         subtract_global_mean=True,
         x_center="median",
         error_type="sem",
+        zero_intercept=False,
     ):
         x_bin, y_bin, yerr_bin, _, _ = self.percentile_binned_mean(
             x,
@@ -2500,8 +2557,19 @@ class PSFLeakagePanelMaker:
         )
 
         w = 1.0 / yerr_bin**2
-        alpha, beta = np.polyfit(x_bin, y_bin, 1, w=w)  # y = beta + alpha x
-        return alpha, beta, x_bin, y_bin, yerr_bin
+
+        if zero_intercept:
+            # weighted least squares forced through origin: y = alpha * x
+            alpha = np.sum(w * x_bin * y_bin) / np.sum(w * x_bin**2)
+            alpha_sh = np.sum(w[1:-1] * x_bin[1:-1] * y_bin[1:-1]) / np.sum(w[1:-1] * x_bin[1:-1]**2)
+            beta, beta_sh = 0.0, 0.0
+        else:
+            alpha, beta = np.polyfit(x_bin, y_bin, 1, w=w)  # y = beta + alpha x
+            alpha_sh, beta_sh = np.polyfit(x_bin[1:-1], y_bin[1:-1], 1, w=w[1:-1])  # y = beta + alpha x
+            
+        return alpha_sh, beta_sh, alpha, beta, x_bin, y_bin, yerr_bin
+
+
 
     # ---------------------------------------------------------------------
     # (moved as-is) plot helpers
@@ -2569,9 +2637,11 @@ class PSFLeakagePanelMaker:
         x_log_scale=False,
         showe1e2_leg=False,
         plot_confidence=False,
-        return_data=False,         
+        return_data=False,
+        subtract_global_mean=True,
+        plot_shorter_fit=False,
     ):
-        alpha_full_1, beta_full_1, x_bin, y_bin_1, yerr_bin = self.slope_from_catalog(
+        alpha_sh, beta_sh, alpha_full_1, beta_full_1, x_bin, y_bin_1, yerr_bin = self.slope_from_catalog(
             x=x_psf,
             y=self.e1_gal,
             nbin=self.NBIN,
@@ -2579,11 +2649,11 @@ class PSFLeakagePanelMaker:
             weights=self.weights,
             calibrate=self.CALIBRATE,
             calib=calib_for_e1,
-            subtract_global_mean=True,
+            subtract_global_mean=subtract_global_mean,
             x_center=self.x_center,
             error_type=self.error_type,
         )
-        alpha_full_2, beta_full_2, _, y_bin_2, yerr_bin_2 = self.slope_from_catalog(
+        _, _, alpha_full_2, beta_full_2, _, y_bin_2, yerr_bin_2 = self.slope_from_catalog(
             x=x_psf,
             y=self.e2_gal,
             nbin=self.NBIN,
@@ -2591,7 +2661,7 @@ class PSFLeakagePanelMaker:
             weights=self.weights,
             calibrate=self.CALIBRATE,
             calib=calib_for_e2,
-            subtract_global_mean=True,
+            subtract_global_mean=subtract_global_mean,
             x_center=self.x_center,
             error_type=self.error_type,
         )
@@ -2601,12 +2671,13 @@ class PSFLeakagePanelMaker:
 
         alpha_jk_1, alpha_jk_2 = [], []
         beta_jk_1, beta_jk_2 = [], []
+        alpha_jk_sh_1, beta_jk_sh_1 = [], []
 
         for i in range(self.njac):
             mask = np.ones(N, dtype=bool)
             mask[i * jk_size : (i + 1) * jk_size] = False
 
-            a1, b1, _, _, _ = self.slope_from_catalog(
+            as1, bs1, a1, b1, _, _, _ = self.slope_from_catalog(
                 x_psf[mask],
                 self.e1_gal[mask],
                 nbin=self.NBIN,
@@ -2614,11 +2685,11 @@ class PSFLeakagePanelMaker:
                 weights=self.weights[mask],
                 calibrate=self.CALIBRATE,
                 calib=np.asarray(calib_for_e1)[mask] if calib_for_e1 is not None else None,
-                subtract_global_mean=True,
+                subtract_global_mean=subtract_global_mean,
                 x_center=self.x_center,
                 error_type=self.error_type,
             )
-            a2, b2, _, _, _ = self.slope_from_catalog(
+            _, _, a2, b2, _, _, _ = self.slope_from_catalog(
                 x_psf[mask],
                 self.e2_gal[mask],
                 nbin=self.NBIN,
@@ -2626,13 +2697,15 @@ class PSFLeakagePanelMaker:
                 weights=self.weights[mask],
                 calibrate=self.CALIBRATE,
                 calib=np.asarray(calib_for_e2)[mask] if calib_for_e2 is not None else None,
-                subtract_global_mean=True,
+                subtract_global_mean=subtract_global_mean,
                 x_center=self.x_center,
                 error_type=self.error_type,
             )
 
             alpha_jk_1.append(a1)
             alpha_jk_2.append(a2)
+            alpha_jk_sh_1.append(as1)
+            beta_jk_sh_1.append(bs1)
             beta_jk_1.append(b1)
             beta_jk_2.append(b2)
 
@@ -2641,6 +2714,8 @@ class PSFLeakagePanelMaker:
         alpha_jk_2 = np.asarray(alpha_jk_2)
         beta_jk_1 = np.asarray(beta_jk_1)
         beta_jk_2 = np.asarray(beta_jk_2)
+        alpha_jk_sh_1 = np.asarray(alpha_jk_sh_1)
+        beta_jk_sh_1 = np.asarray(beta_jk_sh_1)
 
         alpha_mean_1 = np.mean(alpha_jk_1)
         alpha_err_1 = np.sqrt(
@@ -2669,10 +2744,26 @@ class PSFLeakagePanelMaker:
             / self.njac
             * np.sum((beta_jk_2 - beta_mean_2) ** 2)
         )
+        
+        alpha_mean_sh_1 = np.mean(alpha_jk_sh_1)
+        alpha_err_sh_1 = np.sqrt(
+            (self.njac - 1)
+            / self.njac
+            * np.sum((alpha_jk_sh_1 - alpha_mean_sh_1) ** 2)
+        )
+        
+        beta_mean_sh_1 = np.mean(beta_jk_sh_1)
+        beta_err_sh_1 = np.sqrt(
+            (self.njac - 1)
+            / self.njac
+            * np.sum((beta_jk_sh_1 - beta_mean_sh_1) ** 2)
+        )
 
         xx = np.linspace(np.min(x_bin), np.max(x_bin), 200)
+        xx_sh = np.linspace(np.min(x_bin[1:-1]), np.max(x_bin[1:-1]), 200)
         yy_1 = beta_full_1 + alpha_full_1 * xx
         yy_2 = beta_full_2 + alpha_full_2 * xx
+        yy_1_sh = beta_sh + alpha_sh * xx_sh
 
         ax.errorbar(
             x_bin,
@@ -2701,7 +2792,29 @@ class PSFLeakagePanelMaker:
             ax.fill_between(xx, yy_1 - dy_1, yy_1 + dy_1,
                             color=self.color_e1, alpha=0.15, linewidth=0)
 
+        if plot_shorter_fit:
+            ax.plot(
+                xx_sh,
+                yy_1_sh,
+                linewidth=2,
+                c=self.color_e1,
+                linestyle="--",
+            )
+            dy_1_sh = np.sqrt((alpha_err_sh_1 * xx_sh)**2 + beta_err_sh_1**2)
+            if plot_confidence:
+                ax.fill_between(xx_sh, yy_1_sh - dy_1_sh, yy_1_sh + dy_1_sh,
+                                color=self.color_e1, alpha=0.15, linewidth=0)
 
+
+            text = rf"$\alpha_1^{{\prime}} = {alpha_sh:.3f}\ ({(abs(alpha_sh)/alpha_err_sh_1):.2f}\sigma)$"
+            short_handle = Line2D([0], [0], color=self.color_e1, linestyle="--", linewidth=2)
+            leg_short = ax.legend(
+                handles=[short_handle], labels=[text],
+                loc="lower right", bbox_to_anchor=(0.98, 0.03),
+                frameon=False, handlelength=1.8
+            )
+            ax.add_artist(leg_short)        # keep any pre-existing legend intact
+            
         ax.errorbar(
             x_bin,
             y_bin_2,
@@ -2775,7 +2888,7 @@ class PSFLeakagePanelMaker:
     ):
         e_gal = np.asarray(e_gal)
 
-        alpha, beta, x_bin, y_bin, yerr_bin = self.slope_from_catalog(
+        _, _, alpha, beta, x_bin, y_bin, yerr_bin = self.slope_from_catalog(
             x=x_psf, y=e_gal,
             nbin=self.NBIN, min_count=self.MIN_COUNT,
             weights=self.weights, calibrate=self.CALIBRATE, calib=calib,
@@ -3180,6 +3293,16 @@ def pub_rc(fontsize=16, **overrides):
     }
     rc.update(overrides)
     return rc
+
+def weighted_median(values, weights):
+    values = np.asarray(values)
+    weights = np.asarray(weights)
+    sorter = np.argsort(values)
+    values = values[sorter]
+    weights = weights[sorter]
+    cum_weights = np.cumsum(weights)
+    cutoff = cum_weights[-1] / 2.0
+    return values[np.searchsorted(cum_weights, cutoff)]
 
 
 
