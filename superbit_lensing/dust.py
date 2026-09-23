@@ -95,10 +95,13 @@ class DustCorrector:
     def get_Av(self, ra, dec):
         """
         Get A_V from CSFD dust map
+        Rescale the E(B-V) obtained from CSFD by 0.86 to reflect
+        the SFD correction derived in Schlafly & Finkbeiner (2011)
         """
         coords = SkyCoord(ra, dec, unit='deg')
-        ebv = self.csfd(coords)
-        return ebv * self.Rv
+        ebv_sfdscale = self.csfd(coords)
+        ebv_rescl = 0.86 * ebv_sfdscale
+        return ebv_rescl * self.Rv
 
     def get_Ax(self, band, ra, dec):
         """
