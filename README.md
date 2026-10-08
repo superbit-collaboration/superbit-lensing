@@ -20,7 +20,7 @@ Each module directory contains more detailed documentation.
 
 ## Data access
 
-The data is not yet public. It currently lives on the UofT server `hen`. Contact [Emaad Paracha](mailto:emaad.paracha@mail.utoronto.ca) to request an account. Once you have access, the pipeline is plug-and-play.
+All science images, calibration data, and several coadds from the 2023 flight are available for download at https://superbit.space/superbit-data/. As of October 2026, this data is also being prepared for ingest into the Mikulski Archive for Space Telescopes (MAST). A link to the MAST site for SuperBIT will be added to this README once that process is complete. 
 
 ## Installation
 
